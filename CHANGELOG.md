@@ -236,3 +236,9 @@
 ## 0.3.4
 
 - Align bottom of side flyouts with their parent row while respecting screen bounds.
+
+### Packaging correction (Windows Git checkout)
+
+- Moved lower-case installation scripts into `scripts/*-core.sh` to prevent
+  Windows case-insensitive filename collisions with `Install.sh` and `Uninstall.sh`.
+  No widget or application-runtime behavior changed.
