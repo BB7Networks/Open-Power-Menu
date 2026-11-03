@@ -1,0 +1,9 @@
+{
+  "note": "Example entry to add through Configure; this is not an automatically installed config",
+  "submenu": "My work tools",
+  "icon": "network-server",
+  "items": [
+    {"action": "network_locations"},
+    {"action": "remote"}
+  ]
+}

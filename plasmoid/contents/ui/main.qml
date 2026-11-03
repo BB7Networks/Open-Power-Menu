@@ -1,0 +1,904 @@
+// SPDX-License-Identifier: MIT
+// Plasma 6.7-compatible right-click Start adapter: no launcher patches.
+import QtQuick
+import QtQuick.Layouts
+import QtQml
+import QtQuick.Window
+import QtQuick.Controls as QQC2
+import org.kde.kirigami as Kirigami
+import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.components as PC3
+import org.kde.plasma.workspace.dbus as DBus
+import "LauncherVisibility.js" as LauncherVisibility
+import "adapters" as AdapterUi
+import "adapters/LauncherAdapters.js" as LauncherAdapters
+
+PlasmoidItem {
+    id: root
+    Plasmoid.icon: root.effectiveButtonIcon
+    preferredRepresentation: compactRepresentation
+    activationTogglesExpanded: false
+    Plasmoid.hasConfigurationInterface: true
+    toolTipMainText: "Open Power Menu Start Button"
+    toolTipSubText: launcherSwitchError.length ? launcherSwitchError
+                    : launcherMaskError.length ? "Original launcher remains visible: " + launcherMaskError
+                    : maskActive ? "Original launcher hidden by Plasma (experimental) · Left click opens it"
+                    : "Left click: launcher · Right click: Power User menu"
+
+    property var menuEntries: []
+    property var visibleEntries: []
+    property string menuStatus: "Loading system shortcuts..."
+    property bool fetching: false
+
+    // Both launcher visibility and the Start icon are shared editor settings.
+    // A missing/unsupported original icon falls back to the widget's saved
+    // icon, without mutating the underlying launcher's configuration.
+    property string buttonIconMode: "launcher" // "launcher" or "custom"
+    property string customButtonIcon: ""
+    property var selectedLauncherPlan: null
+    readonly property var selectedLauncherItem: selectedLauncherPlan ? selectedLauncherPlan.item : null
+    readonly property var effectiveButtonIcon: LauncherAdapters.chooseIcon(
+        selectedLauncherPlan ? selectedLauncherPlan.applet : null,
+        buttonIconMode, customButtonIcon,
+        Plasmoid.configuration.buttonIcon || "start-here-manjaro")
+
+    // Last requested menu wins. Defer launcher activation one event-loop turn
+    // so the Power User popup and its side flyouts are closed first.
+    property int menuSwitchEpoch: 0
+    property string requestedMenu: "none"
+    // A popup's expanded=false is not the same as its native dialog having
+    // finished losing focus. Wait briefly only when switching from a visible
+    // Power Menu to a Plasma launcher, or the old popup can close the new one.
+    property int pendingLauncherEpoch: -1
+
+    Timer {
+        id: launcherActivationSettle
+        interval: 140
+        repeat: false
+        onTriggered: {
+            const epoch = root.pendingLauncherEpoch;
+            root.pendingLauncherEpoch = -1;
+            if (epoch !== root.menuSwitchEpoch || root.requestedMenu !== "launcher" || root.expanded)
+                return;
+            const plan = root.selectedLauncherPlan;
+            // External Meta/shortcut activation may have won during the wait.
+            // Don't issue a second toggle and close a launcher that's open.
+            if (LauncherAdapters.originalIsOpen(root.selectedLauncherItem,
+                    plan ? plan.applet : null)) {
+                console.info("Open Power Menu: launcher already open after popup settled; avoiding second toggle");
+                return;
+            }
+            console.info("Open Power Menu: activating launcher after Power Menu popup settled");
+            root.activateSelectedLauncher(epoch);
+        }
+    }
+
+    // A switch to Power Menu isn't complete until the other menu has closed.
+    // The selected adapter may close asynchronously or animate its window.
+    // Only open Power Menu when the adapter confirms it is no longer visible.
+    property int pendingPowerEpoch: -1
+    property int launcherClosePollCount: 0
+    property bool awaitingAsyncClose: false
+    property string launcherSwitchError: ""
+
+    // A launcher-specific adapter handles AppGrid's unusual full-screen Wayland
+    // input surface. All other launchers bypass this bridge entirely.
+    AdapterUi.AppGridPanelBridge {
+        id: appGridPanelBridge
+        selectedLauncherPlan: root.selectedLauncherPlan
+        active: root.maskActive && root.hideOriginalLauncherRequested
+        panelWindow: root.Window.window
+        panelLocation: Plasmoid.location
+        compactButtonHeight: button.height
+        onLauncherOpened: root.onOriginalLauncherOpened()
+    }
+
+    function closeLauncherPopup() {
+        if (!selectedLauncherPlan) {
+            try {
+                const panel = Plasmoid.containment;
+                selectedLauncherPlan = LauncherVisibility.prepare(root,
+                    panel ? panel.applets : [], Plasmoid, Plasmoid.id,
+                    panel ? panel.id : -1, launcherAppletId);
+            } catch (e) {
+                // A standalone Power Menu works even without a launcher target.
+                console.warn("Open Power Menu: original launcher unavailable for dismissal:", String(e));
+                return {ok:true, mode:"no-target"};
+            }
+        }
+        const plan = selectedLauncherPlan;
+        const requestEpoch = root.menuSwitchEpoch;
+        LauncherAdapters.trace("launcher before right-click", plan.item, plan.applet);
+        const result = LauncherAdapters.closeOriginal(plan.item, plan.applet, () => {
+            // Only a specialized adapter can request an asynchronous close.
+            // The callback is never invoked by the generic Plasma adapter.
+            root.awaitingAsyncClose = true;
+            LauncherAdapters.requestAsyncClose(plan.applet,
+                (...args) => root.send(...args),
+                () => requestEpoch === root.menuSwitchEpoch,
+                (ok, reason) => {
+                    if (requestEpoch !== root.menuSwitchEpoch) return;
+                    root.awaitingAsyncClose = false;
+                    if (!ok) {
+                        root.launcherSwitchError = String(reason);
+                        console.warn("Open Power Menu:", root.launcherSwitchError);
+                        launcherClosePoll.stop();
+                    }
+                });
+        });
+        LauncherAdapters.traceDismissal(result, plan.item, plan.applet);
+        return result;
+    }
+
+    function finishOpeningPower(epoch) {
+        if (epoch !== menuSwitchEpoch || requestedMenu !== "power") return;
+        launcherClosePoll.stop();
+        pendingPowerEpoch = -1;
+        awaitingAsyncClose = false;
+        launcherSwitchError = "";
+        expanded = true;
+        fetchMenu();
+        launcherCloseFollowup.restart();
+    }
+
+    Timer {
+        id: launcherClosePoll
+        interval: 40
+        repeat: true
+        onTriggered: {
+            if (root.requestedMenu !== "power" || root.pendingPowerEpoch !== root.menuSwitchEpoch) {
+                stop();
+                return;
+            }
+            root.launcherClosePollCount++;
+            if (root.launcherSwitchError.length) {
+                stop();
+                return;
+            }
+            const item = root.selectedLauncherItem;
+            const plan = root.selectedLauncherPlan;
+            const stillVisible = LauncherAdapters.originalIsVisiblyOpen(item, plan ? plan.applet : null);
+            if (!root.awaitingAsyncClose && !stillVisible) {
+                root.finishOpeningPower(root.pendingPowerEpoch);
+                return;
+            }
+            // A custom launcher's close may animate. Retry once, but never
+            // blindly toggle an unknown window.
+            if (root.launcherClosePollCount === 15 && !root.awaitingAsyncClose) {
+                root.closeLauncherPopup();
+            }
+            if (root.launcherClosePollCount >= 50) {
+                stop();
+                root.pendingPowerEpoch = -1;
+                root.launcherSwitchError = "Original launcher did not close; Power Menu was not opened";
+                console.warn("Open Power Menu:", root.launcherSwitchError,
+                             LauncherAdapters.describeState(item, plan ? plan.applet : null));
+            }
+        }
+    }
+
+    // Guard against a late launch activation just after a right-click.
+    // Outside this guard, a later Meta activation takes precedence instead.
+    Timer {
+        id: launcherCloseFollowup
+        interval: 350
+        repeat: false
+        onTriggered: {
+            if (root.expanded && root.requestedMenu === "power")
+                root.closeLauncherPopup();
+        }
+    }
+    function onOriginalLauncherOpened() {
+        if (!root.expanded || !LauncherAdapters.originalIsOpen(
+                root.selectedLauncherItem,
+                root.selectedLauncherPlan ? root.selectedLauncherPlan.applet : null))
+            return;
+        if (root.requestedMenu === "power" && launcherCloseFollowup.running) {
+            root.closeLauncherPopup(); // Right-click was the latest request.
+        } else {
+            root.menuSwitchEpoch += 1;
+            root.requestedMenu = "launcher";
+            root.expanded = false; // Original launcher/Meta takes precedence.
+        }
+    }
+    Connections {
+        target: root.selectedLauncherItem
+        ignoreUnknownSignals: true
+        // Standard Plasma launchers expose their popup through expanded.
+        // Nonstandard lifecycle signals are owned by their adapters.
+        function onExpandedChanged() {
+            root.logLauncherVisibility("original launcher expanded changed");
+            root.onOriginalLauncherOpened();
+        }
+    }
+
+    // Plasma's own panel code honors the HiddenStatus of any applet.
+    // A reversible Binding is used on the chosen existing applet's *status*.
+    // No size-hint, opacity, visible, enabled or layout overrides are made.
+    // Qt restores the original value/binding when the preference is disabled.
+    property var maskedLauncher: null
+    property bool maskActive: false
+    property int launcherAppletId: 0
+    property bool hideOriginalLauncherRequested: false
+    property string launcherMaskError: ""
+    property var maskPlan: null
+
+    // Observation only. The native panel owns both visibility bindings; we do
+    // not write Item.visible or AppletContainer.visible. If KDE's launcher
+    // flashes without a status repair, this distinguishes container exposure
+    // from a visual/representation repaint without changing working behavior.
+    function logLauncherVisibility(reason) {
+        const plan = maskPlan;
+        if (!maskActive || !plan || plan.applet !== maskedLauncher) return;
+        try {
+            console.info("Open Power Menu: launcher visibility:", reason,
+                         "status=" + String(plan.applet.status),
+                         "hidden=" + String(plan.applet.status === PlasmaCore.Types.HiddenStatus),
+                         "containerVisible=" + String(plan.container ? plan.container.visible : "unavailable"),
+                         "itemVisible=" + String(plan.item ? plan.item.visible : "unavailable"),
+                         "launcherExpanded=" + String(plan.item ? plan.item.expanded : "unavailable"));
+        } catch (e) {
+            console.warn("Open Power Menu: launcher visibility inspection failed:", String(e));
+        }
+    }
+    Connections {
+        target: root.maskPlan ? root.maskPlan.container : null
+        ignoreUnknownSignals: true
+        function onVisibleChanged() {
+            if (root.maskActive && root.maskPlan && root.maskPlan.container && root.maskPlan.container.visible)
+                root.logLauncherVisibility("original panel container became visible");
+        }
+    }
+    Connections {
+        target: root.maskPlan ? root.maskPlan.item : null
+        ignoreUnknownSignals: true
+        function onVisibleChanged() {
+            if (root.maskActive && root.maskPlan && root.maskPlan.item && root.maskPlan.item.visible)
+                root.logLauncherVisibility("original applet item became visible");
+        }
+    }
+
+    // A launcher can overwrite its status during activation. A Binding alone
+    // will not necessarily win that write: refresh its revision synchronously
+    // on statusChanged, before the panel has a chance to paint a second icon.
+    // The guarded, reversible Binding still owns the actual status write.
+    property int launcherMaskRevision: 0
+    property bool launcherMaskRepairInProgress: false
+    property bool launcherMaskRepairScheduled: false
+    property int launcherMaskRepairAttempts: 0
+    property int launcherMaskIdentity: 0
+
+    function hiddenStatusForRevision(_revision) {
+        return PlasmaCore.Types.HiddenStatus;
+    }
+
+    Binding {
+        id: launcherStatusBinding
+        target: root.maskedLauncher
+        property: "status"
+        value: root.hiddenStatusForRevision(root.launcherMaskRevision)
+        when: root.maskActive && root.maskedLauncher !== null
+        restoreMode: Binding.RestoreBindingOrValue
+    }
+
+    Timer {
+        id: maskRepairBudget
+        interval: 2500
+        repeat: false
+        onTriggered: root.launcherMaskRepairAttempts = 0
+    }
+
+    // The native panel reacts to status changes itself. Never override the
+    // panel's Item.visible, the launcher's expanded state, or its layout slot.
+    // Repair immediately during statusChanged, not one event-loop turn later:
+    // Qt.callLater can leave the original button visible for a rendered frame.
+    // Guard against nested statusChanged caused by re-evaluating our Binding.
+    function repairLauncherMask() {
+        if (!maskActive || !hideOriginalLauncherRequested || !maskedLauncher ||
+                maskedLauncher.status === PlasmaCore.Types.HiddenStatus ||
+                launcherMaskRepairInProgress)
+            return;
+        const target = maskedLauncher;
+        const identity = launcherMaskIdentity;
+        // Bound retries are a safety valve for incompatible/custom launchers.
+        // Twenty transitions within 2.5 seconds indicates a binding fight,
+        // not ordinary user clicking, and restores the original launcher.
+        if (launcherMaskRepairAttempts >= 20) {
+            releaseMask();
+            launcherMaskError = "Launcher repeatedly overrides its hidden status; original button restored";
+            console.warn("Open Power Menu:", launcherMaskError);
+            return;
+        }
+        launcherMaskRepairAttempts += 1;
+        maskRepairBudget.restart();
+        launcherMaskRepairInProgress = true;
+        try {
+            launcherMaskRevision += 1;
+        } finally {
+            launcherMaskRepairInProgress = false;
+        }
+        // Report repairs so live logs can distinguish status flicker from a
+        // popup or panel drawing issue without enabling verbose logging.
+        if (target.status === PlasmaCore.Types.HiddenStatus)
+            console.info("Open Power Menu: immediate launcher hide repair", String(target.pluginName || "unknown"));
+        // Usually the Binding has already restored HiddenStatus by this point.
+        // On runtimes deferring evaluation, try again later without reentrancy.
+        if (target.status !== PlasmaCore.Types.HiddenStatus && !launcherMaskRepairScheduled) {
+            launcherMaskRepairScheduled = true;
+            Qt.callLater(() => {
+                root.launcherMaskRepairScheduled = false;
+                if (root.maskActive && root.hideOriginalLauncherRequested &&
+                        root.launcherMaskIdentity === identity && root.maskedLauncher === target)
+                    root.repairLauncherMask();
+            });
+        }
+    }
+
+    Connections {
+        target: root.maskedLauncher
+        ignoreUnknownSignals: true
+        function onStatusChanged() {
+            root.logLauncherVisibility("original launcher status changed");
+            root.repairLauncherMask();
+        }
+    }
+
+    function releaseMask() {
+        // Keeping the target until after Binding.when turns false ensures
+        // original bindings are restored, not replaced with raw JS writes.
+        appGridPanelBridge.reset();
+        maskActive = false;
+        launcherMaskIdentity += 1;
+        launcherMaskRepairInProgress = false;
+        launcherMaskRepairScheduled = false;
+        launcherMaskRepairAttempts = 0;
+        maskRepairBudget.stop();
+        maskVerification.stop();
+        // Never write a status or toggle expanded/visible directly.
+    }
+
+    Timer {
+        id: maskVerification
+        interval: 350
+        repeat: false
+        onTriggered: {
+            if (!root.maskActive) return;
+            if (LauncherVisibility.didHide(root.maskPlan, PlasmaCore.Types.HiddenStatus)) {
+                root.launcherMaskError = "";
+            } else {
+                root.releaseMask();
+                const reason = "Plasma did not hide the launcher container; restored previous status";
+                root.launcherMaskError = reason;
+                console.warn("Open Power Menu: " + reason);
+            }
+        }
+    }
+
+    function fetchIntegration() {
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+             "GetIntegration", [], (ok, value) => {
+                 if (!ok) return; // A temporary D-Bus outage should not change panel state.
+                 try {
+                     const cfg = JSON.parse(String(value));
+                     const desired = cfg.hide_original_launcher === true;
+                     const selected = Number(cfg.launcher_applet_id || 0);
+                     if (!Number.isInteger(selected) || selected < 0) return;
+                     if (launcherAppletId !== selected) {
+                         releaseMask();
+                         launcherAppletId = selected;
+                     }
+                     hideOriginalLauncherRequested = desired;
+                     buttonIconMode = cfg.button_icon_mode === "custom" ? "custom" : "launcher";
+                     customButtonIcon = String(cfg.button_icon || "");
+                     synchronizeLauncherVisibility();
+                 } catch (e) {
+                     console.warn("Open Power Menu: invalid integration configuration", e);
+                 }
+             });
+    }
+
+    function synchronizeLauncherVisibility() {
+        // Keep a reference to the selected panel launcher even when hiding is
+        // disabled: its icon and expanded state are needed for the button.
+        if (!hideOriginalLauncherRequested) {
+            releaseMask();
+            launcherMaskError = "";
+        }
+        // The editor's five-second preference poll must not repeatedly find
+        // the panel wrapper while a native popup is being created/destroyed.
+        // The cached target is valid when Plasma still reports that *exact*
+        // selected applet in the same containment. This also rechecks that
+        // automatic selection remains unique when no ID was configured.
+        if (hideOriginalLauncherRequested && maskActive && maskedLauncher &&
+                selectedLauncherPlan && selectedLauncherPlan.applet === maskedLauncher) {
+            try {
+                const panel = Plasmoid.containment;
+                const current = LauncherVisibility.findOriginal(
+                    panel ? panel.applets : [], Plasmoid.id, launcherAppletId);
+                if (current === maskedLauncher) {
+                    repairLauncherMask();
+                    return;
+                }
+            } catch (e) {
+                // Applet selection changed or was removed; let normal fallback
+                // verify and safely release a stale target.
+            }
+        }
+        try {
+            const panel = Plasmoid.containment;
+            const planned = LauncherVisibility.prepare(root, panel ? panel.applets : [],
+                           Plasmoid, Plasmoid.id, panel ? panel.id : -1, launcherAppletId);
+            selectedLauncherPlan = planned;
+            if (!hideOriginalLauncherRequested) return;
+
+            if (maskActive) {
+                if (maskedLauncher === planned.applet) {
+                    // Refresh the item/container references without toggling
+                    // the status Binding. A normal popup transition must not
+                    // briefly restore the original panel icon.
+                    maskPlan = planned;
+                    repairLauncherMask();
+                    return;
+                }
+                releaseMask();
+            }
+            // Qt must restore the old target's original status/binding before
+            // we assign the Binding to a different selected widget.
+            if (maskedLauncher && maskedLauncher !== planned.applet) {
+                maskedLauncher = null;
+                maskPlan = null;
+                Qt.callLater(() => root.synchronizeLauncherVisibility());
+                return;
+            }
+            maskPlan = planned;
+            maskedLauncher = planned.applet;
+            maskActive = true;
+            launcherMaskError = "";
+            maskVerification.restart();
+        } catch (e) {
+            selectedLauncherPlan = null;
+            if (!hideOriginalLauncherRequested) return;
+            releaseMask();
+            const message = String(e);
+            if (message !== launcherMaskError)
+                console.warn("Open Power Menu: launcher remains visible (safe fallback):", message);
+            launcherMaskError = message;
+        }
+    }
+
+    // The editor is a separate Qt process. Poll its shared preference rather
+    // than caching a state that could leave a launcher inaccessible. Clicking
+    // Refresh or opening the menu also re-reads it without any delay.
+    Timer {
+        interval: 5000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: root.fetchIntegration()
+    }
+    Component.onDestruction: {
+        releaseMask();
+    }
+
+    function send(serviceName, path, iface, methodName, args, onDone) {
+        const reply = DBus.SessionBus.asyncCall({
+            service: serviceName, path: path, iface: iface, member: methodName, arguments: args
+        });
+        reply.finished.connect(() => {
+            const bad = reply.isError;
+            const value = reply.value;
+            if (onDone) onDone(!bad, value);
+            reply.destroy();
+        });
+    }
+
+    // Make left/right actions target the *same* launcher. Plasma's global
+    // activateLauncherMenu chooses the first matching launcher after sorting
+    // all panels/outputs. That can be a different instance from the widget
+    // deliberately selected in Configure (and therefore from the instance
+    // right-click tries to close). Emitting activated() is the same action the
+    // Plasma shell uses, but on our exact selected applet.
+    function activateSelectedLauncher(epoch) {
+        if (epoch !== root.menuSwitchEpoch || root.requestedMenu !== "launcher")
+            return;
+        let plan = root.selectedLauncherPlan;
+        if (!plan || !plan.applet || (root.launcherAppletId > 0 &&
+                Number(plan.applet.id) !== root.launcherAppletId)) {
+            try {
+                const panel = Plasmoid.containment;
+                plan = LauncherVisibility.prepare(root, panel ? panel.applets : [],
+                            Plasmoid, Plasmoid.id, panel ? panel.id : -1,
+                            root.launcherAppletId);
+                root.selectedLauncherPlan = plan;
+            } catch (e) {
+                plan = null;
+                console.warn("Open Power Menu: cannot resolve selected launcher for activation:", String(e));
+            }
+        }
+        if (plan && plan.applet && typeof plan.applet.activated === "function") {
+            try {
+                LauncherAdapters.trace("launcher before left-click", plan.item, plan.applet);
+                LauncherAdapters.activate(plan.applet);
+                console.info("Open Power Menu: activated selected launcher widget",
+                             Number(plan.applet.id), String(plan.applet.pluginName || ""));
+                LauncherAdapters.trace("launcher after left-click", plan.item, plan.applet);
+                return;
+            } catch (e) {
+                console.warn("Open Power Menu: selected launcher activation failed:", String(e));
+            }
+        }
+        // Never accidentally activate some OTHER launcher when Configure
+        // explicitly names a widget which is missing/not activatable.
+        if (root.launcherAppletId > 0) {
+            root.launcherSwitchError = "Selected launcher cannot be activated; check widget ID in Configure";
+            return;
+        }
+        // Portable fallback for unconfigured users: preserve Plasma's normal
+        // launcher activation semantics until a specific launcher is chosen.
+        root.send("org.kde.plasmashell", "/PlasmaShell", "org.kde.PlasmaShell",
+                  "activateLauncherMenu", [], (ok, value) => {
+                      if (!ok) console.warn("Open Power Menu: Plasma launcher activation failed");
+                  });
+    }
+
+    function activateLauncher() {
+        // Opening a second native popup while our first popup is still losing
+        // focus can trigger KDE's hide-on-deactivate on the new launcher.
+        // Normal left-click stays immediate; only a visible Power Menu incurs
+        // a short settling interval before we emit the selected applet signal.
+        const wasPowerPopupOpen = expanded === true;
+        const epoch = ++menuSwitchEpoch;
+        requestedMenu = "launcher";
+        launcherClosePoll.stop();
+        pendingPowerEpoch = -1;
+        awaitingAsyncClose = false;
+        launcherSwitchError = "";
+        launcherCloseFollowup.stop();
+        expanded = false; // Also closes any visible side flyout.
+        if (wasPowerPopupOpen) {
+            pendingLauncherEpoch = epoch;
+            launcherActivationSettle.restart();
+        } else {
+            Qt.callLater(() => root.activateSelectedLauncher(epoch));
+        }
+    }
+    function fetchMenu() {
+        fetching = true;
+        menuStatus = "Loading system shortcuts...";
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+             "GetMenu", [], (ok, value) => {
+                 fetching = false;
+                 if (!ok) {
+                     menuStatus = "Menu backend unavailable. Run install.sh and check PySide6.";
+                     menuEntries = [];
+                 } else {
+                     try {
+                         menuEntries = JSON.parse(String(value));
+                         menuStatus = menuEntries.length ? "" : "No available commands";
+                     } catch (e) {
+                         menuStatus = "Could not read menu configuration";
+                         menuEntries = [];
+                     }
+                 }
+                 rebuild();
+             });
+    }
+    // The main menu always has only top-level rows. Submenus are real side
+    // popups, not extra rows inserted below the selected parent.
+    function rebuild() {
+        visibleEntries = menuEntries;
+    }
+    function openMenu() {
+        fetchIntegration();
+        const alreadyOpen = expanded || (launcherClosePoll.running && requestedMenu === "power");
+        const epoch = ++menuSwitchEpoch; // Cancel an unsent left-click activation.
+        launcherActivationSettle.stop(); // Cancel pending Power -> Launcher switch.
+        pendingLauncherEpoch = -1;
+        requestedMenu = alreadyOpen ? "none" : "power";
+        launcherClosePoll.stop();
+        launcherCloseFollowup.stop();
+        pendingPowerEpoch = -1;
+        awaitingAsyncClose = false;
+        launcherSwitchError = "";
+        if (alreadyOpen) {
+            expanded = false;
+            return;
+        }
+        const result = closeLauncherPopup();
+        if (!result.ok) {
+            launcherSwitchError = "Cannot dismiss original launcher (" + result.mode + ")";
+            console.warn("Open Power Menu:", launcherSwitchError);
+            return;
+        }
+        pendingPowerEpoch = epoch;
+        launcherClosePollCount = 0;
+        // Wait for adapter close/acknowledgment before opening Power Menu.
+        launcherClosePoll.start();
+    }
+    function openEditor() {
+        // Close the panel popup so the separate Qt editor is visible.
+        expanded = false;
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+             "Edit", [], (ok, value) => {
+                 if (!ok || value === false) {
+                     menuStatus = "Could not start menu editor. Run open-power-menu --edit in Konsole.";
+                     console.warn("Open Power Menu: editor unavailable; service may need restarting");
+                 }
+             });
+    }
+
+    function launchItem(key) {
+        expanded = false;
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+             "Run", [key], (ok, value) => {
+                 if (!ok || value === false) console.warn("Open Power Menu could not start item", key);
+             });
+    }
+
+    compactRepresentation: Item {
+        id: button
+        Layout.minimumWidth: height
+        Layout.minimumHeight: Kirigami.Units.iconSizes.small
+        Layout.preferredWidth: Math.max(height, Kirigami.Units.iconSizes.medium)
+        activeFocusOnTab: true
+        Accessible.name: "Start menu and Power User menu"
+        Accessible.role: Accessible.Button
+
+        Kirigami.Icon {
+            anchors.centerIn: parent
+            width: Math.min(parent.width, parent.height)
+            height: width
+            source: Plasmoid.icon
+            active: hit.containsMouse
+        }
+        MouseArea {
+            id: hit
+            anchors.fill: parent
+            hoverEnabled: true
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            onPressed: mouse => {
+                if (mouse.button === Qt.RightButton) {
+                    console.info("Open Power Menu: right-click received by Start button");
+                    root.openMenu();
+                    mouse.accepted = true;
+                }
+            }
+            onClicked: mouse => {
+                if (mouse.button === Qt.LeftButton) {
+                    if (Plasmoid.configuration.leftAction === "power") root.openMenu();
+                    else root.activateLauncher();
+                }
+            }
+        }
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+                root.openMenu();
+                event.accepted = true;
+            } else if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return || event.key === Qt.Key_Space) {
+                if (Plasmoid.configuration.leftAction === "power") root.openMenu();
+                else root.activateLauncher();
+                event.accepted = true;
+            }
+        }
+    }
+
+    fullRepresentation: Item {
+        id: popup
+
+        // Flyouts derive their anchor from the hovered ROW, with a separate
+        // one-pixel proxy for bottom-edge vertical alignment. Screen geometry
+        // is read from the visible row before the flyout becomes visible.
+        property string activeFlyoutKey: ""
+
+        function showFlyout(entry, sourceRow) {
+            if (entry.kind !== "submenu") return;
+            if (flyout.visible && activeFlyoutKey === entry.key
+                    && flyout.visualParent === flyoutAnchor) return;
+            flyout.visible = false;
+            flyout.entries = entry.items || [];
+            flyout.screenRect = sourceRow.menuScreen;
+            // Plasma side popups center vertically on visualParent. A slim
+            // proxy lets the flyout's BOTTOM meet the parent row's bottom.
+            flyout.positionAtRow(sourceRow, flyoutAnchor, sourceRow.menuScreen);
+            flyout.visualParent = flyoutAnchor;
+            flyout.popupDirection = flyout.chooseSide(flyoutAnchor);
+            activeFlyoutKey = entry.key;
+            flyout.visible = true;
+        }
+
+        // Invisible position-only anchor. Keep it outside the ScrollView
+        // so the parent row's clipping cannot affect the popup geometry.
+        Item {
+            id: flyoutAnchor
+            width: 1
+            height: 1
+        }
+
+        SideFlyout {
+            id: flyout
+            onTriggered: key => {
+                flyout.visible = false;
+                root.launchItem(key);
+            }
+            onVisibleChanged: {
+                if (!visible) popup.activeFlyoutKey = "";
+            }
+        }
+        Connections {
+            target: root
+            function onExpandedChanged() {
+                if (!root.expanded) flyout.visible = false;
+            }
+        }
+
+        // Fit the popup to the rows actually displayed. The old fixed 590px
+        // preferred height left an empty area below the list when fewer
+        // commands were available; moving footer buttons did not fix that.
+        // Only scroll when the list is taller than the available screen area.
+        readonly property real naturalHeight: {
+            // Header margins are 5px each; keep a small inset allowance
+            // so the final row is never obscured by theme/rounding effects.
+            return menuHeader.implicitHeight + 10
+                + Math.max(1, menuDivider.implicitHeight)
+                + menuColumn.implicitHeight
+                + (menuStatusLabel.visible ? menuStatusLabel.implicitHeight : 0)
+                + 4;
+        }
+        readonly property real heightCap: Math.min(590,
+            Screen.desktopAvailableHeight > 140
+                ? Screen.desktopAvailableHeight - 48 : 590)
+
+        Layout.preferredWidth: 328
+        Layout.preferredHeight: Math.max(76, Math.min(heightCap, naturalHeight))
+        Layout.minimumWidth: 285
+        Layout.minimumHeight: 76
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 0
+            RowLayout {
+                id: menuHeader
+                Layout.fillWidth: true
+                Layout.leftMargin: 12
+                Layout.rightMargin: 7
+                Layout.topMargin: 5
+                Layout.bottomMargin: 5
+                spacing: 3
+                PC3.Label {
+                    Layout.fillWidth: true
+                    font.bold: true
+                    text: "Power User Menu"
+                }
+                PC3.ToolButton {
+                    id: refreshButton
+                    icon.name: "view-refresh"
+                    text: "Refresh menu"
+                    display: QQC2.AbstractButton.IconOnly
+                    Layout.preferredWidth: 29
+                    Layout.preferredHeight: 29
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: "Refresh menu entries"
+                    onClicked: { root.fetchMenu(); root.fetchIntegration(); }
+                }
+                PC3.ToolButton {
+                    id: configureButton
+                    icon.name: "configure"
+                    text: "Configure menu"
+                    display: QQC2.AbstractButton.IconOnly
+                    Layout.preferredWidth: 29
+                    Layout.preferredHeight: 29
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: "Add, remove and reorder menu entries"
+                    onClicked: root.openEditor()
+                }
+            }
+            Kirigami.Separator {
+                id: menuDivider
+                Layout.fillWidth: true
+            }
+            QQC2.ScrollView {
+                id: menuScroll
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+                contentHeight: menuColumn.implicitHeight
+                Column {
+                    id: menuColumn
+                    width: menuScroll.availableWidth
+                    spacing: 0
+                    Repeater {
+                        model: root.visibleEntries
+                        delegate: Item {
+                            id: menuRow
+                            required property var modelData
+                            property var entry: modelData
+                            // Screen attached to a visible row in the main Plasma popup.
+                            // virtualX/Y also cover non-primary monitors.
+                            readonly property rect menuScreen: Qt.rect(
+                                Screen.virtualX, Screen.virtualY,
+                                Screen.width, Screen.height)
+                            width: menuColumn.width
+                            height: entry.kind === "separator" ? 13 : 34
+                            Kirigami.Separator {
+                                anchors.centerIn: parent
+                                width: parent.width - 24
+                                visible: menuRow.entry.kind === "separator"
+                            }
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.leftMargin: 4
+                                anchors.rightMargin: 4
+                                radius: 3
+                                visible: menuRow.entry.kind !== "separator" && (rowMouse.containsMouse || rowMouse.pressed)
+                                color: Kirigami.Theme.highlightColor
+                                opacity: 0.30
+                            }
+                            RowLayout {
+                                visible: menuRow.entry.kind !== "separator"
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 9
+                                Kirigami.Icon {
+                                    source: menuRow.entry.icon || "application-x-executable"
+                                    Layout.preferredHeight: 18
+                                    Layout.preferredWidth: 18
+                                    visible: menuRow.entry.kind !== "separator"
+                                    opacity: menuRow.entry.enabled === false ? 0.4 : 1
+                                }
+                                PC3.Label {
+                                    Layout.fillWidth: true
+                                    text: menuRow.entry.title || ""
+                                    elide: Text.ElideRight
+                                    opacity: menuRow.entry.enabled === false ? 0.5 : 1
+                                }
+                                Kirigami.Icon {
+                                    Layout.preferredWidth: 14
+                                    Layout.preferredHeight: 14
+                                    source: "go-next-symbolic"
+                                    visible: menuRow.entry.kind === "submenu"
+                                }
+                            }
+                            MouseArea {
+                                id: rowMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                enabled: menuRow.entry.kind !== "separator" && menuRow.entry.enabled !== false
+                                // Prefer right-hand flyouts regardless of
+                                // panel edge. Plasma flips left if necessary.
+                                onEntered: {
+                                    if (menuRow.entry.kind === "submenu") {
+                                        popup.showFlyout(menuRow.entry, menuRow);
+                                    } else {
+                                        flyout.visible = false;
+                                    }
+                                }
+                                onClicked: {
+                                    if (menuRow.entry.kind === "submenu") {
+                                        popup.showFlyout(menuRow.entry, menuRow);
+                                    } else {
+                                        flyout.visible = false;
+                                        root.launchItem(menuRow.entry.key);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            PC3.Label {
+                id: menuStatusLabel
+                visible: root.menuStatus.length > 0
+                Layout.fillWidth: true
+                Layout.leftMargin: 12
+                Layout.rightMargin: 12
+                text: root.menuStatus
+                wrapMode: Text.WordWrap
+                opacity: 0.75
+            }
+        }
+        Keys.onEscapePressed: root.expanded = false
+    }
+}

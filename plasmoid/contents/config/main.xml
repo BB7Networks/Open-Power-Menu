@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE kcfg SYSTEM "http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+<kcfg>
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="buttonIcon" type="String">
+      <label>Icon name or absolute PNG/SVG path</label>
+      <default>start-here-manjaro</default>
+    </entry>
+    <entry name="leftAction" type="String">
+      <label>Action on left click</label>
+      <default>launcher</default>
+    </entry>
+  </group>
+</kcfg>

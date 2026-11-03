@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "appearance": "aero",
+  "anchor": "cursor",
+  "show_unavailable": false,
+  "menu": [
+    {"action": "applications"},
+    {"action": "power"},
+    {"action": "network"},
+    {"action": "disks"},
+    {"separator": true},
+    {"action": "terminal"},
+    {"action": "monitor"},
+    {"action": "files"},
+    {"action": "settings"},
+    {"separator": true},
+    {"submenu": "My Work Tools", "icon": "network-server", "items": [
+      {"action": "remote"},
+      {"label": "Kate", "icon": "accessories-text-editor", "command": ["kate"]}
+    ]},
+    {"submenu": "Shut down or sign out", "icon": "system-shutdown", "items": [
+      {"action": "lock"}, {"action": "logout"}, {"action": "reboot"}, {"action": "shutdown"}
+    ]}
+  ]
+}

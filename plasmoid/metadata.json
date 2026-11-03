@@ -1,0 +1,13 @@
+{
+  "KPlugin": {
+    "Id": "org.openpowermenu.start",
+    "Name": "Open Power Menu Start Button",
+    "Description": "Left-click your Plasma launcher; right-click a standalone Power User menu",
+    "Icon": "start-here-kde",
+    "Category": "Application Launchers",
+    "Version": "0.4.17",
+    "License": "MIT"
+  },
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "KPackageStructure": "Plasma/Applet"
+}
