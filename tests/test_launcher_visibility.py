@@ -119,7 +119,7 @@ plugin=org.kde.plasma.kickoff
             self.assertNotIn(forbidden, js + qml)
         for forbidden in ('visible = false', 'enabled = false', 'opacity = 0;', 'destroy('):
             self.assertNotIn(forbidden, js)
-        self.assertNotIn('panel-snapshot.sh', (ROOT/'install.sh').read_text())
+        self.assertNotIn('panel-snapshot.sh', (ROOT/'scripts/install-core.sh').read_text())
 
     def test_native_widget_settings_page_accepts_loader_properties(self):
         qml = (ROOT/'plasmoid/contents/ui/configGeneral.qml').read_text()
