@@ -153,8 +153,7 @@ class EditorDiscoverabilityTests(unittest.TestCase):
             "plasmoid/contents/ui/adapters/AppGridLauncher.js",
             "plasmoid/contents/ui/adapters/AppGridPanelBridge.qml",
             "plasmoid/contents/ui/adapters/LauncherAdapters.js",
-            "openpowermenu/core.py",
-        ):
+                    ):
             self.assertEqual((ROOT / rel).read_bytes(), (previous / rel).read_bytes(), rel)
 
 
