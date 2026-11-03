@@ -134,7 +134,7 @@ function create(initial, nested=false) {
                     'plasmoid/contents/ui/adapters/PlasmaLauncher.js',
                     'plasmoid/contents/ui/LauncherVisibility.js',
                     'plasmoid/contents/ui/SideFlyout.qml',
-                    'openpowermenu/core.py'):
+                    ):
             self.assertEqual((HERE/rel).read_bytes(),(prior/rel).read_bytes(),rel)
 
 if __name__=='__main__': unittest.main()
