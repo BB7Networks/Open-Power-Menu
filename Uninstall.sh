@@ -3,7 +3,7 @@
 set -euo pipefail
 here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 [[ $EUID -ne 0 ]] || { printf 'Do not run this as root.\n' >&2; exit 1; }
-[[ -f "$here/uninstall.sh" ]] || { printf 'Uninstall files missing; extract the whole ZIP.\n' >&2; exit 1; }
+[[ -f "$here/scripts/uninstall-core.sh" ]] || { printf 'Uninstall files missing; extract the whole ZIP.\n' >&2; exit 1; }
 bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"
 if [[ -x "$bin_home/open-power-menu" ]]; then
     "$bin_home/open-power-menu" --show-launcher-button || true
@@ -16,5 +16,5 @@ if [[ ! "$reply" =~ ^[yY]([eE][sS])?$ ]]; then
     printf 'Cancelled. Your original launcher button has been restored if possible.\n'
     exit 0
 fi
-bash "$here/uninstall.sh"
+bash "$here/scripts/uninstall-core.sh"
 printf '\nYour personal menu settings were not removed.\n'
