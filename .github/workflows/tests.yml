@@ -17,4 +17,4 @@ jobs:
           node-version: '22'
       - run: python -m pip install pytest
       - run: python -m pytest -q
-      - run: bash -n Install.sh Uninstall.sh install.sh uninstall.sh scripts/build-release.sh scripts/build-widget-only.sh
+      - run: bash -n Install.sh Uninstall.sh scripts/install-core.sh scripts/uninstall-core.sh scripts/build-release.sh scripts/build-widget-only.sh
