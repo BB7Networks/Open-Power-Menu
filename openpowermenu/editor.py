@@ -26,7 +26,7 @@ def launch_editor() -> int:
         from PySide6.QtWidgets import (
             QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
             QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
-            QMessageBox, QPushButton, QScrollArea, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton,
+            QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton,
             QListWidget, QListWidgetItem, QPlainTextEdit, QVBoxLayout, QWidget
         )
     except ImportError:
@@ -454,6 +454,25 @@ def launch_editor() -> int:
                 cfg.get("appearance", "native"))))
             style_form.addRow("Menu style:", self.appearance)
             general_layout.addWidget(style_group)
+
+            backups_group = QGroupBox("Configuration backups", general)
+            backups_form = QFormLayout(backups_group)
+            self.backup_retention = QSpinBox(backups_group)
+            self.backup_retention.setObjectName("backupRetentionSpin")
+            self.backup_retention.setRange(0, 1000)
+            self.backup_retention.setValue(cfg.get("backup_retention", DEFAULT_CONFIG["backup_retention"]))
+            self.backup_retention.setSpecialValueText("Off (no new backups)")
+            self.backup_retention.setToolTip(
+                "Number of previous menu.json versions to keep. Default: 10. "
+                "Setting 0 stops creating automatic backups without deleting existing ones.")
+            backups_form.addRow("Previous versions to keep:", self.backup_retention)
+            backups_help = QLabel(
+                "Every save keeps the previous configuration for recovery. "
+                "After a successful save, older automatic backups beyond this limit are removed. "
+                "Manual backups are left alone.", backups_group)
+            backups_help.setWordWrap(True)
+            backups_form.addRow(backups_help)
+            general_layout.addWidget(backups_group)
             general_layout.addStretch(1)
             general_scroll = QScrollArea(tabs)
             general_scroll.setWidgetResizable(True)
@@ -654,6 +673,7 @@ def launch_editor() -> int:
             self.cfg["launcher_applet_id"] = int(self.launcher_target.currentData())
             self.cfg["button_icon_mode"] = self.icon_mode.currentData()
             self.cfg["button_icon"] = self.button_icon.text().strip()
+            self.cfg["backup_retention"] = self.backup_retention.value()
             try:
                 saved = save_config(self.cfg)
             except (ValueError, OSError) as exc:
