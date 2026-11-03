@@ -1,5 +1,12 @@
 # Open Power Menu changelog
 
+## Unreleased - configurable configuration backup retention
+
+- Keep the latest 10 timestamped configuration backups by default.
+- Add Configure -> General -> Configuration backups with a 0-1000 limit.
+- Keep manual backups and preserve existing history when backups are disabled.
+- Only prune automatic backups after an atomic save succeeds.
+
 ## 0.4.17 - menu editor onboarding
 
 - Add a searchable installed-application chooser, reading standard XDG desktop
