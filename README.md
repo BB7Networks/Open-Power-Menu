@@ -42,6 +42,9 @@ or your panel configuration.
 
 For updates, run the new `Install.sh` again. Menu settings are preserved.
 
+The setup wrappers use `scripts/install-core.sh` and `scripts/uninstall-core.sh`,
+so source archives work correctly on Windows as well as Linux.
+
 **The current installation requires both the QML widget and a Python/PySide6
 backend.** Installing only `plasmoid/` through KDE Store / Get New Widgets
 *does not* install that backend. KDE Store one-click support is a planned
