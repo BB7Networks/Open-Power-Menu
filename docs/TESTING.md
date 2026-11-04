@@ -24,6 +24,10 @@ tar -tzf dist/OpenPowerMenu-EZ-v0.4.17.tar.gz
 Optional Qt runtime checks require PySide6 QtCore/QtDBus/QtWidgets/QtTest and
 `dbus-run-session` (normally supplied by the distro's D-Bus packages):
 
+On a minimal Debian/Ubuntu image, the Qt wheel also needs the system `libegl1`
+package even with the offscreen platform. CI installs it and checks Qt imports
+before running tests, so a missing runtime cannot silently skip this job.
+
 ```bash
 python -m pip install PySide6-Essentials==6.10.2
 QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_qt_runtime.py
