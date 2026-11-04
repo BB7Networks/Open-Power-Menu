@@ -7,7 +7,21 @@ function references(entries) {
 }
 function start(response) {
     return {token: response.token, entries: response.entries,
-        original: JSON.stringify(references(response.entries)), parentId: "", selectedId: ""};
+        original: JSON.stringify(references(response.entries)), parentId: "", selectedId: "", views: {}};
+}
+// UI-only memory belongs to the applet's draft, never to the saved references.
+function rememberView(draft, parentId, view) {
+    if (!draft.views) draft.views = {};
+    draft.views[parentId || ""] = view;
+}
+function view(draft, parentId) {
+    return draft && draft.views ? draft.views[parentId || ""] : null;
+}
+function selection(draft, parentId, fallback) {
+    const saved = view(draft, parentId);
+    const items = children(draft.entries, parentId) || [];
+    return saved && items.some(entry => entry.id === saved.selectedId) ? saved.selectedId
+        : items.some(entry => entry.id === fallback) ? fallback : items.length ? items[0].id : "";
 }
 function dirty(draft) {
     return !!draft && JSON.stringify(references(draft.entries)) !== draft.original;

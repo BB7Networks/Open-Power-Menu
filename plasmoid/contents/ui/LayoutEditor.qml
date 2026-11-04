@@ -17,6 +17,12 @@ QQC2.Control {
     property bool dragCanceled: false
     property string dropRow: ""
     property bool dropBelow: false
+    property bool viewReady: false
+    property bool restoringView: false
+    property bool revealSelection: false
+    property string displayedParent: ""
+    property string displayedToken: ""
+    property int viewEpoch: 0
     signal edited(var value)
     signal failed(string message)
     signal saveRequested()
@@ -27,12 +33,89 @@ QQC2.Control {
     focusPolicy: Qt.StrongFocus
     Accessible.name: "Power User Menu layout editing. Commands are inactive."
 
+    ListModel { id: rowModel }
+    function rowIndex(id) {
+        for (let index = 0; index < rowModel.count; index++)
+            if (rowModel.get(index).itemId === id) return index;
+        return -1;
+    }
+    function rememberView() {
+        if (!viewReady || restoringView || !draft || displayedToken !== draft.token
+                || displayedParent !== draft.parentId) return;
+        const index = list.indexAt(1, list.contentY + 1);
+        const item = index >= 0 ? list.itemAtIndex(index) : null;
+        Draft.rememberView(draft, displayedParent, {
+            anchorId: item ? rowModel.get(index).itemId : "",
+            offset: item ? item.y - list.contentY : 0,
+            position: list.contentY - list.originY, selectedId: draft.selectedId
+        });
+    }
+    function restoreView(reveal) {
+        if (!draft) return;
+        list.forceLayout();
+        const saved = Draft.view(draft, draft.parentId);
+        const anchor = saved ? rowIndex(saved.anchorId) : -1;
+        let position = list.originY + (saved ? saved.position : 0);
+        if (anchor >= 0) {
+            list.positionViewAtIndex(anchor, ListView.Beginning);
+            list.forceLayout();
+            const item = list.itemAtIndex(anchor);
+            if (item) position = item.y - saved.offset;
+        }
+        list.contentY = Math.max(list.originY, Math.min(position,
+            list.originY + Math.max(0, list.contentHeight - list.height)));
+        if (reveal && selectedIndex >= 0) list.positionViewAtIndex(selectedIndex, ListView.Contain);
+    }
+    function syncView() {
+        if (!viewReady) return;
+        if (!draft) {
+            rowModel.clear(); displayedToken = ""; cancelDrag(); return;
+        }
+        const entries = Draft.children(draft.entries, draft.parentId) || [];
+        const changedLevel = displayedToken !== draft.token || displayedParent !== draft.parentId;
+        const changedRows = rowModel.count !== entries.length || entries.some((entry, index) =>
+            index >= rowModel.count || rowModel.get(index).itemId !== entry.id);
+        if (!changedLevel && !changedRows) { revealSelection = false; rememberView(); return; }
+        restoringView = true;
+        displayedToken = draft.token;
+        displayedParent = draft.parentId;
+        if (changedLevel) rowModel.clear();
+        // Stable ListModel rows avoid resetting the view/delegates on each move.
+        for (let index = 0; index < entries.length; index++) {
+            const entry = entries[index];
+            const existing = rowIndex(entry.id);
+            if (existing < 0) rowModel.insert(index, {itemId: entry.id, itemTitle: entry.title, itemKind: entry.kind});
+            else if (existing !== index) rowModel.move(existing, index, 1);
+        }
+        if (rowModel.count > entries.length) rowModel.remove(entries.length, rowModel.count - entries.length);
+        const reveal = revealSelection;
+        revealSelection = false;
+        const epoch = ++viewEpoch;
+        Qt.callLater(() => {
+            if (epoch !== viewEpoch || !draft) return;
+            restoreView(reveal);
+            restoringView = false;
+            rememberView();
+        });
+    }
+    function navigate(parentId, selectedId) {
+        rememberView();
+        edited(Draft.select(draft, parentId, Draft.selection(draft, parentId, selectedId)));
+        if (visible) forceActiveFocus();
+    }
+
     function choose(id) {
         edited(Draft.select(draft, draft.parentId, id));
     }
     function move(id, parentId, beforeId) {
         if (busy || expired) return;
-        try { edited(Draft.move(draft, id, parentId, beforeId)); }
+        try {
+            const next = Draft.move(draft, id, parentId, beforeId);
+            rememberView();
+            revealSelection = true;
+            edited(next);
+            if (visible) forceActiveFocus();
+        }
         catch (e) { failed(String(e.message)); }
     }
     function reorder(direction) {
@@ -49,12 +132,12 @@ QQC2.Control {
     }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
-        if (children) edited(Draft.select(draft, id, children.length ? children[0].id : ""));
+        if (children) navigate(id, children.length ? children[0].id : "");
     }
     function back() {
         if (!draft || !draft.parentId) return;
         const parent = Draft.find(draft.entries, draft.parentId);
-        edited(Draft.select(draft, parent.parentId, parent.entry.id));
+        navigate(parent.parentId, parent.entry.id);
     }
     function cancelDrag() {
         dragCanceled = true;
@@ -84,10 +167,12 @@ QQC2.Control {
         event.accepted = true;
     }
     Keys.onPressed: event => handleKey(event)
-    onDraftChanged: {
-        if (!draft) cancelDrag();
+    onDraftChanged: syncView()
+    Component.onCompleted: { viewReady = true; syncView(); }
+    onVisibleChanged: {
+        if (!visible) { rememberView(); cancelDrag(); }
+        else if (viewReady && draft) Qt.callLater(() => restoreView(false));
     }
-    onVisibleChanged: if (!visible) cancelDrag()
 
     contentItem: ColumnLayout {
         spacing: 4
@@ -121,15 +206,18 @@ QQC2.Control {
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
-            model: control.rows
+            model: rowModel
             interactive: !control.dragActive
+            onContentYChanged: control.rememberView()
             boundsBehavior: Flickable.StopAtBounds
             QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
             delegate: QQC2.ItemDelegate {
                 id: row
-                required property var modelData
+                required property string itemId
+                required property string itemTitle
+                required property string itemKind
                 required property int index
-                property var entry: modelData
+                property var entry: ({id: itemId, title: itemTitle, kind: itemKind})
                 objectName: "layoutRow-" + entry.id
                 width: list.width
                 height: 36

@@ -58,6 +58,27 @@ def draft(root):
     return root.property('draft').toVariant()
 
 
+def evaluate(root, code):
+    expression = QQmlExpression(QQmlEngine.contextForObject(root), root, code)
+    result, _ = expression.evaluate()
+    assert not expression.hasError(), expression.error().toString()
+    return result
+
+
+def long_menu(view, root):
+    value = draft(root)
+    value['entries'] = [{'id': f'x{i}', 'kind': 'command', 'title': f'Entry {i}'} for i in range(60)]
+    value['entries'][47] = {'id': 'x47', 'kind': 'submenu', 'title': 'Long group', 'items': [
+        {'id': f'y{i}', 'kind': 'command', 'title': f'Child {i}'} for i in range(40)]}
+    value['selectedId'] = 'x45'
+    value['views'] = {}
+    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    QTest.qWait(20)
+    evaluate(root, 'list.positionViewAtIndex(42, ListView.Beginning)')
+    QTest.qWait(10)
+    root.forceActiveFocus()
+
+
 def click(view, root, name):
     item = child(root, name)
     assert item is not None, name
@@ -153,6 +174,66 @@ def test_controls_fit_small_popup_and_dismissal_retains_draft(quick):
     assert draft(root) == before and not root.property('dragActive')
     root.setVisible(True)
     assert draft(root) == before
+
+
+def test_repeated_bottom_moves_keep_anchor_selection_focus_and_delegate(quick):
+    _, view, root = quick
+    long_menu(view, root)
+    rows = child(root, 'layoutRows')
+    before = child(root, 'layoutRow-x45')
+    anchor_y = child(root, 'layoutRow-x42').mapToScene(QPointF(0, 0)).y()
+    for key in [Qt.Key_Down] * 3 + [Qt.Key_Up] * 3:
+        QTest.keyClick(view, key, Qt.AltModifier)
+        QTest.qWait(20)
+        assert rows.property('contentY') > 1000
+        assert draft(root)['selectedId'] == 'x45'
+        assert root.property('activeFocus')
+        moved = child(root, 'layoutRow-x45')
+        assert moved == before  # The existing delegate is moved, not rebuilt.
+        top = moved.mapToScene(QPointF(0, 0)).y()
+        viewport_top = rows.mapToScene(QPointF(0, 0)).y()
+        assert viewport_top <= top <= viewport_top + rows.height() - moved.height()
+        assert abs(child(root, 'layoutRow-x42').mapToScene(QPointF(0, 0)).y() - anchor_y) <= 1
+
+
+def test_parent_and_child_viewports_survive_navigation_and_reparenting(quick):
+    _, view, root = quick
+    long_menu(view, root)
+    rows = child(root, 'layoutRows')
+    parent_y = rows.property('contentY') - rows.property('originY')
+    evaluate(root, "control.choose('x47'); control.enter('x47')")
+    QTest.qWait(20)
+    assert rows.property('contentY') == rows.property('originY')
+    evaluate(root, "list.positionViewAtIndex(24, ListView.Beginning); control.choose('y28')")
+    QTest.qWait(20)
+    child_y = rows.property('contentY') - rows.property('originY')
+    QTest.keyClick(view, Qt.Key_Left)
+    QTest.qWait(20)
+    assert draft(root)['selectedId'] == 'x47'
+    assert abs(rows.property('contentY') - rows.property('originY') - parent_y) <= 1
+    QTest.keyClick(view, Qt.Key_Right)
+    QTest.qWait(20)
+    assert draft(root)['selectedId'] == 'y28'
+    assert abs(rows.property('contentY') - rows.property('originY') - child_y) <= 1
+    QTest.keyClick(view, Qt.Key_Left, Qt.AltModifier)
+    QTest.qWait(20)
+    assert draft(root)['parentId'] == '' and draft(root)['selectedId'] == 'y28'
+    assert rows.property('contentY') > 1000 and root.property('activeFocus')
+
+
+def test_draft_viewport_survives_popup_component_recreation(quick):
+    _, view, root = quick
+    long_menu(view, root)
+    before = child(root, 'layoutRows').property('contentY')
+    value = draft(root)
+    view.setSource(QUrl())
+    view.setSource(QUrl.fromLocalFile(str(ROOT / 'plasmoid/contents/ui/LayoutEditor.qml')))
+    replacement = view.rootObject()
+    replacement.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    replacement.edited.connect(lambda value: replacement.setProperty('draft', value))
+    QTest.qWait(30)
+    assert abs(child(replacement, 'layoutRows').property('contentY') - before) <= 1
+    assert draft(replacement)['selectedId'] == 'x45'
 
 
 def test_handle_click_and_outside_drop_leave_layout_unchanged(quick):
