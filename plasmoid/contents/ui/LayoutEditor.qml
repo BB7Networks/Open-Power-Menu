@@ -23,6 +23,8 @@ QQC2.Control {
     property real flyoutX: width + 4
     property real flyoutY: 0
     property bool nativeDragHandled: false
+    readonly property string nativeDragFormat: "application/x-opm-layout-entry"
+    readonly property string nativeTokenFormat: "application/x-opm-layout-session"
     property string pendingHoverFlyoutId: ""
     property int hoverOpenDelay: 180
     property int flyoutDismissDelay: 230
@@ -204,8 +206,10 @@ QQC2.Control {
         const leftFree = global.x - screenLeft;
         const openRight = rightFree >= flyoutPane.width + 6 || rightFree >= leftFree;
         flyoutX = openRight ? local.x + row.width + 3 : local.x - flyoutPane.width - 3;
+        const childCount = (Draft.children(draft.entries, id) || []).length;
+        const desiredHeight = Math.max(72, Math.min(410, (childCount * 36) + 72));
         const globalY = Math.max(screenTop + 4, Math.min(global.y,
-            screenTop + screenHeight - flyoutPane.height - 4));
+            screenTop + screenHeight - desiredHeight - 4));
         flyoutY = local.y + globalY - global.y;
     }
     function enter(id) {
@@ -237,6 +241,32 @@ QQC2.Control {
             hoverParent = parentId;
             if (key) springOpen.restart(); else springOpen.stop();
         }
+    }
+    // Accept only current-draft entry references. A drag cannot execute commands.
+    function nativeDrop(event, destination, view, entries) {
+        if (!draft || !cascadingEnabled || busy || expired) return false;
+        if (!event.formats.includes(nativeDragFormat) ||
+                !event.formats.includes(nativeTokenFormat)) return false;
+        const id = event.getDataAsString(nativeDragFormat);
+        if (event.getDataAsString(nativeTokenFormat) !== draft.token ||
+                !Draft.find(draft.entries, id)) return false;
+        const contentY = event.y + view.contentY;
+        const index = view.indexAt(Math.min(12, view.width / 2), contentY);
+        let parentId = destination, beforeId = "";
+        if (index >= 0 && index < entries.length) {
+            const entry = entries[index], row = view.itemAtIndex(index);
+            if (!row) return false;
+            const relativeY = contentY - row.y;
+            if (entry.kind === "submenu" && relativeY >= row.height * .25 &&
+                    relativeY < row.height * .75) parentId = entry.id;
+            else if (relativeY < row.height / 2) beforeId = entry.id;
+            else beforeId = entries[index + 1] ? entries[index + 1].id : "";
+        }
+        if (Draft.moveError(draft, id, parentId, beforeId)) return false;
+        nativeDragHandled = true;
+        move(id, parentId, beforeId);
+        cancelDrag(false);
+        return true;
     }
     function containsPointer(pane, x, y) {
         if (!pane.visible) return false;
@@ -542,6 +572,15 @@ QQC2.Control {
                              control.dropParent === control.draft.parentId
                 }
             }
+            DropArea {
+                anchors.fill: parent
+                keys: ["opm-layout"]
+                onDropped: event => {
+                    if (control.nativeDrop(event, control.draft.parentId, list, control.rows))
+                        event.accept(Qt.MoveAction);
+                    else event.accepted = false;
+                }
+            }
         }
         RowLayout {
             Layout.fillWidth: true
@@ -569,6 +608,11 @@ QQC2.Control {
             modal: false
             focus: false
             closePolicy: QQC2.Popup.NoAutoClose
+            onAboutToShow: control.positionFlyout(control.flyoutId)
+            onClosed: {
+                control.flyoutPointerInside = false;
+                if (control.flyoutId) control.flyoutId = "";
+            }
             x: control.flyoutX
             y: control.flyoutY
             width: 280
@@ -649,6 +693,37 @@ QQC2.Control {
                             opacity: control.dropKind === "inside" ? .25 : 1
                             visible: control.dragActive && control.dropRow === childRow.entry.id
                         }
+                        MouseArea {
+                            id: childPointer
+                            anchors.fill: parent
+                            acceptedButtons: Qt.LeftButton
+                            preventStealing: true
+                            drag.target: childDragHandle
+                            drag.smoothed: false
+                            onPressed: {
+                                control.nativeDragHandled = false;
+                                control.flyoutPointerInside = true;
+                                flyoutDismiss.stop();
+                            }
+                            onClicked: {
+                                if (childRow.entry.kind === "submenu")
+                                    control.openFlyout(childRow.entry.id);
+                                else control.navigate(control.flyoutId, childRow.entry.id);
+                            }
+                        }
+                        Item {
+                            id: childDragHandle
+                            width: 1
+                            height: 1
+                            Drag.active: childPointer.drag.active
+                            Drag.dragType: Drag.Automatic
+                            Drag.keys: ["opm-layout"]
+                            Drag.supportedActions: Qt.MoveAction
+                            Drag.mimeData: ({
+                                "application/x-opm-layout-entry": childRow.entry.id,
+                                "application/x-opm-layout-session": control.draft ? control.draft.token : ""
+                            })
+                        }
                     }
                     footer: Item {
                         width: flyoutList.width
@@ -663,6 +738,15 @@ QQC2.Control {
                             color: control.dropValid ? control.palette.highlight : "#da4453"
                             visible: control.dragActive && control.dropKind === "end" &&
                                      control.dropParent === control.flyoutId
+                        }
+                    }
+                    DropArea {
+                        anchors.fill: parent
+                        keys: ["opm-layout"]
+                        onDropped: event => {
+                            if (control.nativeDrop(event, control.flyoutId, flyoutList, control.flyoutEntries))
+                                event.accept(Qt.MoveAction);
+                            else event.accepted = false;
                         }
                     }
                 }
@@ -694,6 +778,7 @@ QQC2.Control {
         onPressed: mouse => {
             hoverOpen.stop();
             flyoutDismiss.stop();
+            control.nativeDragHandled = false;
             const hit = control.rowUnderPointer(mouse.x, mouse.y);
             if (!hit) { mouse.accepted = false; return; }
             pressedId = hit.entry.id;
@@ -720,6 +805,12 @@ QQC2.Control {
         }
         onReleased: mouse => {
             if (mouse.button === Qt.RightButton) return;
+            if (control.nativeDragHandled) {
+                suppressClick = true;
+                control.nativeDragHandled = false;
+                control.cancelDrag(false);
+                return;
+            }
             suppressClick = control.dragActive || control.dragCanceled;
             control.updateDragTarget();
             const accepted = control.dragActive && !control.dragCanceled && control.dropValid;
@@ -742,7 +833,20 @@ QQC2.Control {
         onCanceled: { suppressClick = true; control.cancelDrag(); }
         onWheel: wheel => control.scrollDuringDrag(wheel)
     }
-    Item { id: dragPosition }
+    Item {
+        id: dragPosition
+        Drag.active: control.cascadingEnabled && control.flyoutVisible && rowPointer.drag.active
+        Drag.dragType: Drag.Automatic
+        Drag.keys: ["opm-layout"]
+        Drag.supportedActions: Qt.MoveAction
+        Drag.mimeData: ({
+            "application/x-opm-layout-entry": control.draggedId,
+            "application/x-opm-layout-session": control.draft ? control.draft.token : ""
+        })
+        Drag.onDragFinished: {
+            control.cancelDrag(false);
+        }
+    }
     Rectangle {
         id: dragProxy
         objectName: "inMenuDragPreview"
