@@ -10,12 +10,15 @@ QQC2.Control {
     property var draft: null
     property bool busy: false
     property bool expired: false
+    // False preserves the proven narrow single-pane editor for fallback/tests.
+    // The Plasma widget explicitly enables the adjacent flyout experience.
+    property bool cascadingEnabled: false
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
     // The adjacent editor pane is not a second native window: Wayland keeps
     // the entire drag inside the one, existing Plasma popup.
     property string flyoutId: ""
-    readonly property bool flyoutVisible: !!draft && !!flyoutId &&
+    readonly property bool flyoutVisible: cascadingEnabled && !!draft && !!flyoutId &&
         !!Draft.find(draft.entries, flyoutId) &&
         Draft.find(draft.entries, flyoutId).parentId === draft.parentId
     readonly property var flyoutEntries: flyoutVisible ? (Draft.children(draft.entries, flyoutId) || []) : []
@@ -154,6 +157,7 @@ QQC2.Control {
     }
     function openFlyout(id) {
         if (!draft) return;
+        if (!cascadingEnabled) { enter(id); return; }
         const found = Draft.find(draft.entries, id);
         if (!found || found.entry.kind !== "submenu") return;
         if (found.parentId === draft.parentId) {
@@ -667,8 +671,9 @@ QQC2.Control {
         onTriggered: {
             if (!control.dragActive || !control.hoverKey) return;
             const parentId = control.hoverParent;
+            const kind = control.dropKind; // Preserve before clearTarget resets it.
             control.clearTarget();
-            if (control.dropKind === "parent") {
+            if (kind === "parent" || !control.cascadingEnabled) {
                 control.navigate(parentId, "");
             } else {
                 control.openFlyout(parentId);
