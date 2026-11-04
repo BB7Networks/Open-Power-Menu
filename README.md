@@ -87,8 +87,11 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 ## Make it yours
 
 For a quick rearrangement, right-click the Start button and select the **lock**
-icon. Drag any part of an entry to move it. Pause over a submenu to open it while
-dragging, or over **Back** to move up a level. The list keeps your place as you
+icon. Drag an entry to reorder it; hover or click a submenu to open a real
+floating flyout beside its row, rather than widening the editor into two panes.
+For cross-window moves, open the destination submenu first before dragging,
+or use the keyboard/context Move into submenu action. Drag over **Back** to
+move up a level. The list keeps your place as you
 rearrange entries, including wheel scrolling during a drag. Right-click or press
 Shift+F10 for movement actions; Alt+Arrow shortcuts remain available. All entries
 appear, including unavailable applications and empty submenus. **Save layout**
