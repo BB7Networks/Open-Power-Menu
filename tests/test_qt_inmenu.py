@@ -695,3 +695,29 @@ def test_cascading_flyout_closes_when_popup_hides(quick):
     assert not root.property('flyoutVisible')
     root.setVisible(True)
     assert draft(root) == initial
+
+
+def test_native_flyout_switches_to_nested_level_without_widening(quick):
+    _, view, root = quick
+    value = draft(root)
+    value['entries'][1]['items'].append({
+        'id': 'h', 'kind': 'submenu', 'title': 'Nested',
+        'items': [{'id': 'z', 'kind': 'command', 'title': 'Inside'}]
+    })
+    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    root.setProperty('cascadingEnabled', True)
+    view.resize(328, 430)
+    QTest.qWait(30)
+
+    click(view, root, 'layoutRow-g')
+    assert root.property('flyoutId') == 'g'
+    evaluate(root, "control.openFlyout('h')")
+    QTest.qWait(60)
+    assert draft(root)['parentId'] == 'g'
+    assert root.property('flyoutVisible')
+    assert root.property('flyoutId') == 'h'
+    assert root.implicitWidth() == 304
+    assert [e['id'] for e in draft(root)['entries'][1]['items']] == ['c', 'h']
+    evaluate(root, 'control.back()')
+    assert not root.property('flyoutVisible')
+    assert draft(root)['parentId'] == 'g'
