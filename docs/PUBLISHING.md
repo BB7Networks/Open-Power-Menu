@@ -1,52 +1,43 @@
-# Initial GitHub release and follow-up publishing
+# Reviewing and preparing releases
 
-These commands are intended for a Manjaro/KDE machine with Git and `gh`.
+The canonical repository is <https://github.com/BB7Networks/Open-Power-Menu>.
+Use a feature branch and a pull request. Keep the widget ID
+`org.openpowermenu.start` stable so existing users retain the same applet.
 
-## Create the public GitHub repository
+## Before a new beta
 
-Unpack the **GitHub-ready source ZIP** in a project workspace (not directly
-into `~/.local/share/plasma`). Open a terminal in the extracted
-`Open-Power-Menu-GitHub-Ready` folder.
+1. Merge prerequisite fixes in order after their checks and review: the
+   Windows-safe installer change, backup retention, then dependent feature work.
+2. Run [automated checks and the two-workstation matrix](TESTING.md). Review
+   [process findings](PROCESS-LIFECYCLE.md) and capture [real screenshots](images/README.md).
+3. Choose a new beta version only after successful review. Update Python,
+   metadata, installer labels, documentation, archive references and notes
+   consistently. Do not tag or publish merely because a local archive builds.
+4. Check license/attribution, clean-account setup and upgrade/rollback from the
+   actual prior release packages. Preserve user menu and launcher configuration.
 
-```bash
-gh auth status                         # If needed: gh auth login
-git init -b main
-git add .
-git commit -m "Initial public beta: Open Power Menu v0.4.17"
-gh repo create Open-Power-Menu --public --source=. --remote=origin --push
-```
+## Build local review artifacts
 
-By default, `gh repo create` uses the account you're signed into; to publish
-under an organization, pass `ORG/Open-Power-Menu` instead. Verify the intended
-owner before creating the repository. Don't publish it under an employer or
-shared organization without permission.
-
-After publishing, update README links and `plasmoid/metadata.json` with the
-real repository URL/maintainer details, and commit those small documentation
-changes. Keep the `org.openpowermenu.start` widget ID stable — changing it
-would create a separate widget for existing users.
-
-## Create a release download
+Current version identifiers remain at 0.4.17:
 
 ```bash
 bash scripts/build-release.sh
-sha256sum -c dist/SHA256SUMS
-# Then create a GitHub release, attach the complete EZ installer:
-gh release create v0.4.17 dist/OpenPowerMenu-EZ-v0.4.17.zip   --title "Open Power Menu v0.4.17 (beta)"   --notes-file RELEASE-NOTES-v0.4.17.md
+bash scripts/build-widget-only.sh
+(cd dist && sha256sum -c SHA256SUMS)
+unzip -t dist/OpenPowerMenu-EZ-v0.4.17.zip
+tar -tzf dist/OpenPowerMenu-EZ-v0.4.17.tar.gz
 ```
 
-The release script produces ZIP and TAR.GZ archives for ordinary users.
-**Neither archive is a standalone `.plasmoid` for the KDE Store.**
+The complete EZ ZIP and TAR.GZ include both backend and widget plus instructions.
+The `.plasmoid` is a separate widget-only artifact. Build scripts do not publish
+anything. After a new version is reviewed and explicitly approved for release,
+attach its complete EZ archives and checksums to the corresponding GitHub beta
+release with accurate notes. Do not overwrite an existing release's versioned
+artifacts with unreleased changes.
 
-## Prepare to list the widget in the KDE Store
+## KDE Store
 
-Read [KDE-STORE.md](KDE-STORE.md) before publishing. The current widget-only
-archive cannot install the required Python/PySide6 backend through the native
-Get New Widgets workflow. Do not list it as one-click working until the setup
-path has been implemented and tested on a clean Plasma 6 account.
-
-Before a public listing, also:
-- confirm the license/attribution for every included file and icon,
-- take a few actual KDE screenshots (both click modes and Configure),
-- test on another user's account/machine and a clean KDE install,
-- publish clear issues/security reporting and the compatibility matrix.
+Read [KDE-STORE.md](KDE-STORE.md). Store setup remains separate future work: a
+native widget archive does not install the Python/PySide6 backend. Do not claim
+one-click operation or publish a Store listing before the complete user-driven
+setup path has been implemented and tested in a clean Plasma 6 account.

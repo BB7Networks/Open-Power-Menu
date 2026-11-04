@@ -1,5 +1,11 @@
 # Open Power Menu 0.4.17
 
+For the current branch's action/lifecycle changes, automated checks and remaining
+desktop acceptance, read [REVIEW.md](REVIEW.md), [TESTING.md](TESTING.md) and
+[PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md). The release-history notes below do
+not replace those results. Optional PySide6 offscreen tests now run in CI; actual
+Plasma/Wayland acceptance remains separate.
+
 A launcher-independent Power User menu for KDE Plasma 6, with an optional unified
 Start-button widget. **Left-click** delegates to an existing launcher; **right-click**
 shows the Power User menu. The original launcher, its favorites, and its settings
@@ -117,8 +123,8 @@ Plasma/Wayland. Portable tests cannot reproduce compositor focus transitions.
 ## Install / upgrade on Manjaro
 
 ```bash
-cd ~/Downloads
-tar -xzf OpenPowerMenu-0.4.16.tar.gz
+tar -xzf OpenPowerMenu-EZ-v0.4.17.tar.gz
+cd OpenPowerMenu-v0.4.17
 bash Install.sh
 ```
 

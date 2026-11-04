@@ -17,4 +17,20 @@ jobs:
           node-version: '22'
       - run: python -m pip install pytest
       - run: python -m pytest -q
-      - run: bash -n Install.sh Uninstall.sh scripts/install-core.sh scripts/uninstall-core.sh scripts/build-release.sh scripts/build-widget-only.sh
+      - name: Check every shell script
+        run: |
+          for script in Install.sh Uninstall.sh scripts/*.sh tools/*.sh; do
+            bash -n "$script"
+          done
+  qt-runtime:
+    name: Qt and D-Bus runtime
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install pytest PySide6-Essentials==6.10.2
+      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_installation.py
+        env:
+          QT_QPA_PLATFORM: offscreen

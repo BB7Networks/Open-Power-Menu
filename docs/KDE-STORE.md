@@ -29,6 +29,24 @@ should happen merely because a user added a widget.
 
 ## Publishing procedure once that work is completed
 
+### Proposed first-run path (future work)
+
+Keep this separate from the action/lifecycle changes. A missing backend should
+show an explicit setup page rather than offer a nonfunctional menu. Explain
+which component is missing, link to the complete trusted release and manual
+installation instructions, and offer **Retry connection** after installation.
+Adding a widget must never execute a downloaded shell script. Package installation
+and any authentication remain under the user's control.
+
+Prefer distro packages for Python/PySide6 and a separately installed, versioned
+backend package with a user D-Bus activation file. Define a backend/widget
+compatibility handshake before adding automated recovery: distinguish absent
+service, missing PySide6 and incompatible versions instead of repeatedly polling
+or trying reinstall commands. Validate clean-account install, upgrade, offline
+failure, retry and removal on supported distros before advertising Store readiness.
+The current Ping/version API can inform that design but is not a completed setup
+experience. No Store integration is implemented by this PR.
+
 1. Test a clean Plasma 6 account/VM with **no backend previously installed**.
    Make the Store install path complete the setup, or clearly guide the user
    through the required backend installation.
