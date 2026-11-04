@@ -612,31 +612,23 @@ def create_editor(path: Path | None = None):
             backups_form.addRow(manage)
             backups_layout.addWidget(backups_group)
 
-            from .widget_snapshots import directory, recovery_path, GENERATED
-            import os
-            import stat
-            snapshots = recovery_path(Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share"))
-            try:
-                with directory(snapshots) as snapshot_directory:
-                    count = sum(bool(GENERATED.fullmatch(name)) and stat.S_ISDIR(os.stat(
-                        name, dir_fd=snapshot_directory, follow_symlinks=False).st_mode)
-                        for name in os.listdir(snapshot_directory))
-                status = f"{count} generated snapshots available."
-            except FileNotFoundError:
-                status = "No widget snapshots yet."
-            except OSError:
-                status = "Snapshot directory is unavailable."
             snapshot_group = QGroupBox("Widget upgrade snapshots", backups_tab)
             snapshot_layout = QVBoxLayout(snapshot_group)
             snapshot_help = QLabel("Previous widget files are kept separately during upgrades. "
                                    "Default: 5 snapshots. Uninstall preserves them.", snapshot_group)
             snapshot_help.setWordWrap(True)
             snapshot_layout.addWidget(snapshot_help)
-            self.snapshot_location = QLabel(f"{snapshots}\n{status}", snapshot_group)
+            self.snapshot_location = QLabel(snapshot_group)
             self.snapshot_location.setObjectName("widgetSnapshotLocation")
             self.snapshot_location.setWordWrap(True)
             self.snapshot_location.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
             snapshot_layout.addWidget(self.snapshot_location)
+            snapshot_refresh = QPushButton("Refresh", snapshot_group)
+            snapshot_refresh.setObjectName("widgetSnapshotRefresh")
+            snapshot_refresh.setToolTip("Update the snapshot count without changing any files.")
+            snapshot_refresh.clicked.connect(self.refresh_snapshots)
+            snapshot_layout.addWidget(snapshot_refresh, 0, Qt.AlignLeft)
+            self.refresh_snapshots()
             snapshot_setting = QLabel("Choose the limit when installing: OPM_WIDGET_BACKUP_RETENTION=5 bash install.sh", snapshot_group)
             snapshot_setting.setWordWrap(True)
             snapshot_setting.setToolTip("Installer setting: 1–1,000. It is separate from configuration backup retention. See the recovery guide to restore a widget and its matching backend.")
@@ -667,6 +659,17 @@ def create_editor(path: Path | None = None):
             self.show_missing.toggled.connect(self.unavailable_changed)
             self.update_dirty()
             self.update_actions()
+
+        def refresh_snapshots(self):
+            import os
+            from .widget_snapshots import recovery_path, snapshot_count
+            data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+            try:
+                count = snapshot_count(data_home)
+                status = f"{count} generated snapshots available." if count else "No widget snapshots yet."
+            except OSError:
+                status = "Snapshot directory is unavailable."
+            self.snapshot_location.setText(f"{recovery_path(data_home)}\n{status}")
 
         def _make_item(self, entry: dict):
             # Build unattached: QTreeWidgetItem cannot be inserted into a

@@ -401,6 +401,76 @@ def test_three_tabs_instructions_and_responsive_history_controls(editor, app):
             assert button.y() >= 0 and button.geometry().bottom() < editor.toolbar.height()
 
 
+@pytest.mark.parametrize('protected', [False, True])
+def test_backup_delete_confirmation_corrupt_preview_and_selection_refresh(editor, monkeypatch, app, protected):
+    name = 'menu.json.pre-restore-test' if protected else 'menu.json.bak-manual'
+    source = editor.target.with_name(name)
+    source.write_text('{broken backup')
+    another = editor.target.with_name('menu.json.bak-keep')
+    another.write_bytes(editor.target.read_bytes())
+    active = editor.target.read_bytes()
+    dialog = BackupDialog(editor.target, editor)
+    assert not dialog.delete_button.isEnabled()
+    selected = next(dialog.files.topLevelItem(i) for i in range(dialog.files.topLevelItemCount())
+                    if dialog.files.topLevelItem(i).data(0, Qt.UserRole) == name)
+    dialog.files.setCurrentItem(selected)
+    assert dialog.delete_button.isEnabled() and not dialog.restore_button.isEnabled()
+    messages = []
+    def cancel(parent, title, message, *buttons):
+        messages.append(message)
+        assert buttons[-1] == QMessageBox.Cancel
+        return QMessageBox.Cancel
+    monkeypatch.setattr(QMessageBox, 'question', cancel)
+    dialog.delete_selected()
+    assert source.exists() and 'cannot be undone' in messages[-1]
+    assert name in messages[-1] and 'bytes' in messages[-1] and 'Saved:' in messages[-1]
+    assert ('protected' in messages[-1]) == protected
+    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.Yes)
+    dialog.delete_selected()
+    assert not source.exists() and another.exists() and editor.target.read_bytes() == active
+    assert dialog.files.currentItem().data(0, Qt.UserRole) == another.name
+    assert dialog.files.topLevelItemCount() == 2 and not dialog.restored
+    dialog.deleteLater()
+
+
+@pytest.mark.parametrize('change', ['changed', 'missing', 'denied'])
+def test_backup_delete_conflicts_and_errors_keep_active_configuration(editor, monkeypatch, app, change):
+    source = editor.target.with_name('menu.json.bak-test')
+    source.write_bytes(editor.target.read_bytes())
+    active = editor.target.read_bytes()
+    dialog = BackupDialog(editor.target, editor)
+    dialog.files.setCurrentItem(dialog.files.topLevelItem(1))
+    def confirm(*args):
+        if change == 'changed': source.write_bytes(b'changed during confirmation')
+        elif change == 'missing': source.unlink()
+        return QMessageBox.Yes
+    monkeypatch.setattr(QMessageBox, 'question', confirm)
+    if change == 'denied':
+        monkeypatch.setattr('openpowermenu.backup_dialog.delete_backup', lambda *a, **kw: (_ for _ in ()).throw(PermissionError('denied')))
+    dialog.delete_selected()
+    assert editor.target.read_bytes() == active and not dialog.restored
+    assert not dialog.delete_button.isEnabled() and editor.warnings
+    if change != 'missing': assert source.exists()
+    dialog.deleteLater()
+
+
+def test_snapshot_refresh_updates_count_without_changing_unsaved_settings(editor, app, tmp_path, monkeypatch):
+    from openpowermenu.widget_snapshots import recovery_path
+    monkeypatch.setenv('XDG_DATA_HOME', str(tmp_path / 'data'))
+    editor.refresh_snapshots()
+    assert 'No widget snapshots' in editor.snapshot_location.text()
+    root = recovery_path(tmp_path / 'data')
+    snapshot = root / 'org.openpowermenu.start-20260101-010101-000000000'
+    snapshot.mkdir(parents=True)
+    editor.backup_retention.setValue(5)
+    before = editor.configuration()
+    editor.tabs.setCurrentIndex(2)
+    editor.findChild(QPushButton, 'widgetSnapshotRefresh').click()
+    assert '1 generated snapshots' in editor.snapshot_location.text()
+    assert editor.configuration() == before and editor.is_dirty()
+    assert editor.snapshot_location.textInteractionFlags() & Qt.TextSelectableByKeyboard
+
+
 def test_nested_edit_save_reopen_round_trip(editor):
     editor.tree.setCurrentItem(editor.item_for((0,)))
     editor.duplicate_selected()

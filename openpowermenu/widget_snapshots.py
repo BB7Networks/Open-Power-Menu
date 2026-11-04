@@ -1,4 +1,4 @@
-"""Installer-only widget history, independent of configuration backup retention.
+"""Widget history and read-only status, independent of configuration backups.
 
 This module is also a standalone script so extracted installers need no imports
 from an already installed backend. All paths are user-local XDG data paths.
@@ -41,6 +41,27 @@ def directory(path, *, create=False):
 
 def recovery_path(data_home):
     return Path(data_home) / 'open-power-menu-recovery/widget-backups'
+
+
+def generated_names(root):
+    names = []
+    for name in os.listdir(root):
+        if not GENERATED.fullmatch(name):
+            continue
+        try:
+            if stat.S_ISDIR(os.stat(name, dir_fd=root, follow_symlinks=False).st_mode):
+                names.append(name)
+        except FileNotFoundError:
+            continue  # An upgrade or user cleanup may have removed this entry.
+    return names
+
+
+def snapshot_count(data_home):
+    try:
+        with directory(recovery_path(data_home)) as root:
+            return len(generated_names(root))
+    except FileNotFoundError:
+        return 0
 
 
 def retention(value):
@@ -106,8 +127,7 @@ def prune(data_home, keep):
     if not os.path.lexists(path):
         return
     with directory(path) as root:
-        names = [name for name in os.listdir(root) if GENERATED.fullmatch(name)
-                 and stat.S_ISDIR(os.stat(name, dir_fd=root, follow_symlinks=False).st_mode)]
+        names = generated_names(root)
         for name in sorted(names, reverse=True)[keep:]:
             # Python's fd-based rmtree refuses a symlink substituted at the root
             # and unlinks nested links without traversing their destinations.
