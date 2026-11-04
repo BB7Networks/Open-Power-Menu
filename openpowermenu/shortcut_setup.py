@@ -60,7 +60,7 @@ def create_shortcut_dialog(parent=None):
                 '<ol><li>Remove an old Open Power Menu Meta+X application shortcut, if assigned.</li>'
                 '<li>Enter Plasma Panel Edit Mode and open this widget’s settings.</li>'
                 '<li>Under <b>Keyboard Shortcuts</b>, assign <b>Meta+X</b> and apply.</li></ol>'
-                '<p>KDE checks for conflicts. Cancel if Meta+X is already in use; OPM never overrides another shortcut automatically.</p>'
+                '<p>KDE checks for shortcut conflicts; cancel if Meta+X is already in use. OPM never overrides another shortcut automatically.</p>'
                 '<b>Optional: standalone menu test</b>'
                 '<p>Use Test menu launch below to check the separate application. '
                 'It does not test Meta+X and may appear near the screen center.</p>', self)
