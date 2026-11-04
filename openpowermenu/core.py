@@ -181,16 +181,10 @@ def config_path() -> Path:
 
 
 def load_config(path: Path | None = None) -> dict[str, Any]:
-    src = path or config_path()
-    if not src.exists():
-        return deepcopy(DEFAULT_CONFIG)
-    obj = json.loads(src.read_text(encoding="utf-8"))
-    if not isinstance(obj, dict) or not isinstance(obj.get("menu"), list):
-        raise ValueError("menu.json must be an object with a 'menu' array")
-    result = deepcopy(DEFAULT_CONFIG)
-    result.update(obj)
-    validate_configuration(result)
-    return result
+    """Use the same bounded, no-follow reader and validation as editor recovery."""
+    from .recovery import current_revision, decode_configuration
+
+    return decode_configuration(current_revision(path or config_path()).content)
 
 
 def which_executable(name: str) -> bool:

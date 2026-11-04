@@ -7,14 +7,15 @@ starts at PR #3 (`feature/default-actions-and-readiness`, `e3d0de8`), while PRs
 ## Automated verification (2026-11-04)
 
 - Before changes: **177 passed, 8 skipped, 18 subtests passed**.
-- After changes: **232 passed, 8 skipped, 18 subtests passed** in the full suite
+- After changes, including runtime-loader safety: **281 passed, 8 skipped,
+  18 subtests passed** in the full suite
   with Python 3.12, PySide6 6.10.2, offscreen Qt, isolated D-Bus sessions and Node
   24. CI uses Node 22. All eight skips are unavailable historical release trees.
 - Python compilation, all seven Bash scripts checked individually, full ZIP/TAR
   and widget archive integrity, checksums and extracted-backend checks pass.
 - The entire `plasmoid/` tree, D-Bus service, standalone menu and detached-launch
   module are unchanged from PR #3. An AST comparison also confirms the existing
-  core command-resolution functions are unchanged; only save, retention and
+  core command-resolution functions are unchanged; only loading, saving, retention and
   validation reporting changed there.
 
 CI requires a separate Qt job; portable CI deliberately skips Qt-dependent tests
@@ -70,7 +71,9 @@ external file changes again while that choice is open, overwrite fails safely
 and the editor stays open. When the file was deleted there are no bytes to copy.
 
 Files and path components must not be symlinks; configuration and backup files
-must be regular files and at most 4 MiB. New files use mode 0600, and temporary
+must be regular files and at most 4 MiB. The editor, CLI and backend share these
+reading and validation rules. A missing configuration file or directory returns
+fresh defaults without creating files. New files use mode 0600, and temporary
 files live beside the target for atomic replacement. Lock files are retained
 in the configuration directory. Non-OPM tools do not honor the cooperative lock;
 avoid writing concurrently during an explicit restore/overwrite operation.
