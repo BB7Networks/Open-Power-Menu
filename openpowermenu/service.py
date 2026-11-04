@@ -9,6 +9,8 @@ import json
 import subprocess
 import sys
 
+from .launching import launch_detached, reap_children
+
 BUS_NAME = "org.openpowermenu.Service"
 OBJECT_PATH = "/OpenPowerMenu"
 
@@ -30,6 +32,22 @@ def run_service() -> int:
     idle_timer.setSingleShot(True)
     idle_timer.setInterval(5 * 60 * 1000)
     idle_timer.timeout.connect(app.quit)
+
+    # Popen only opportunistically reaps discarded children on a later launch.
+    # Reap promptly even when no further menu requests arrive; never signal apps.
+    child_timer = QTimer()
+    child_timer.setInterval(1000)
+
+    def reap_finished():
+        if not reap_children():
+            child_timer.stop()
+
+    child_timer.timeout.connect(reap_finished)
+
+    def launch(argv):
+        launch_detached(argv)
+        if not child_timer.isActive():
+            child_timer.start()
 
     class MenuService(QObject):
         def touch(self):
@@ -53,7 +71,7 @@ def run_service() -> int:
                 cmd = command_at_key(load_config(), key)
                 if cmd is None:
                     return False
-                subprocess.Popen(list(cmd.argv), close_fds=True, start_new_session=True)
+                launch(cmd.argv)
                 return True
             except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
                 print("Open Power Menu could not run item", key, ":", exc, file=sys.stderr)
@@ -67,8 +85,7 @@ def run_service() -> int:
             from pathlib import Path
             script = Path(__file__).resolve().parents[1] / "run.py"
             try:
-                subprocess.Popen([sys.executable, str(script), "--edit"],
-                                 close_fds=True, start_new_session=True)
+                launch([sys.executable, str(script), "--edit"])
                 return True
             except OSError as exc:
                 print("Could not start Open Power Menu editor:", exc, file=sys.stderr)

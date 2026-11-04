@@ -1,10 +1,10 @@
 """Qt Widgets front end. Uses a native QMenu rather than embedding a launcher."""
 from __future__ import annotations
 
-import subprocess
 import sys
 
 from .core import normalized_menu
+from .launching import launch_detached
 
 
 def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) -> int:
@@ -84,7 +84,7 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) 
     if not argv:
         return 0
     try:
-        subprocess.Popen(argv, close_fds=True, start_new_session=True)
+        launch_detached(argv)
     except OSError as exc:
         QMessageBox.critical(None, "Could not open " + selected.text(), str(exc))
         return 1

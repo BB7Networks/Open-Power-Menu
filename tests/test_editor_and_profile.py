@@ -110,7 +110,7 @@ class EditorIntegrationTests(unittest.TestCase):
         service = (ROOT/'openpowermenu/service.py').read_text()
         self.assertIn('def Edit(self):', service)
         self.assertIn('"--edit"', service)
-        self.assertIn('subprocess.Popen([sys.executable, str(script), "--edit"]', service)
+        self.assertIn('launch([sys.executable, str(script), "--edit"])', service)
         self.assertNotIn('shell=True', service)
         cli = (ROOT/'openpowermenu/cli.py').read_text()
         self.assertIn('"--edit"', cli)
