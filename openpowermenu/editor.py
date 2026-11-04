@@ -24,12 +24,12 @@ from .plasma_panels import list_panel_applets
 def create_editor(path: Path | None = None):
     try:
         from PySide6.QtCore import Qt, QUrl
-        from PySide6.QtGui import QIcon, QAction, QKeySequence, QUndoStack
+        from PySide6.QtGui import QIcon, QAction, QFontDatabase, QKeySequence, QUndoStack
         from PySide6.QtWidgets import (
             QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
             QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
             QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton, QHeaderView,
-            QListWidget, QListWidgetItem, QPlainTextEdit, QVBoxLayout, QWidget
+            QListWidget, QListWidgetItem, QPlainTextEdit, QSizePolicy, QVBoxLayout, QWidget
         )
     except ImportError:
         print("The menu editor requires PySide6. On Manjaro: sudo pacman -S --needed pyside6",
@@ -396,11 +396,30 @@ def create_editor(path: Path | None = None):
                 "Plasma status when this option is disabled.")
             launcher_layout.addWidget(self.hide_launcher)
             launcher_help = QLabel(
-                "Left-click uses the selected launcher; right-click uses Power User Menu. "
-                "Hiding is reversible, and the launcher remains installed. "
-                "Emergency restore: open-power-menu --show-launcher-button", launcher_group)
+                "Left-click opens your launcher; right-click opens Power User Menu. "
+                "Hiding the original button is reversible.", launcher_group)
             launcher_help.setWordWrap(True)
             launcher_layout.addWidget(launcher_help)
+            restore_row = QHBoxLayout()
+            restore_row.addWidget(QLabel("Emergency restore", launcher_group))
+            restore_row.addStretch(1)
+            restore_command = "open-power-menu --show-launcher-button"
+            restore_copy = QPushButton("Copy", launcher_group)
+            restore_copy.setObjectName("copyEmergencyRestore")
+            restore_copy.setAccessibleName("Copy emergency restore command")
+            restore_copy.clicked.connect(lambda: QApplication.clipboard().setText(restore_command))
+            restore_row.addWidget(restore_copy)
+            launcher_layout.addLayout(restore_row)
+            restore_text = QLabel(restore_command, launcher_group)
+            restore_text.setObjectName("emergencyRestoreCommand")
+            restore_text.setTextFormat(Qt.PlainText)
+            restore_text.setWordWrap(True)
+            restore_text.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+            restore_text.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+            restore_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+            restore_font.setPointSizeF(self.font().pointSizeF())
+            restore_text.setFont(restore_font)
+            launcher_layout.addWidget(restore_text)
             general_layout.addWidget(launcher_group)
 
             icon_group = QGroupBox("Start button icon", general)
@@ -631,14 +650,10 @@ def create_editor(path: Path | None = None):
             snapshot_layout.addWidget(snapshot_help)
             self.snapshot_location = QLabel(snapshot_group)
             self.snapshot_location.setObjectName("widgetSnapshotLocation")
+            self.snapshot_location.setTextFormat(Qt.PlainText)
             self.snapshot_location.setWordWrap(True)
             self.snapshot_location.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
             snapshot_layout.addWidget(self.snapshot_location)
-            snapshot_refresh = QPushButton("Refresh", snapshot_group)
-            snapshot_refresh.setObjectName("widgetSnapshotRefresh")
-            snapshot_refresh.setToolTip("Update the snapshot count without changing any files.")
-            snapshot_refresh.clicked.connect(self.refresh_snapshots)
-            snapshot_layout.addWidget(snapshot_refresh, 0, Qt.AlignLeft)
             self.refresh_snapshots()
             snapshot_setting = QLabel("Choose the limit when installing: OPM_WIDGET_BACKUP_RETENTION=5 bash install.sh", snapshot_group)
             snapshot_setting.setWordWrap(True)
@@ -651,6 +666,8 @@ def create_editor(path: Path | None = None):
             backups_scroll.setFrameShape(QFrame.NoFrame)
             backups_scroll.setWidget(backups_tab)
             tabs.addTab(backups_scroll, "Backups")
+            tabs.currentChanged.connect(lambda index: self.refresh_snapshots()
+                                        if tabs.widget(index) is backups_scroll else None)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
             buttons.accepted.connect(self.accept)

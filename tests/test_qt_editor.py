@@ -468,7 +468,7 @@ def test_backup_delete_confirmation_displays_literal_manual_name(editor, monkeyp
     dialog.deleteLater()
 
 
-def test_snapshot_refresh_updates_count_without_changing_unsaved_settings(editor, app, tmp_path, monkeypatch):
+def test_backups_tab_refreshes_count_on_return_without_changing_unsaved_settings(editor, app, tmp_path, monkeypatch):
     from openpowermenu.widget_snapshots import recovery_path
     monkeypatch.setenv('XDG_DATA_HOME', str(tmp_path / 'data'))
     editor.refresh_snapshots()
@@ -478,11 +478,38 @@ def test_snapshot_refresh_updates_count_without_changing_unsaved_settings(editor
     snapshot.mkdir(parents=True)
     editor.backup_retention.setValue(5)
     before = editor.configuration()
+    files_before = sorted(path.relative_to(tmp_path) for path in tmp_path.rglob('*'))
     editor.tabs.setCurrentIndex(2)
-    editor.findChild(QPushButton, 'widgetSnapshotRefresh').click()
+    assert editor.findChild(QPushButton, 'widgetSnapshotRefresh') is None
     assert '1 generated snapshots' in editor.snapshot_location.text()
     assert editor.configuration() == before and editor.is_dirty()
     assert editor.snapshot_location.textInteractionFlags() & Qt.TextSelectableByKeyboard
+    assert sorted(path.relative_to(tmp_path) for path in tmp_path.rglob('*')) == files_before
+    editor.tabs.setCurrentIndex(0)
+    snapshot.rmdir()
+    assert '1 generated snapshots' in editor.snapshot_location.text()  # No polling.
+    editor.tabs.setCurrentIndex(2)
+    assert 'No widget snapshots' in editor.snapshot_location.text()
+    assert editor.configuration() == before and editor.is_dirty()
+
+
+def test_emergency_restore_is_separate_selectable_and_copyable(editor, app):
+    command = editor.findChild(QLabel, 'emergencyRestoreCommand')
+    assert command.text() == 'open-power-menu --show-launcher-button'
+    assert command.wordWrap() and command.textFormat() == Qt.PlainText
+    assert command.textInteractionFlags() & Qt.TextSelectableByKeyboard
+    editor.tabs.setCurrentIndex(0)
+    editor.resize(620, 620)
+    app.processEvents()
+    assert command.height() >= command.heightForWidth(command.width())
+    enlarged = command.font()
+    enlarged.setPointSizeF(enlarged.pointSizeF() * 1.75)
+    command.setFont(enlarged)
+    QTest.qWait(30)
+    assert command.height() >= command.heightForWidth(command.width())
+    editor.findChild(QPushButton, 'copyEmergencyRestore').click()
+    assert app.clipboard().text() == command.text()
+    assert not editor.is_dirty()
 
 
 def test_shortcut_setup_uses_kde_ui_without_claiming_or_changing_bindings(editor, app, monkeypatch, tmp_path):
