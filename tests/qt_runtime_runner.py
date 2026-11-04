@@ -236,7 +236,7 @@ def editor_flow(app, temp, config):
             errors.append(repr(exc))
             for widget in app.topLevelWidgets():
                 if isinstance(widget, QDialog):
-                    widget.reject()
+                    QDialog.reject(widget)
             app.quit()
     QTimer.singleShot(0, exercise)
     assert launch_editor() == 0
@@ -258,8 +258,14 @@ def editor_flow(app, temp, config):
     # Cancel must not save even an in-memory preference change.
     original = (temp / 'config/open-power-menu/menu.json').read_bytes()
     def cancel():
+        from PySide6.QtWidgets import QMessageBox
         dialog = app.activeModalWidget()
         dialog.backup_retention.setValue(0)
+        def discard():
+            # Keep the PySide wrapper alive while using its button.
+            message = app.activeModalWidget()
+            message.button(QMessageBox.Discard).click()
+        QTimer.singleShot(50, discard)
         dialog.reject()
     QTimer.singleShot(0, cancel)
     assert launch_editor() == 0

@@ -350,40 +350,49 @@ def describe_menu(items: list[dict[str, Any]], indent: int = 0) -> list[str]:
     return lines
 
 
-def validate_menu_definition(items: list[dict[str, Any]], depth: int = 0) -> None:
-    """Validate definitions before writing them, including hidden items.
+class MenuValidationError(ValueError):
+    def __init__(self, path, label, message):
+        self.path = path
+        super().__init__(f"Menu entry {' / '.join(str(i + 1) for i in path)} ({label}): {message}")
 
-    This avoids saving broken commands which happen to be hidden by the
-    availability filter on the current workstation.
-    """
+
+def validate_menu_definition(items: list[dict[str, Any]], depth: int = 0, _path=()) -> None:
+    """Validate without executing commands; include the affected entry path."""
     if depth > 8:
-        raise ValueError("Menus may be nested at most eight levels")
+        raise MenuValidationError(_path, 'Submenu', 'Menus may be nested at most eight levels')
     if not isinstance(items, list) or len(items) > 200:
-        raise ValueError("Each menu must contain at most 200 entries")
-    for item in items:
-        if not isinstance(item, dict):
-            raise ValueError("Menu entries must be objects")
-        if item.get("separator") is True:
-            continue
-        if "submenu" in item:
-            if not isinstance(item["submenu"], str) or not item["submenu"].strip():
-                raise ValueError("Every submenu needs a name")
-            validate_menu_definition(item.get("items"), depth + 1)
-            continue
-        if "action" in item:
-            if not isinstance(item["action"], str) or item["action"] not in COMMANDS:
-                raise ValueError("Unknown built-in action: " + str(item["action"]))
-            continue
-        commands = [item["command"]] if "command" in item else item.get("commands")
-        if not isinstance(commands, list) or not commands:
-            raise ValueError("Custom menu items need an argument-array command")
-        validate_requirements(item)
-        for candidate in commands:
-            argv = candidate.get("argv") if isinstance(candidate, dict) else candidate
-            if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a and "\x00" not in a for a in argv):
-                raise ValueError("A custom command must be an array of nonempty strings (no shell command string)")
-            if isinstance(candidate, dict):
-                validate_requirements(candidate)
+        raise MenuValidationError(_path, 'Menu', 'Each menu must contain at most 200 entries')
+    for index, item in enumerate(items):
+        try:
+            if not isinstance(item, dict):
+                raise ValueError("Menu entries must be objects")
+            if item.get("separator") is True:
+                continue
+            if "submenu" in item:
+                if not isinstance(item["submenu"], str) or not item["submenu"].strip():
+                    raise ValueError("Every submenu needs a name")
+                validate_menu_definition(item.get("items"), depth + 1, _path + (index,))
+                continue
+            if "action" in item:
+                if not isinstance(item["action"], str) or item["action"] not in COMMANDS:
+                    raise ValueError("Unknown built-in action: " + str(item["action"]))
+                continue
+            commands = [item["command"]] if "command" in item else item.get("commands")
+            if not isinstance(commands, list) or not commands:
+                raise ValueError("Custom menu items need an argument-array command")
+            validate_requirements(item)
+            for candidate in commands:
+                argv = candidate.get("argv") if isinstance(candidate, dict) else candidate
+                if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a and "\x00" not in a for a in argv):
+                    raise ValueError("A custom command must be an array of nonempty strings (no shell command string)")
+                if isinstance(candidate, dict):
+                    validate_requirements(candidate)
+
+        except MenuValidationError:
+            raise
+        except ValueError as exc:
+            label = (item.get('submenu') or item.get('label') or item.get('action')) if isinstance(item, dict) else None
+            raise MenuValidationError(_path + (index,), str(label or f'Entry {index + 1}'), str(exc)) from exc
 
 
 def validate_requirements(spec: dict[str, Any]) -> None:
@@ -425,7 +434,7 @@ def validate_backup_retention(value: Any) -> None:
         raise ValueError(f"backup_retention must be an integer from 0 to {MAX_BACKUP_RETENTION}")
 
 
-def prune_automatic_backups(target: Path, keep: int) -> None:
+def prune_automatic_backups(target: Path, keep: int, protected: frozenset[str] = frozenset()) -> None:
     """Remove excess timestamped automatic backups; never delete manual files.
 
     Keep zero disables *future* backup creation but leaves existing history
@@ -436,14 +445,19 @@ def prune_automatic_backups(target: Path, keep: int) -> None:
     # Our automatic names: menu.json.bak-YYYYMMDDTHHMMSSffffffZ.
     # Filter symlinks and unrelated names so user-maintained backups survive.
     pattern = re.compile(re.escape(target.name) + r"\.bak-\d{8}T\d{12}Z")
-    backups = sorted((p for p in target.parent.iterdir()
-                      if p.is_file() and not p.is_symlink() and pattern.fullmatch(p.name)),
-                     key=lambda p: p.name, reverse=True)
-    for old in backups[keep:]:
-        try:
-            old.unlink()
-        except OSError as exc:
-            _logger.warning("Could not remove old Open Power Menu backup %s: %s", old, exc)
+    import stat
+    from .recovery import configuration_directory
+    with configuration_directory(target) as directory:
+        backups = sorted((name for name in os.listdir(directory)
+                          if pattern.fullmatch(name) and stat.S_ISREG(os.stat(
+                              name, dir_fd=directory, follow_symlinks=False).st_mode)), reverse=True)
+        for old in backups[keep:]:
+            if old in protected:
+                continue
+            try:
+                os.unlink(old, dir_fd=directory)
+            except OSError as exc:
+                _logger.warning("Could not remove old Open Power Menu backup %s: %s", old, exc)
 
 
 def validate_configuration(config: dict[str, Any]) -> None:
@@ -464,53 +478,72 @@ def validate_configuration(config: dict[str, Any]) -> None:
     validate_menu_definition(config["menu"])
 
 
-def save_config(config: dict[str, Any], path: Path | None = None) -> Path:
-    """Safely persist a menu. The previous file is saved for rollback.
+_ANY_REVISION = object()
 
+
+def save_config(config: dict[str, Any], path: Path | None = None, *,
+                expected_revision=_ANY_REVISION, recovery_reason: str | None = None,
+                protected_backups: frozenset[str] = frozenset()) -> Path:
+    """Atomically save under a cooperative lock, optionally checking the loaded file.
+
+    Explicit restore/overwrite recovery copies are independent of auto retention.
     No Plasma settings or launcher configurations are modified here.
     """
     from datetime import datetime, timezone
-    import tempfile
+    from io import BytesIO
+    from uuid import uuid4
+    from .recovery import (ConfigurationConflict, MAX_CONFIG_BYTES,
+                           configuration_lock, read_at)
 
     validate_configuration(config)
+    if recovery_reason not in (None, 'restore', 'overwrite'):
+        raise ValueError('Unknown recovery operation')
     retention = config.get("backup_retention", DEFAULT_CONFIG["backup_retention"])
     target = path or config_path()
-    target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if target.is_symlink():
         raise ValueError("Refusing to replace a symlinked menu configuration")
-    payload = json.dumps(config, ensure_ascii=False, indent=2) + "\n"
-    name = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=target.parent,
-                                         prefix=".menu-", suffix=".tmp", delete=False) as temp:
-            name = Path(temp.name)
-            temp.write(payload)
-            temp.flush()
-            os.fsync(temp.fileno())
-        os.chmod(name, 0o600)
-        if target.is_file() and retention > 0:
-            # Unique names even if two saves happen during the same second.
-            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-            backup = target.with_name(target.name + ".bak-" + stamp)
-            # Never overwrite a same-named backup or follow a planted symlink.
-            fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    payload = (json.dumps(config, ensure_ascii=False, indent=2) + "\n").encode('utf-8')
+    if len(payload) > MAX_CONFIG_BYTES:
+        raise ValueError('Configuration is larger than the 4 MiB safety limit')
+    with configuration_lock(target) as directory:
+        current = read_at(directory, target.name)
+        if expected_revision is not _ANY_REVISION and current != expected_revision:
+            raise ConfigurationConflict('menu.json changed outside this editor. Reload it or explicitly overwrite after preserving a recovery copy.')
+        name = '.menu-' + uuid4().hex + '.tmp'
+        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
+        try:
+            with os.fdopen(fd, 'wb') as temp:
+                temp.write(payload)
+                temp.flush()
+                os.fsync(temp.fileno())
+            if current.content is not None and (retention > 0 or recovery_reason):
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+                suffix = '.pre-' + recovery_reason + '-' if recovery_reason else '.bak-'
+                backup = target.name + suffix + stamp
+                backup_fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory)
+                try:
+                    with os.fdopen(backup_fd, 'wb') as dest:
+                        shutil.copyfileobj(BytesIO(current.content), dest)
+                        dest.flush()
+                        os.fsync(dest.fileno())
+                except BaseException:
+                    os.unlink(backup, dir_fd=directory)
+                    raise
+            if read_at(directory, target.name) != current:
+                raise ConfigurationConflict('menu.json changed during saving; your changes are still in the editor.')
+            os.replace(name, target.name, src_dir_fd=directory, dst_dir_fd=directory)
+            # A cleanup failure must not report a successful save as failed.
+            if retention > 0:
+                try:
+                    if protected_backups:
+                        prune_automatic_backups(target, retention, protected_backups)
+                    else:
+                        prune_automatic_backups(target, retention)
+                except OSError as exc:
+                    _logger.warning("Could not inspect automatic backups for %s: %s", target, exc)
+        finally:
             try:
-                with os.fdopen(fd, "wb") as dest, target.open("rb") as source:
-                    shutil.copyfileobj(source, dest)
-                    dest.flush()
-                    os.fsync(dest.fileno())
-            except BaseException:
-                backup.unlink()
-                raise
-        os.replace(name, target)
-        # A failed save must never prune the last known-good backups.
-        # A cleanup failure should not falsely report that a successful save failed.
-        if retention > 0:
-            try:
-                prune_automatic_backups(target, retention)
-            except OSError as exc:
-                _logger.warning("Could not inspect automatic backups for %s: %s", target, exc)
-    finally:
-        if name is not None and name.exists():
-            name.unlink()
+                os.unlink(name, dir_fd=directory)
+            except FileNotFoundError:
+                pass
     return target

@@ -1,8 +1,8 @@
 """Native Qt menu editor: launcher-independent, no shell execution.
 
-Uses the same menu.json as the standalone menu and Plasma widget.  Every edit
-stays in memory until Save; Cancel has no effect on disk.  Previous JSON is
-backed up on save.  Qt is imported only when the editor is launched.
+Uses the same menu.json as the standalone menu and Plasma widget. Edits stay in
+memory until Save; closing dirty state offers Save/Discard/Cancel. Explicit
+restores preserve a recovery copy. Qt is imported only when the editor opens.
 """
 from __future__ import annotations
 
@@ -15,25 +15,31 @@ from .desktop_apps import application_menu_item, installed_applications
 from .editor_helpers import (built_in_candidates, editable_builtin_copy,
                              preview_command, display_argv)
 
-from .core import COMMANDS, DEFAULT_CONFIG, config_path, load_config, save_config
+from .core import (COMMANDS, DEFAULT_CONFIG, config_path, save_config,
+                   validate_configuration, validate_menu_definition, MenuValidationError)
+from .recovery import (ConfigurationConflict, current_revision, decode_configuration)
 from .plasma_panels import list_panel_applets
 
 
-def launch_editor() -> int:
+def create_editor(path: Path | None = None):
     try:
         from PySide6.QtCore import Qt, QUrl
-        from PySide6.QtGui import QIcon
+        from PySide6.QtGui import QIcon, QAction, QKeySequence, QUndoStack
         from PySide6.QtWidgets import (
             QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
             QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
-            QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton,
+            QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton, QHeaderView,
             QListWidget, QListWidgetItem, QPlainTextEdit, QVBoxLayout, QWidget
         )
     except ImportError:
         print("The menu editor requires PySide6. On Manjaro: sudo pacman -S --needed pyside6",
               file=sys.stderr)
-        return 2
+        raise
 
+    from .editor_tree import LayoutChange, MenuTree
+    target = path or config_path()
+    revision = current_revision(target)
+    config = decode_configuration(revision.content)
     app = QApplication.instance() or QApplication(sys.argv[:1])
     app.setApplicationName("Open Power Menu — Menu Editor")
     app.setDesktopFileName("org.openpowermenu")
@@ -140,7 +146,7 @@ def launch_editor() -> int:
         def __init__(self, initial: dict, parent=None):
             super().__init__(parent)
             self.setWindowTitle("Add or edit menu entry")
-            self.setMinimumWidth(560)
+            self.resize(560, 420)
             self.original = deepcopy(initial)
             self.kind = kind_of(initial)
             self.picked_desktop_file = initial.get("desktop_file", "")
@@ -227,6 +233,10 @@ def launch_editor() -> int:
             buttons.accepted.connect(self.accept)
             buttons.rejected.connect(self.reject)
             outer.addWidget(buttons)
+            try:
+                self.initial_definition = self.definition()
+            except ValueError:
+                self.initial_definition = None
 
         def refresh_builtin(self):
             effective, candidates = built_in_candidates(self.builtin.currentData())
@@ -272,7 +282,7 @@ def launch_editor() -> int:
         def definition(self) -> dict:
             item = deepcopy(self.original)
             if self.kind == "Separator":
-                return {"separator": True}
+                return item
             if self.kind == "Submenu":
                 title = self.name.text().strip()
                 if not title:
@@ -315,8 +325,14 @@ def launch_editor() -> int:
         def accept(self):
             try:
                 self.result_entry = self.definition()
+                if self.result_entry == self.initial_definition:
+                    self.result_entry = deepcopy(self.original)
+                validate_menu_definition([self.result_entry])
             except ValueError as e:
                 QMessageBox.warning(self, "Invalid entry", str(e))
+                field = self.argv if hasattr(self, "argv") and self.name.text().strip() else getattr(self, "name", None)
+                if field is not None:
+                    field.setFocus()
                 return
             super().accept()
 
@@ -324,10 +340,15 @@ def launch_editor() -> int:
         def __init__(self, cfg: dict):
             super().__init__()
             self.cfg = deepcopy(cfg)
-            self.setWindowTitle("Open Power Menu — Configure")
+            self.target, self.revision = target, revision
+            self.saved_config = deepcopy(cfg)
+            self._applying, self._closing = False, False
+            self.undo_stack = QUndoStack(self)
+            self.setWindowTitle("Open Power Menu — Configure[*]")
             self.resize(930, 620)
             root = QVBoxLayout(self)
             tabs = QTabWidget(self)
+            self.tabs = tabs
             tabs.setObjectName("configureTabs")
             root.addWidget(tabs, 1)
 
@@ -467,11 +488,15 @@ def launch_editor() -> int:
                 "Setting 0 stops creating automatic backups without deleting existing ones.")
             backups_form.addRow("Previous versions to keep:", self.backup_retention)
             backups_help = QLabel(
-                "Every save keeps the previous configuration for recovery. "
+                "When enabled, each save keeps the previous configuration for recovery. "
                 "After a successful save, older automatic backups beyond this limit are removed. "
                 "Manual backups are left alone.", backups_group)
             backups_help.setWordWrap(True)
             backups_form.addRow(backups_help)
+            manage = QPushButton("Manage backups…", backups_group)
+            manage.setObjectName("manageBackupsButton")
+            manage.clicked.connect(self.manage_backups)
+            backups_form.addRow(manage)
             general_layout.addWidget(backups_group)
             general_layout.addStretch(1)
             general_scroll = QScrollArea(tabs)
@@ -487,15 +512,20 @@ def launch_editor() -> int:
             layout_help = QLabel(
                 "Add an installed app with a search, choose a built-in system action, "
                 "or enter an advanced command. The Runs column shows what each item launches. "
-                "Select a submenu before Add to insert inside it; otherwise Add inserts after the selected entry.",
+                "Select a submenu before Add to insert inside it. Drag entries between or into submenus; "
+                "the drop indicator shows their destination. Right-click for keyboard shortcuts.",
                 layout_tab)
             layout_help.setWordWrap(True)
             layout_root.addWidget(layout_help)
-            self.tree = QTreeWidget(layout_tab)
+            self.tree = MenuTree(self, layout_tab)
             self.tree.setObjectName("menuLayoutTree")
             self.tree.setColumnCount(3)
             self.tree.setHeaderLabels(["Menu item", "Type", "Runs on this computer"])
-            self.tree.setColumnWidth(0, 240)
+            self.tree.setAccessibleName("Power User Menu layout")
+            self.tree.setTextElideMode(Qt.ElideMiddle)
+            self.tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
+            self.tree.header().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            self.tree.header().setSectionResizeMode(2, QHeaderView.Stretch)
             self.tree.setColumnWidth(1, 135)
             self.tree.setAlternatingRowColors(True)
             self.tree.setSelectionMode(QTreeWidget.SingleSelection)
@@ -514,14 +544,48 @@ def launch_editor() -> int:
             popup.addAction("Separator", lambda: self.add_entry({"separator": True}, edit=False))
             self.add_button.setMenu(popup)
             line.addWidget(self.add_button)
-            for label, callback in (("Edit", self.edit_selected), ("Remove", self.remove_selected),
+            self.edit_buttons = {}
+            for label, callback in (("Edit", self.edit_selected), ("Remove", self.remove_selected), ("Duplicate", self.duplicate_selected),
                                     ("Move up", lambda: self.move_selected(-1)),
                                     ("Move down", lambda: self.move_selected(1))):
                 b = QPushButton(label, layout_tab)
                 b.clicked.connect(callback)
                 line.addWidget(b)
+                self.edit_buttons[label] = b
             line.addStretch(1)
             layout_root.addLayout(line)
+            history = QHBoxLayout()
+            self.undo_action = self.undo_stack.createUndoAction(self, "Undo")
+            self.undo_action.setShortcuts(QKeySequence.Undo)
+            self.redo_action = self.undo_stack.createRedoAction(self, "Redo")
+            self.redo_action.setShortcuts([QKeySequence("Ctrl+Shift+Z"), QKeySequence("Ctrl+Y")])
+            self.undo_action.setToolTip("Undo layout change (Ctrl+Z)")
+            self.redo_action.setToolTip("Redo layout change (Ctrl+Shift+Z or Ctrl+Y)")
+            for action in (self.undo_action, self.redo_action):
+                self.addAction(action)
+                button = QToolButton(layout_tab)
+                button.setDefaultAction(action)
+                history.addWidget(button)
+            history.addStretch(1)
+            layout_root.addLayout(history)
+            self.context_actions = {}
+            for label, callback, shortcut in (("Edit", self.edit_selected, "F2"),
+                    ("Duplicate", self.duplicate_selected, "Ctrl+D"),
+                    ("Remove", self.remove_selected, "Delete"),
+                    ("Move up", lambda: self.move_selected(-1), "Alt+Up"),
+                    ("Move down", lambda: self.move_selected(1), "Alt+Down"),
+                    ("Move into previous submenu", self.indent_selected, "Alt+Right"),
+                    ("Move out of submenu", self.outdent_selected, "Alt+Left")):
+                action = QAction(label, self.tree)
+                action.triggered.connect(callback)
+                action.setShortcut(QKeySequence(shortcut))
+                action.setShortcutContext(Qt.WidgetShortcut)
+                self.tree.addAction(action)
+                self.context_actions[label] = action
+                if label in self.edit_buttons:
+                    self.edit_buttons[label].setToolTip(f"{label} ({shortcut})")
+            self.tree.setContextMenuPolicy(Qt.CustomContextMenu)
+            self.tree.customContextMenuRequested.connect(self.context_menu)
 
             bottom_row = QHBoxLayout()
             self.show_missing = QCheckBox("Show unavailable apps as disabled entries", layout_tab)
@@ -544,8 +608,21 @@ def launch_editor() -> int:
             buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
             buttons.accepted.connect(self.accept)
             buttons.rejected.connect(self.reject)
+            self.dirty_label = QLabel(self)
+            root.addWidget(self.dirty_label)
             root.addWidget(buttons)
             self.fill(cfg["menu"])
+            self._last_layout = self.capture_layout()
+            self.tree.itemSelectionChanged.connect(self.update_actions)
+            self.undo_stack.indexChanged.connect(self.update_dirty)
+            for control in (self.appearance, self.launcher_target, self.icon_mode):
+                control.currentIndexChanged.connect(self.update_dirty)
+            self.hide_launcher.toggled.connect(self.update_dirty)
+            self.button_icon.textChanged.connect(self.update_dirty)
+            self.backup_retention.valueChanged.connect(self.update_dirty)
+            self.show_missing.toggled.connect(self.unavailable_changed)
+            self.update_dirty()
+            self.update_actions()
 
         def _make_item(self, entry: dict):
             # Build unattached: QTreeWidgetItem cannot be inserted into a
@@ -559,6 +636,10 @@ def launch_editor() -> int:
             if icon:
                 item.setIcon(0, icon_for(icon))
             item.setData(0, Qt.UserRole, deepcopy(entry))
+            item.setToolTip(0, label)
+            item.setFlags(item.flags() | Qt.ItemIsDragEnabled)
+            if kind != "Submenu":
+                item.setFlags(item.flags() & ~Qt.ItemIsDropEnabled)
             if kind == "Submenu":
                 for child in entry.get("items", []):
                     item.addChild(self._make_item(child))
@@ -570,7 +651,7 @@ def launch_editor() -> int:
             for entry in entries:
                 self.tree.addTopLevelItem(self._make_item(entry))
             self.tree.expandAll()
-            self.tree.resizeColumnToContents(0)
+
 
         def _selected(self):
             return self.tree.currentItem()
@@ -603,22 +684,25 @@ def launch_editor() -> int:
                 if dialog.exec() != QDialog.Accepted:
                     return
                 entry = dialog.result_entry
+            before = self.capture_layout()
             parent, index = self._container_for_add()
             item = self._make_item(entry)
             parent.insertChild(index, item)
             parent.setExpanded(True)
             self.tree.setCurrentItem(item)
+            self.record_layout(before, "Add entry")
 
         def edit_selected(self):
             selected = self._selected()
             if not selected:
                 return
-            original = selected.data(0, Qt.UserRole)
+            original = self.entry_data(selected)
             if kind_of(original) == "Separator":
                 return
             dialog = EditEntryDialog(original, self)
             if dialog.exec() != QDialog.Accepted:
                 return
+            before = self.capture_layout()
             updated = dialog.result_entry
             selected.setData(0, Qt.UserRole, updated)
             label, kind, icon = details(updated)
@@ -627,13 +711,20 @@ def launch_editor() -> int:
             selected.setText(2, preview_command(updated))
             selected.setToolTip(2, preview_command(updated))
             selected.setIcon(0, icon_for(icon))
+            selected.setToolTip(0, label)
+            self.record_layout(before, "Edit entry")
 
         def remove_selected(self):
             selected = self._selected()
             if selected is None:
                 return
+            before = self.capture_layout()
             parent = selected.parent() or self.tree.invisibleRootItem()
-            parent.removeChild(selected)
+            index = parent.indexOfChild(selected)
+            parent.takeChild(index)
+            self.tree.setCurrentItem(parent.child(min(index, parent.childCount()-1)) if parent.childCount()
+                                     else parent if parent is not self.tree.invisibleRootItem() else None)
+            self.record_layout(before, "Remove entry")
 
         def move_selected(self, delta: int):
             selected = self._selected()
@@ -644,48 +735,341 @@ def launch_editor() -> int:
             destination = index + delta
             if destination < 0 or destination >= parent.childCount():
                 return
-            detached = parent.takeChild(index)
-            parent.insertChild(destination, detached)
-            self.tree.setCurrentItem(detached)
+            self.relocate(selected, parent, destination if delta < 0 else destination + 1)
 
         def _walk(self, parent):
             entries = []
             for index in range(parent.childCount()):
                 item = parent.child(index)
-                data = deepcopy(item.data(0, Qt.UserRole))
-                if kind_of(data) == "Submenu":
-                    data["items"] = self._walk(item)
+                data = self.entry_data(item)
                 entries.append(data)
             return entries
+
+        def indent_selected(self):
+            selected = self._selected()
+            if selected is None:
+                return
+            parent = selected.parent() or self.tree.invisibleRootItem()
+            index = parent.indexOfChild(selected)
+            previous = parent.child(index - 1) if index > 0 else None
+            if previous is not None and 'submenu' in previous.data(0, Qt.UserRole):
+                self.relocate(selected, previous, previous.childCount())
+
+        def outdent_selected(self):
+            selected = self._selected()
+            if selected is None or selected.parent() is None:
+                return
+            parent = selected.parent()
+            grandparent = parent.parent() or self.tree.invisibleRootItem()
+            self.relocate(selected, grandparent, grandparent.indexOfChild(parent) + 1)
 
         def restore_defaults(self):
             if QMessageBox.question(self, "Restore defaults", "Replace the unsaved Power User Menu layout with standard defaults?\nGeneral settings will stay as they are. Nothing changes on disk until Save.") != QMessageBox.Yes:
                 return
+            before = self.capture_layout()
+            self._applying = True
             self.fill(DEFAULT_CONFIG["menu"])
             self.show_missing.setChecked(DEFAULT_CONFIG["show_unavailable"])
+            self._applying = False
+            self.record_layout(before, "Restore default layout")
             # Reset applies to the Layout tab only; General settings remain untouched.
 
-        def accept(self):
-            self.cfg["menu"] = self._walk(self.tree.invisibleRootItem())
-            self.cfg["show_unavailable"] = self.show_missing.isChecked()
-            self.cfg["appearance"] = self.appearance.currentData()
-            self.cfg["hide_original_launcher"] = self.hide_launcher.isChecked()
-            self.cfg["launcher_applet_id"] = int(self.launcher_target.currentData())
-            self.cfg["button_icon_mode"] = self.icon_mode.currentData()
-            self.cfg["button_icon"] = self.button_icon.text().strip()
-            self.cfg["backup_retention"] = self.backup_retention.value()
-            try:
-                saved = save_config(self.cfg)
-            except (ValueError, OSError) as exc:
-                QMessageBox.critical(self, "Could not save menu", str(exc))
-                return
-            self.saved_path = saved
-            super().accept()
+        def entry_data(self, item):
+            data = deepcopy(item.data(0, Qt.UserRole))
+            if 'submenu' in data:
+                data['items'] = self._walk(item)
+            return data
 
+        def path_for(self, item):
+            path = []
+            while item is not None:
+                parent = item.parent() or self.tree.invisibleRootItem()
+                path.append(parent.indexOfChild(item))
+                item = item.parent()
+            return tuple(reversed(path))
+
+        def item_for(self, path):
+            item = self.tree.invisibleRootItem()
+            for index in path:
+                item = item.child(index) if item is not None else None
+            return item if path else None
+
+        def capture_layout(self):
+            expanded = []
+            def visit(parent, path=()):
+                for i in range(parent.childCount()):
+                    child = parent.child(i)
+                    if child.isExpanded():
+                        expanded.append(path + (i,))
+                    visit(child, path + (i,))
+            visit(self.tree.invisibleRootItem())
+            return {'menu': self._walk(self.tree.invisibleRootItem()),
+                    'show_unavailable': self.show_missing.isChecked(),
+                    'selected': self.path_for(self.tree.currentItem()),
+                    'expanded': expanded, 'scroll': self.tree.verticalScrollBar().value()}
+
+        def apply_layout(self, state):
+            self._applying = True
+            try:
+                self.fill(state['menu'])
+                self.tree.collapseAll()
+                for path in state['expanded']:
+                    item = self.item_for(path)
+                    if item:
+                        item.setExpanded(True)
+                self.tree.setCurrentItem(self.item_for(state['selected']))
+                self.show_missing.setChecked(state['show_unavailable'])
+                self.tree.verticalScrollBar().setValue(state['scroll'])
+            finally:
+                self._applying = False
+            self._last_layout = self.capture_layout()
+            self.update_actions()
+            self.update_dirty()
+
+        def record_layout(self, before, label):
+            after = self.capture_layout()
+            try:
+                validate_menu_definition(after['menu'])
+            except ValueError as exc:
+                self.apply_layout(before)
+                QMessageBox.warning(self, 'Cannot change layout', str(exc))
+                return False
+            if any(before[key] != after[key] for key in ('menu', 'show_unavailable')):
+                self.undo_stack.push(LayoutChange(self, before, after, label))
+            self._last_layout = after
+            self.update_dirty()
+            self.update_actions()
+            return True
+
+        def unavailable_changed(self):
+            if not self._applying:
+                before = self.capture_layout()
+                before['show_unavailable'] = self._last_layout['show_unavailable']
+                self.record_layout(before, 'Show unavailable entries')
+
+        def relocate(self, source, parent, index):
+            ancestor = parent
+            while ancestor is not None:
+                if ancestor is source:
+                    return False
+                ancestor = ancestor.parent()
+            root = self.tree.invisibleRootItem()
+            if parent is not root and 'submenu' not in parent.data(0, Qt.UserRole):
+                return False
+            if not 0 <= index <= parent.childCount():
+                return False
+            previous = source.parent() or root
+            old_index = previous.indexOfChild(source)
+            if old_index < 0:
+                return False
+            if parent is previous and index > old_index:
+                index -= 1
+            if parent is previous and index == old_index:
+                return False
+            before = self.capture_layout()
+            previous.takeChild(old_index)
+            parent.insertChild(index, source)
+            if parent is not root:
+                parent.setExpanded(True)
+            self.tree.setCurrentItem(source)
+            return self.record_layout(before, 'Move entry')
+
+        def duplicate_selected(self):
+            selected = self.tree.currentItem()
+            if selected is None:
+                return
+            before = self.capture_layout()
+            parent = selected.parent() or self.tree.invisibleRootItem()
+            duplicate = self._make_item(self.entry_data(selected))
+            parent.insertChild(parent.indexOfChild(selected) + 1, duplicate)
+            self.tree.setCurrentItem(duplicate)
+            self.record_layout(before, 'Duplicate entry')
+
+        def update_actions(self):
+            if not hasattr(self, 'edit_buttons'):
+                return
+            selected = self.tree.currentItem()
+            parent = (selected.parent() or self.tree.invisibleRootItem()) if selected else None
+            index = parent.indexOfChild(selected) if parent else -1
+            states = {'Edit': selected is not None and not selected.data(0, Qt.UserRole).get('separator'),
+                      'Remove': selected is not None, 'Duplicate': selected is not None,
+                      'Move up': index > 0, 'Move down': parent is not None and index + 1 < parent.childCount(),
+                      'Move into previous submenu': index > 0 and 'submenu' in parent.child(index - 1).data(0, Qt.UserRole),
+                      'Move out of submenu': selected is not None and selected.parent() is not None}
+            for name, enabled in states.items():
+                if name in self.edit_buttons:
+                    self.edit_buttons[name].setEnabled(enabled)
+                if name in self.context_actions:
+                    self.context_actions[name].setEnabled(enabled)
+
+        def context_menu(self, position):
+            item = self.tree.itemAt(position)
+            if item:
+                self.tree.setCurrentItem(item)
+            menu = QMenu(self.tree)
+            for action in self.context_actions.values():
+                menu.addAction(action)
+            menu.addSeparator()
+            menu.addAction(self.undo_action)
+            menu.addAction(self.redo_action)
+            menu.exec(self.tree.viewport().mapToGlobal(position))
+
+        def configuration(self):
+            config = deepcopy(self.cfg)
+            config['menu'] = self._walk(self.tree.invisibleRootItem())
+            config['show_unavailable'] = self.show_missing.isChecked()
+            config['appearance'] = self.appearance.currentData()
+            config['hide_original_launcher'] = self.hide_launcher.isChecked()
+            config['launcher_applet_id'] = int(self.launcher_target.currentData())
+            config['button_icon_mode'] = self.icon_mode.currentData()
+            config['button_icon'] = self.button_icon.text().strip()
+            config['backup_retention'] = self.backup_retention.value()
+            return config
+
+        def is_dirty(self):
+            return self.configuration() != self.saved_config
+
+        def update_dirty(self):
+            if self._applying or not hasattr(self, 'dirty_label'):
+                return
+            dirty = self.is_dirty()
+            self.setWindowModified(dirty)
+            self.dirty_label.setText('Unsaved changes' if dirty else 'No unsaved changes')
+
+        def load_state(self, config, revision):
+            self._applying = True
+            try:
+                self.cfg = deepcopy(config)
+                self.saved_config = deepcopy(config)
+                self.revision = revision
+                self.fill(config['menu'])
+                self.show_missing.setChecked(config['show_unavailable'])
+                self.hide_launcher.setChecked(config['hide_original_launcher'])
+                for widget, key in ((self.appearance, 'appearance'), (self.icon_mode, 'button_icon_mode'),
+                                    (self.launcher_target, 'launcher_applet_id')):
+                    index = widget.findData(config[key])
+                    if index < 0:
+                        widget.addItem(f"Saved widget #{config[key]}", config[key])
+                        index = widget.count() - 1
+                    widget.setCurrentIndex(index)
+                self.button_icon.setText(config['button_icon'])
+                self.backup_retention.setValue(config['backup_retention'])
+                self.undo_stack.clear()
+                self._last_layout = self.capture_layout()
+            finally:
+                self._applying = False
+            self.update_actions()
+            self.update_dirty()
+
+        def confirm_discard(self, operation):
+            return not self.is_dirty() or QMessageBox.question(self, operation,
+                'Discard the unsaved editor changes before continuing?',
+                QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel) == QMessageBox.Discard
+
+        def reload_external(self):
+            if not self.confirm_discard('Reload configuration'):
+                return False
+            try:
+                revision = current_revision(self.target)
+                config = decode_configuration(revision.content)
+            except (OSError, ValueError) as exc:
+                QMessageBox.warning(self, 'Could not reload', str(exc))
+                return False
+            self.load_state(config, revision)
+            return True
+
+        def conflict_choice(self):
+            message = QMessageBox(QMessageBox.Warning, 'Configuration changed elsewhere',
+                'Another editor or tool changed menu.json. Keep editing, reload the newer file, '
+                'or overwrite it after keeping a separate recovery copy.', parent=self)
+            keep = message.addButton('Keep editing', QMessageBox.RejectRole)
+            reload_button = message.addButton('Reload…', QMessageBox.ActionRole)
+            overwrite = message.addButton('Overwrite with recovery copy', QMessageBox.DestructiveRole)
+            message.setDefaultButton(keep)
+            message.exec()
+            return 'reload' if message.clickedButton() is reload_button else 'overwrite' if message.clickedButton() is overwrite else 'cancel'
+
+        def accept(self):
+            config = self.configuration()
+            try:
+                validate_configuration(config)
+                try:
+                    saved = save_config(config, self.target, expected_revision=self.revision)
+                except ConfigurationConflict:
+                    current = current_revision(self.target)
+                    decision = self.conflict_choice()
+                    if decision == 'reload':
+                        self.reload_external()
+                        return False
+                    if decision != 'overwrite':
+                        return False
+                    saved = save_config(config, self.target, expected_revision=current, recovery_reason='overwrite')
+            except (ValueError, OSError) as exc:
+                if isinstance(exc, MenuValidationError):
+                    self.tabs.setCurrentIndex(1)
+                    self.tree.setCurrentItem(self.item_for(exc.path))
+                    self.tree.setFocus()
+                elif 'button_icon' in str(exc) or 'icon' in str(exc).lower():
+                    self.tabs.setCurrentIndex(0)
+                    self.button_icon.setFocus()
+                QMessageBox.critical(self, 'Could not save menu', str(exc))
+                return False
+            self.saved_path = saved
+            self.saved_config = deepcopy(config)
+            self._closing = True
+            super().accept()
+            return True
+
+        def reject(self):
+            if self.is_dirty():
+                choice = QMessageBox.question(self, 'Unsaved changes', 'Save your changes before closing?',
+                    QMessageBox.Save | QMessageBox.Discard | QMessageBox.Cancel, QMessageBox.Cancel)
+                if choice == QMessageBox.Save:
+                    self.accept()
+                    return
+                if choice != QMessageBox.Discard:
+                    return
+            self._closing = True
+            super().reject()
+
+        def closeEvent(self, event):
+            if not self._closing:
+                self.reject()
+            event.accept() if self._closing else event.ignore()
+
+        def manage_backups(self):
+            from .backup_dialog import BackupDialog
+            dialog = BackupDialog(self.target, self, before_restore=lambda: self.confirm_discard('Restore backup'))
+            dialog.exec()
+            if dialog.restored:
+                try:
+                    revision = current_revision(self.target)
+                    config = decode_configuration(revision.content)
+                    self.load_state(config, revision)
+                except (OSError, ValueError) as exc:
+                    QMessageBox.warning(self, 'Could not refresh configuration', str(exc))
+
+    dialog = MenuEditor(config)
+    dialog.application = app
+    return dialog
+
+
+def launch_editor() -> int:
     try:
-        cfg = load_config()
-    except (ValueError, OSError) as exc:
-        QMessageBox.critical(None, "Invalid configuration", f"Could not open {config_path()}:\n{exc}\n\nFix or back up the file before continuing.")
+        dialog = create_editor()
+    except ImportError:
         return 2
-    dialog = MenuEditor(cfg)
-    return 0 if dialog.exec() == QDialog.Accepted else 0
+    except (ValueError, OSError) as exc:
+        from PySide6.QtWidgets import QApplication, QMessageBox
+        from .backup_dialog import BackupDialog
+        app = QApplication.instance() or QApplication(sys.argv[:1])
+        if QMessageBox.question(None, "Invalid configuration", f"{exc}\n\nOpen configuration backups to recover?",
+                                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return 2
+        recovery = BackupDialog(config_path())
+        recovery.exec()
+        if not recovery.restored:
+            return 2
+        return launch_editor()
+    dialog.exec()
+    return 0
