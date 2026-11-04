@@ -607,3 +607,46 @@ def test_quick_controls_follow_light_dark_and_aero_palettes(quick, background, f
 
     bright, dark = sorted((luminance(background), luminance(foreground)), reverse=True)
     assert (bright + .05) / (dark + .05) >= 4.5
+
+
+def test_cascading_parent_and_child_are_visible_and_drag_across_one_popup(quick):
+    """Experimental two-pane path: both lists share one pointer owner/window."""
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(650, 430)
+    QTest.qWait(30)
+
+    click(view, root, 'layoutRow-g')
+    QTest.qWait(25)
+    assert root.property('flyoutVisible')
+    assert root.property('flyoutId') == 'g'
+    assert draft(root)['parentId'] == ''
+    left = child(root, 'layoutRows')
+    right = child(root, 'layoutFlyoutRows')
+    assert left is not None and right is not None
+    assert child(root, 'layoutRow-a') is not None
+    assert child(root, 'layoutFlyoutRow-c') is not None
+    assert left.mapToScene(QPointF(0, 0)).x() < right.mapToScene(QPointF(0, 0)).x()
+
+    end = point(root, 'layoutFlyoutRow-c', x=45, y=5)
+    begin_drag(view, point(root, 'layoutRow-b', x=90), end)
+    assert root.property('dragActive')
+    assert root.property('dropValid')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(30)
+    value = draft(root)
+    group = next(e for e in value['entries'] if e['id'] == 'g')
+    assert [e['id'] for e in group['items']] == ['b', 'c']
+    assert root.property('flyoutVisible')
+    assert value['parentId'] == ''
+
+    # Drag the same item back into the parent without a navigation button.
+    start = point(root, 'layoutFlyoutRow-b', x=40)
+    end = point(root, 'layoutRow-a', x=90, y=5)
+    begin_drag(view, start, end)
+    assert root.property('dropValid')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(30)
+    value = draft(root)
+    assert value['entries'][0]['id'] == 'b'
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id'] == 'g')['items']] == ['c']
