@@ -471,6 +471,57 @@ def test_snapshot_refresh_updates_count_without_changing_unsaved_settings(editor
     assert editor.snapshot_location.textInteractionFlags() & Qt.TextSelectableByKeyboard
 
 
+def test_shortcut_setup_uses_kde_ui_without_claiming_or_changing_bindings(editor, app, monkeypatch, tmp_path):
+    from PySide6.QtCore import QProcess
+    from openpowermenu.shortcut_setup import create_shortcut_dialog
+    shortcuts = tmp_path / 'kglobalshortcutsrc'
+    shortcuts.write_text('Existing shortcut=Meta+X\n')
+    before = editor.configuration()
+    monkeypatch.setattr('openpowermenu.shortcut_setup.installed_command', lambda: "'/home/test user/.local/bin/open-power-menu'")
+    monkeypatch.setattr('openpowermenu.shortcut_setup.settings_command', lambda: ['/usr/bin/kcmshell6', 'kcm_keys'])
+    launches = []
+    monkeypatch.setattr(QProcess, 'startDetached', lambda program, args: (launches.append([program, *args]) or True, 123))
+    dialog = create_shortcut_dialog(editor)
+    assert dialog.command.isReadOnly()
+    dialog.findChild(QPushButton, 'copyShortcutCommand').click()
+    assert app.clipboard().text() == dialog.command.text()
+    dialog.findChild(QPushButton, 'openKdeShortcuts').click()
+    assert launches == [['/usr/bin/kcmshell6', 'kcm_keys']]
+    assert 'settings opened' in dialog.status.text() and 'applying' in dialog.status.text()
+    explanation = ' '.join(label.text() for label in dialog.findChildren(QLabel))
+    assert 'standalone' in explanation and 'conflict' in explanation and 'cancel' in explanation
+    assert shortcuts.read_text() == 'Existing shortcut=Meta+X\n'
+    assert editor.configuration() == before and not editor.is_dirty()
+    dialog.deleteLater()
+
+
+def test_shortcut_setup_missing_services_and_failed_launch_are_clear(editor, app, monkeypatch):
+    from PySide6.QtCore import QProcess
+    from openpowermenu.shortcut_setup import create_shortcut_dialog
+    monkeypatch.setattr('openpowermenu.shortcut_setup.installed_command', lambda: None)
+    monkeypatch.setattr('openpowermenu.shortcut_setup.settings_command', lambda: None)
+    dialog = create_shortcut_dialog(editor)
+    assert not dialog.findChild(QPushButton, 'copyShortcutCommand').isEnabled()
+    assert 'bash install.sh' in dialog.status.text()
+    dialog.open_settings()
+    assert 'unavailable' in dialog.status.text()
+    monkeypatch.setattr('openpowermenu.shortcut_setup.settings_command', lambda: ['systemsettings', 'kcm_keys'])
+    monkeypatch.setattr(QProcess, 'startDetached', lambda *args: (False, 0))
+    dialog.open_settings()
+    assert 'Could not open' in dialog.status.text()
+    dialog.deleteLater()
+
+
+def test_general_shortcut_setup_is_discoverable_and_does_not_dirty_editor(editor, app):
+    button = editor.findChild(QPushButton, 'setupMenuShortcut')
+    assert editor.tabs.widget(0).isAncestorOf(button)
+    def inspect(dialog):
+        assert dialog.windowTitle().endswith('Set up Meta+X')
+        assert dialog.findChild(QPushButton, 'openKdeShortcuts')
+    modal(app, inspect, button.click)
+    assert not editor.is_dirty()
+
+
 def test_nested_edit_save_reopen_round_trip(editor):
     editor.tree.setCurrentItem(editor.item_for((0,)))
     editor.duplicate_selected()
