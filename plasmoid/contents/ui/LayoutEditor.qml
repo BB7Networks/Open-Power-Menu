@@ -12,6 +12,13 @@ QQC2.Control {
     property bool expired: false
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
+    // The adjacent editor pane is not a second native window: Wayland keeps
+    // the entire drag inside the one, existing Plasma popup.
+    property string flyoutId: ""
+    readonly property bool flyoutVisible: !!draft && !!flyoutId &&
+        !!Draft.find(draft.entries, flyoutId) &&
+        Draft.find(draft.entries, flyoutId).parentId === draft.parentId
+    readonly property var flyoutEntries: flyoutVisible ? (Draft.children(draft.entries, flyoutId) || []) : []
     property string draggedId: ""
     property bool dragActive: false
     property bool dragCanceled: false
@@ -38,7 +45,7 @@ QQC2.Control {
     signal cancelRequested()
     signal closeRequested()
     implicitHeight: 356
-    implicitWidth: 304
+    implicitWidth: flyoutVisible ? 606 : 304
     focusPolicy: Qt.StrongFocus
     Accessible.name: "Power User Menu layout editing. Commands are inactive."
 
@@ -110,6 +117,7 @@ QQC2.Control {
     }
     function navigate(parentId, selectedId) {
         rememberView();
+        flyoutId = "";
         edited(Draft.select(draft, parentId, Draft.selection(draft, parentId, selectedId)));
         if (visible) forceActiveFocus();
     }
@@ -121,6 +129,10 @@ QQC2.Control {
         if (busy || expired) return;
         try {
             const next = Draft.move(draft, id, parentId, beforeId);
+            // Keep both panes open when the drop crosses the visible boundary.
+            // Only data references are saved; this is purely visual navigation.
+            if (flyoutVisible && (parentId === flyoutId || parentId === draft.parentId))
+                next.parentId = draft.parentId;
             rememberView();
             revealSelection = true;
             edited(next);
@@ -140,11 +152,27 @@ QQC2.Control {
         const sibling = parent.container[parent.index + 1];
         move(draft.selectedId, parent.parentId, sibling ? sibling.id : "");
     }
+    function openFlyout(id) {
+        if (!draft) return;
+        const found = Draft.find(draft.entries, id);
+        if (!found || found.entry.kind !== "submenu") return;
+        if (found.parentId === draft.parentId) {
+            flyoutId = id;
+        } else if (flyoutVisible && found.parentId === flyoutId) {
+            // Advance one step deeper while keeping its parent in the left pane.
+            navigate(flyoutId, id);
+            flyoutId = id;
+        } else {
+            navigate(found.parentId, id);
+            flyoutId = id;
+        }
+    }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
         if (children) navigate(id, children.length ? children[0].id : "");
     }
     function back() {
+        if (flyoutVisible) { flyoutId = ""; return; }
         if (!draft || !draft.parentId) return;
         const parent = Draft.find(draft.entries, draft.parentId);
         navigate(parent.parentId, parent.entry.id);
@@ -169,6 +197,33 @@ QQC2.Control {
             if (key) springOpen.restart(); else springOpen.stop();
         }
     }
+    function containsPointer(pane, x, y) {
+        if (!pane.visible) return false;
+        const point = rowPointer.mapToItem(pane, x, y);
+        return point.x >= 0 && point.y >= 0 &&
+               point.x < pane.width && point.y < pane.height;
+    }
+    function pointerPane(x, y) {
+        if (flyoutVisible && containsPointer(flyoutList, x, y)) {
+            const point = rowPointer.mapToItem(flyoutList, x, y);
+            if (point.x < flyoutList.width - (flyoutScrollBar.visible ? flyoutScrollBar.width : 0))
+                return {list: flyoutList, parentId: flyoutId, entries: flyoutEntries};
+        }
+        if (containsPointer(list, x, y)) {
+            const point = rowPointer.mapToItem(list, x, y);
+            if (point.x < list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0))
+                return {list: list, parentId: draft.parentId, entries: rows};
+        }
+        return null;
+    }
+    function rowUnderPointer(x, y) {
+        const pane = pointerPane(x, y);
+        if (!pane) return null;
+        const point = rowPointer.mapToItem(pane.list.contentItem, x, y);
+        const index = pane.list.indexAt(point.x, point.y);
+        return index >= 0 && index < pane.entries.length ?
+            {entry: pane.entries[index], parentId: pane.parentId} : null;
+    }
     function updateDragTarget() {
         if (!dragActive || dragCanceled || !draft || restoringView) return;
         const backPoint = rowPointer.mapToItem(navigationBar, rowPointer.mouseX, rowPointer.mouseY);
@@ -179,22 +234,21 @@ QQC2.Control {
             target("parent:" + draft.parentId, "parent", parent.parentId, next ? next.id : "", true);
             return;
         }
-        const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
-        if (point.x < 0 || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)
-                || point.y < 0 || point.y >= list.height) { clearTarget(); return; }
-        const content = rowPointer.mapToItem(list.contentItem, rowPointer.mouseX, rowPointer.mouseY);
-        const index = list.indexAt(content.x, content.y);
-        if (index < 0) { target("end", "end", draft.parentId, "", false); return; }
-        const row = list.itemAtIndex(index);
+        const pane = pointerPane(rowPointer.mouseX, rowPointer.mouseY);
+        if (!pane) { clearTarget(); return; }
+        const point = rowPointer.mapToItem(pane.list.contentItem, rowPointer.mouseX, rowPointer.mouseY);
+        const index = pane.list.indexAt(point.x, point.y);
+        if (index < 0) { target("end:" + pane.parentId, "end", pane.parentId, "", false); return; }
+        const row = pane.list.itemAtIndex(index);
         if (!row) { clearTarget(); return; }
-        const entry = rows[index];
-        const y = content.y - row.y;
+        const entry = pane.entries[index];
+        const y = point.y - row.y;
         if (entry.kind === "submenu" && y >= row.height * .25 && y < row.height * .75) {
             target(entry.id, "inside", entry.id, "", true);
         } else {
             dropBelow = y >= row.height / 2;
-            const next = rows[index + 1];
-            target(entry.id, dropBelow ? "after" : "before", draft.parentId,
+            const next = pane.entries[index + 1];
+            target(entry.id, dropBelow ? "after" : "before", pane.parentId,
                    dropBelow ? (next ? next.id : "") : entry.id, false);
         }
     }
@@ -214,9 +268,11 @@ QQC2.Control {
         // three 36px rows. Consume even at bounds so the outer popup stays put.
         const delta = wheel.pixelDelta.y || wheel.angleDelta.y / 120 * 108;
         if (Number.isFinite(delta) && delta !== 0) {
-            list.contentY = Math.max(list.originY, Math.min(list.contentY - delta,
-                list.originY + Math.max(0, list.contentHeight - list.height)));
-            list.forceLayout();
+            const pane = pointerPane(rowPointer.mouseX, rowPointer.mouseY);
+            const view = pane ? pane.list : list;
+            view.contentY = Math.max(view.originY, Math.min(view.contentY - delta,
+                view.originY + Math.max(0, view.contentHeight - view.height)));
+            view.forceLayout();
             updateDragTarget();
         }
         wheel.accepted = true;
@@ -256,7 +312,11 @@ QQC2.Control {
         event.accepted = true;
     }
     Keys.onPressed: event => handleKey(event)
-    onDraftChanged: syncView()
+    onDraftChanged: {
+        syncView();
+        // Closing or reparenting a submenu must never leave a stale target.
+        if (!draft || (flyoutId && !flyoutVisible)) flyoutId = "";
+    }
     Component.onCompleted: { viewReady = true; syncView(); }
     onVisibleChanged: {
         if (!visible) { rememberView(); cancelDrag(); movesMenu.close(); destinationMenu.close(); }
@@ -340,9 +400,14 @@ QQC2.Control {
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag to move; pause over a submenu or Back. Right-click or Shift+F10 for moves."
+            text: "Drag between the menu and its flyout. Hover to open a submenu; Back moves up."
             wrapMode: Text.WordWrap
         }
+        RowLayout {
+            id: cascadingEditorRow
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 5
         ListView {
             id: list
             objectName: "layoutRows"
@@ -403,9 +468,102 @@ QQC2.Control {
                     width: parent.width
                     height: 2
                     color: control.dropValid ? control.palette.highlight : "#da4453"
-                    visible: control.dragActive && control.dropKind === "end"
+                    visible: control.dragActive && control.dropKind === "end" &&
+                             control.dropParent === control.draft.parentId
                 }
             }
+        }
+        QQC2.Frame {
+            id: flyoutPane
+            objectName: "layoutCascadingPane"
+            visible: control.flyoutVisible
+            Layout.preferredWidth: Math.min(292, Math.max(200, control.width * .48))
+            Layout.fillHeight: true
+            padding: 5
+            background: Rectangle {
+                color: control.palette.window
+                border.color: control.palette.mid
+                radius: 4
+            }
+            contentItem: ColumnLayout {
+                spacing: 4
+                QQC2.Label {
+                    Layout.fillWidth: true
+                    font.bold: true
+                    text: control.flyoutVisible ? Draft.find(control.draft.entries, control.flyoutId).entry.title : ""
+                    elide: Text.ElideMiddle
+                    Accessible.name: "Open submenu"
+                }
+                ListView {
+                    id: flyoutList
+                    objectName: "layoutFlyoutRows"
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    model: control.flyoutEntries
+                    interactive: !control.dragActive
+                    boundsBehavior: Flickable.StopAtBounds
+                    QQC2.ScrollBar.vertical: QQC2.ScrollBar { id: flyoutScrollBar }
+                    onModelChanged: Qt.callLater(() => {
+                        if (!control.flyoutVisible) return;
+                        const saved = Draft.view(control.draft, control.flyoutId);
+                        if (saved) contentY = Math.max(originY, Math.min(originY + saved.position,
+                            originY + Math.max(0, contentHeight - height)));
+                    })
+                    onContentYChanged: {
+                        if (!control.flyoutVisible || !control.draft || control.restoringView) return;
+                        const saved = Draft.view(control.draft, control.flyoutId) || {};
+                        Draft.rememberView(control.draft, control.flyoutId, {
+                            anchorId: saved.anchorId || "",
+                            offset: 0, position: contentY - originY,
+                            selectedId: saved.selectedId || ""
+                        });
+                    }
+                    delegate: QQC2.ItemDelegate {
+                        id: childRow
+                        required property var modelData
+                        required property int index
+                        property var entry: modelData
+                        objectName: "layoutFlyoutRow-" + entry.id
+                        width: flyoutList.width
+                        height: 36
+                        text: entry.title
+                        highlighted: control.draft && entry.id === control.draft.selectedId
+                        enabled: !control.busy
+                        Accessible.name: entry.title + (entry.kind === "submenu" ? ", submenu" : ", rearrange only")
+                        QQC2.Label {
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.rightMargin: 9
+                            text: childRow.entry.kind === "submenu" ? "›" : ""
+                        }
+                        Rectangle {
+                            width: parent.width
+                            height: control.dropKind === "inside" ? parent.height : 2
+                            y: control.dropKind !== "inside" && control.dropBelow ? parent.height - height : 0
+                            color: control.dropValid ? control.palette.highlight : "#da4453"
+                            opacity: control.dropKind === "inside" ? .25 : 1
+                            visible: control.dragActive && control.dropRow === childRow.entry.id
+                        }
+                    }
+                    footer: Item {
+                        width: flyoutList.width
+                        height: flyoutList.count ? 24 : Math.max(32, flyoutList.height)
+                        QQC2.Label {
+                            anchors.centerIn: parent
+                            text: control.dragActive ? "Drop at end" : flyoutList.count ? "" : "Empty submenu"
+                        }
+                        Rectangle {
+                            width: parent.width
+                            height: 2
+                            color: control.dropValid ? control.palette.highlight : "#da4453"
+                            visible: control.dragActive && control.dropKind === "end" &&
+                                     control.dropParent === control.flyoutId
+                        }
+                    }
+                }
+            }
+        }
         }
         RowLayout {
             Layout.fillWidth: true
@@ -432,27 +590,24 @@ QQC2.Control {
         z: 50
         enabled: !control.busy && !control.expired
         property string pressedId: ""
+        property string pressedParent: ""
         property bool suppressClick: false
         preventStealing: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         drag.target: (pressedButtons & Qt.LeftButton) ? dragPosition : null
         drag.smoothed: false
         onPressed: mouse => {
-            const point = mapToItem(list, mouse.x, mouse.y);
-            const content = mapToItem(list.contentItem, mouse.x, mouse.y);
-            const index = list.indexAt(content.x, content.y);
-            if (point.x < 0 || point.y < 0 || point.y >= list.height || index < 0
-                    || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)) {
-                mouse.accepted = false; return;
-            }
-            pressedId = rowModel.get(index).itemId;
+            const hit = control.rowUnderPointer(mouse.x, mouse.y);
+            if (!hit) { mouse.accepted = false; return; }
+            pressedId = hit.entry.id;
+            pressedParent = hit.parentId;
             control.choose(pressedId);
             control.forceActiveFocus();
             if (mouse.button === Qt.RightButton) return;
             suppressClick = false;
             control.dragCanceled = false;
             control.draggedId = pressedId;
-            control.dragOriginParent = control.draft.parentId;
+            control.dragOriginParent = pressedParent;
             dragPosition.x = mouse.x - 8;
             dragPosition.y = mouse.y - 18;
         }
@@ -471,10 +626,16 @@ QQC2.Control {
             control.cancelDrag(!accepted);
         }
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) { control.showMoves(mouse.x, mouse.y); return; }
+            if (mouse.button === Qt.RightButton) {
+                if (pressedParent !== control.draft.parentId)
+                    control.navigate(pressedParent, pressedId);
+                control.showMoves(mouse.x, mouse.y); return;
+            }
             if (suppressClick || !control.draft) return;
             const entry = Draft.find(control.draft.entries, pressedId);
-            if (entry && entry.entry.kind === "submenu") control.enter(pressedId);
+            if (entry && entry.entry.kind === "submenu") control.openFlyout(pressedId);
+            else if (pressedParent !== control.draft.parentId)
+                control.navigate(pressedParent, pressedId);
         }
         onCanceled: { suppressClick = true; control.cancelDrag(); }
         onWheel: wheel => control.scrollDuringDrag(wheel)
@@ -485,7 +646,7 @@ QQC2.Control {
         objectName: "inMenuDragPreview"
         x: Math.max(0, Math.min(dragPosition.x, control.width - width))
         y: dragPosition.y
-        width: control.width - 30
+        width: Math.min(292, control.width - 30)
         height: 36
         z: 100
         visible: control.dragActive
@@ -507,7 +668,11 @@ QQC2.Control {
             if (!control.dragActive || !control.hoverKey) return;
             const parentId = control.hoverParent;
             control.clearTarget();
-            control.navigate(parentId, "");
+            if (control.dropKind === "parent") {
+                control.navigate(parentId, "");
+            } else {
+                control.openFlyout(parentId);
+            }
         }
     }
     Timer {
@@ -515,11 +680,13 @@ QQC2.Control {
         repeat: true
         running: control.dragActive
         onTriggered: {
-            const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
-            if (point.x < 0 || point.x > list.width || point.y < 0 || point.y > list.height) return;
-            if (point.y < 24) list.contentY = Math.max(list.originY, list.contentY - 12);
-            else if (point.y > list.height - 24)
-                list.contentY = Math.min(list.originY + Math.max(0, list.contentHeight - list.height), list.contentY + 12);
+            const pane = control.pointerPane(rowPointer.mouseX, rowPointer.mouseY);
+            if (!pane) return;
+            const view = pane.list;
+            const point = rowPointer.mapToItem(view, rowPointer.mouseX, rowPointer.mouseY);
+            if (point.y < 24) view.contentY = Math.max(view.originY, view.contentY - 12);
+            else if (point.y > view.height - 24)
+                view.contentY = Math.min(view.originY + Math.max(0, view.contentHeight - view.height), view.contentY + 12);
             control.updateDragTarget();
         }
     }
