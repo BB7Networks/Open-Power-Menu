@@ -613,12 +613,10 @@ QQC2.Control {
             closePolicy: QQC2.Popup.NoAutoClose
             onAboutToShow: control.positionFlyout(control.flyoutId)
             onClosed: {
+                // The editor owns visibility through flyoutId. A late native
+                // close notification must not erase a newly selected nested
+                // submenu that was opened during the same event loop.
                 control.flyoutPointerInside = false;
-                // A nested level may have replaced the popup's contents before
-                // the previous close notification reaches this event loop.
-                Qt.callLater(() => {
-                    if (!flyoutPane.visible && control.flyoutId) control.flyoutId = "";
-                });
             }
             x: control.flyoutX
             y: control.flyoutY
