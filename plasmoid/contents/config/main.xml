@@ -12,7 +12,7 @@
       <default>launcher</default>
     </entry>
     <entry name="useCascadingEdit" type="Bool">
-      <label>Show an adjacent submenu pane while rearranging</label>
+      <label>Open floating submenu flyouts while rearranging</label>
       <default>true</default>
     </entry>
     <entry name="opmDefaultShortcutTried" type="Bool">
