@@ -22,27 +22,31 @@ Menu; a second press should close it. Test AppGrid visible/hidden, drafts,
 fast switching, and launcher focus on Plasma 6 Wayland and X11. Automated
 tests cannot validate KGlobalAccel or native popup placement.
 
-## Cascading drag-and-drop preview
+## Floating layout-edit flyouts
 
-While the menu is unlocked, clicking a submenu or resting the pointer
-on it briefly opens an adjacent pane inside the **same Plasma popup**.
-The flyout remains open while moving into its child pane; it closes after
-a short delay once the pointer leaves both the parent row and child pane.
-Cross-pane drags suspend hover dismissal until release. The unchanged saved-menu model
-remains authoritative; two visible views only move the same opaque item IDs.
-Dragging between parent and child is supported with native pointer movement
-and no second Wayland window or arbitrary command execution.
+The unlocked editor stays a normal-width menu. Clicking or hovering over a
+submenu opens a **separate, row-anchored Qt Popup.Window** beside that item,
+instead of widening the parent into a fixed split-pane layout. The flyout
+adapts to available space on either side and clamps vertically to the
+source screen. Nested submenus advance the focused parent/child level.
+Normal locked-menu flyouts are unchanged.
 
-The menu grows to a maximum of 650 px while the flyout is open and respects
-available screen width. Opening another submenu advances the two-pane view to
-that level; Back remains available, and normal keyboard navigation is retained.
-The right-pane scroll view remembers its position. All changes remain a draft
-until Save; Cancel discards them.
+The flyout remains visible when the pointer crosses into the child popup
+and dismisses after a short grace interval when it leaves both the parent
+row and flyout. Closing the main popup also closes its editing flyout,
+without discarding the unsaved draft.
 
-**Experimental:** The editor's in-process split pane is NOT a native
-cross-window Plasma flyout and still needs real Wayland acceptance, especially
-on a right-edge panel, narrow display and fractional scaling. The stable PR #5
-branch has not been modified.
+Cross-window reordering uses Qt's native drag/drop with opaque, current-
+session item IDs and validation through the existing layout move rules.
+If a native Wayland drag between popup windows does not work on the user's
+compositor, the editor's Move into submenu command and single-pane
+fallback remain available. For cross-window moves, open the submenu
+before beginning the drag. No menu commands execute during editing.
+
+**Physical acceptance remains required:** actual KWin/Wayland popup placement,
+hover persistence, focus, close/reopen, multi-monitor and fractional scaling,
+drag in both directions, and right-edge panel use cannot be established by
+headless Qt tests alone.
 
 ## Optional single-pane fallback
 
