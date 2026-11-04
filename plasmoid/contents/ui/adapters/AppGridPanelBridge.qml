@@ -37,6 +37,7 @@ Item {
             if (typeof owner.setInputRect === "function") {
                 // AppGrid's documented 0x0 rect restores full-window input.
                 owner.setInputRect(win, 0, 0, 0, 0);
+                AppGridLauncher.trace("input-mask-restored", null, owner);
                 console.info("Open Power Menu: restored AppGrid full-window input");
             }
         } catch (e) {
@@ -83,6 +84,7 @@ Item {
             passThroughApplet = plan.applet;
             passThroughWindow = win;
             passThroughSignature = signature;
+            AppGridLauncher.trace("input-mask-applied", item, plan.applet, {edge:edge, cut:rect.cut});
             console.info("Open Power Menu: AppGrid panel input pass-through applied:",
                          edge, "strip=" + rect.cut + "px", "applet=" + plan.applet.id);
             return true;
@@ -152,8 +154,14 @@ Item {
         function onVisibleChanged() {
             const item = bridge.selectedLauncherPlan ? bridge.selectedLauncherPlan.item : null;
             const win = item ? item.gridWindow : null;
+            const plan = bridge.selectedLauncherPlan;
+            AppGridLauncher.trace("window-visible", item, plan ? plan.applet : null, {maskActive:bridge.active});
             if (win && win.visible && item.gridOpen === true) bridge.schedule();
             else if (!win || !win.visible) bridge.restoreAppGridPassThrough();
+        }
+        function onActiveChanged() {
+            const plan = bridge.selectedLauncherPlan;
+            AppGridLauncher.trace("window-active", plan ? plan.item : null, plan ? plan.applet : null);
         }
         function onWidthChanged() {
             bridge.passThroughSignature = "";
@@ -171,8 +179,7 @@ Item {
         function onGridOpenChanged() {
             const plan = bridge.selectedLauncherPlan;
             if (!plan || !AppGridLauncher.matches(plan.applet)) return;
-            console.info("Open Power Menu: observed AppGrid gridOpen change:",
-                         AppGridLauncher.describeState(plan.item, plan.applet));
+            AppGridLauncher.trace("grid-open", plan.item, plan.applet, {maskActive:bridge.active});
             if (plan.item && plan.item.gridOpen === true) bridge.schedule();
             else bridge.reset();
             bridge.launcherOpened();

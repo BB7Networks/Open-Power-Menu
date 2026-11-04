@@ -26,6 +26,8 @@ function originalIsVisiblyOpen(item, applet) {
 
 function activate(applet) { return Plasma.activate(applet); }
 
+function deferSignalClose(applet) { return kind(applet) === "appgrid-center"; }
+
 function chooseIcon(applet, mode, custom, fallback) {
     return Plasma.chooseIcon(applet, mode, custom, fallback);
 }
@@ -36,16 +38,25 @@ function describeState(item, applet) {
 }
 
 // Keep verbose diagnostics limited to the unusual adapter that needs them.
-function trace(label, item, applet) {
-    if (kind(applet) !== "appgrid-center") return;
-    console.info("Open Power Menu: " + label + ":", describeState(item, applet));
+function trace(label, item, applet, context) {
+    AppGrid.trace(label, item, applet, context);
+}
+
+function traceRequest(root, label, callbackEpoch) {
+    const plan = root.selectedLauncherPlan;
+    if (!plan || kind(plan.applet) !== "appgrid-center") return;
+    trace(label, plan.item, plan.applet, {
+        epoch: root.menuSwitchEpoch, callbackEpoch: callbackEpoch,
+        requested: root.requestedMenu, powerOpen: root.expanded,
+        pendingLauncher: root.pendingLauncherEpoch, pendingPower: root.pendingPowerEpoch,
+        awaitingClose: root.awaitingAsyncClose, maskActive: root.maskActive,
+        hideRequested: root.hideOriginalLauncherRequested, draft: !!root.layoutDraft
+    });
 }
 
 function traceDismissal(result, item, applet) {
     if (kind(applet) !== "appgrid-center") return;
-    console.info("Open Power Menu: launcher dismissal:", result.mode,
-                 "forcedHidden=" + String(result.forceHidden === true),
-                 describeState(item, applet));
+    trace("dismissal", item, applet, {mode:result.mode, forcedHidden:result.forceHidden === true});
 }
 
 function requestAsyncClose(applet, send, isCurrent, done) {

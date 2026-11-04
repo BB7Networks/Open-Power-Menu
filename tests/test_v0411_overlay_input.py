@@ -82,7 +82,7 @@ const calls=[];
 const applet={id:59,pluginName:'dev.xarbit.appgrid',setInputRect:(...args)=>calls.push(args)};
 const item={gridOpen:true,gridWindow:w,isDragInFlight:false};
 const c={PanelGeometry:o,PlasmaCore:{Types:types},
-    AppGridLauncher:{supportsPanelPassThrough(plan){return plan?.applet?.pluginName==='dev.xarbit.appgrid' && plan.item.gridOpen===true}},
+    AppGridLauncher:{trace(){},supportsPanelPassThrough(plan){return plan?.applet?.pluginName==='dev.xarbit.appgrid' && plan.item.gridOpen===true}},
     panelWindow:{height:56,width:1920,screen:{name:'DP-1'}},
     panelLocation:10,compactButtonHeight:40,selectedLauncherPlan:{applet,item},
     active:true,passThroughWindow:null,passThroughApplet:null,passThroughSignature:'',console};

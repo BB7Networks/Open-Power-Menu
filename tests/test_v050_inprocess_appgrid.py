@@ -44,7 +44,7 @@ const item={gridOpen:false,gridWindow:{visible:true},closeWindow(){closeCalls++}
 const result=c.closeOriginal(item,{pluginName:'dev.xarbit.appgrid'},()=>probes++);
 assert.equal(result.ok,true); assert.equal(result.mode,'appgrid-local-closed');
 assert.equal(result.forceHidden,true);assert.equal(item.gridWindow.visible,false);
-assert.equal(closeCalls,1);assert.equal(probes,0); // Never probe an absent standalone daemon
+assert.equal(closeCalls,0);assert.equal(probes,0); // No new exit animation or daemon probe
 ''')
 
     def test_unknown_or_already_closed_window_not_mutated(self):
@@ -67,8 +67,8 @@ assert.equal(other.gridWindow.visible,true); // never change unrelated applets
         self.assertIn('traceDismissal(',q)
         self.assertIn('launcher before left-click',q)
         self.assertIn('launcher after left-click',q)
-        self.assertIn('observed AppGrid gridOpen change:', (ROOT/'plasmoid/contents/ui/adapters/AppGridPanelBridge.qml').read_text())
-        self.assertIn('forcedHidden=', (ROOT/'plasmoid/contents/ui/adapters/LauncherAdapters.js').read_text())
+        self.assertIn('AppGridLauncher.trace("grid-open"', (ROOT/'plasmoid/contents/ui/adapters/AppGridPanelBridge.qml').read_text())
+        self.assertIn('forcedHidden:', (ROOT/'plasmoid/contents/ui/adapters/LauncherAdapters.js').read_text())
         self.assertIn('value: root.hiddenStatusForRevision(root.launcherMaskRevision)',q)
         self.assertIn('LauncherAdapters.chooseIcon(',q)
         self.assertNotIn('selectedLauncherItem.visible =',q)

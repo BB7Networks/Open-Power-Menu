@@ -81,7 +81,7 @@ Object.assign(root,{activateSelectedLauncher(epoch){
   closeLauncherPopup(){return {ok:true}},fetchMenu(){}});
 const c={root,Qt:{callLater(f){cbs.push(f)}},
   launcherClosePoll:poll,launcherCloseFollowup:follow,launcherActivationSettle:settle,
-  LauncherAdapters:{originalIsOpen(item){return item&&item.expanded===true}},
+  LauncherAdapters:{traceRequest(){},originalIsOpen(item){return item&&item.expanded===true}},
   console:{info(...args){messages.push(args.join(' '))}},
   fetchIntegration(){},closeLauncherPopup(){return root.closeLauncherPopup()}};
 for(const key of ['expanded','menuSwitchEpoch','requestedMenu','pendingPowerEpoch',

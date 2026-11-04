@@ -80,6 +80,7 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             const epoch = root.pendingLauncherEpoch;
+            LauncherAdapters.traceRequest(root, "activation-settle", epoch);
             root.pendingLauncherEpoch = -1;
             if (epoch !== root.menuSwitchEpoch || root.requestedMenu !== "launcher" || root.expanded)
                 return;
@@ -154,6 +155,7 @@ PlasmoidItem {
     }
 
     function finishOpeningPower(epoch) {
+        LauncherAdapters.traceRequest(root, "power-close-confirmed", epoch);
         if (epoch !== menuSwitchEpoch || requestedMenu !== "power") return;
         launcherClosePoll.stop();
         pendingPowerEpoch = -1;
@@ -207,22 +209,40 @@ PlasmoidItem {
         interval: 350
         repeat: false
         onTriggered: {
+            LauncherAdapters.traceRequest(root, "close-followup", root.menuSwitchEpoch);
             if (root.expanded && root.requestedMenu === "power")
                 root.closeLauncherPopup();
         }
     }
     function onOriginalLauncherOpened() {
+        LauncherAdapters.traceRequest(root, "launcher-state-signal", root.menuSwitchEpoch);
         if (!root.expanded || !LauncherAdapters.originalIsOpen(
                 root.selectedLauncherItem,
                 root.selectedLauncherPlan ? root.selectedLauncherPlan.applet : null))
             return;
         if (root.requestedMenu === "power" && launcherCloseFollowup.running) {
-            root.closeLauncherPopup(); // Right-click was the latest request.
+            if (!LauncherAdapters.deferSignalClose(root.selectedLauncherPlan ? root.selectedLauncherPlan.applet : null)) {
+                root.closeLauncherPopup();
+                return;
+            }
+            // gridOpen changes before AppGrid's openWindow finishes showing its
+            // window. Do not reenter closeWindow halfway through that call.
+            const epoch = root.menuSwitchEpoch;
+            Qt.callLater(() => {
+                LauncherAdapters.traceRequest(root, "late-open-close-callback", epoch);
+                if (epoch === root.menuSwitchEpoch && root.requestedMenu === "power" && root.expanded)
+                    root.closeLauncherPopup();
+            });
         } else {
             root.menuSwitchEpoch += 1;
             root.requestedMenu = "launcher";
             root.expanded = false; // Original launcher/Meta takes precedence.
         }
+    }
+    Connections {
+        target: root
+        function onExpandedChanged() { LauncherAdapters.traceRequest(root, "power-expanded", root.menuSwitchEpoch); }
+        function onMaskActiveChanged() { LauncherAdapters.traceRequest(root, "mask-active", root.menuSwitchEpoch); }
     }
     Connections {
         target: root.selectedLauncherItem
@@ -523,6 +543,7 @@ PlasmoidItem {
     // right-click tries to close). Emitting activated() is the same action the
     // Plasma shell uses, but on our exact selected applet.
     function activateSelectedLauncher(epoch) {
+        LauncherAdapters.traceRequest(root, "activation-callback", epoch);
         if (epoch !== root.menuSwitchEpoch || root.requestedMenu !== "launcher")
             return;
         let plan = root.selectedLauncherPlan;
@@ -573,6 +594,7 @@ PlasmoidItem {
         const wasPowerPopupOpen = expanded === true;
         const epoch = ++menuSwitchEpoch;
         requestedMenu = "launcher";
+        LauncherAdapters.traceRequest(root, "left-request", epoch);
         launcherClosePoll.stop();
         pendingPowerEpoch = -1;
         awaitingAsyncClose = false;
@@ -624,6 +646,7 @@ PlasmoidItem {
         launcherActivationSettle.stop(); // Cancel pending Power -> Launcher switch.
         pendingLauncherEpoch = -1;
         requestedMenu = alreadyOpen ? "none" : "power";
+        LauncherAdapters.traceRequest(root, "right-request", epoch);
         launcherClosePoll.stop();
         launcherCloseFollowup.stop();
         pendingPowerEpoch = -1;
