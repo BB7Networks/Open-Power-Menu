@@ -18,6 +18,9 @@ QQC2.Control {
     // The adjacent editor pane is not a second native window: Wayland keeps
     // the entire drag inside the one, existing Plasma popup.
     property string flyoutId: ""
+    property string pendingHoverFlyoutId: ""
+    property int hoverOpenDelay: 180
+    property int flyoutDismissDelay: 230
     readonly property bool flyoutVisible: cascadingEnabled && !!draft && !!flyoutId &&
         !!Draft.find(draft.entries, flyoutId) &&
         Draft.find(draft.entries, flyoutId).parentId === draft.parentId
@@ -120,6 +123,9 @@ QQC2.Control {
     }
     function navigate(parentId, selectedId) {
         rememberView();
+        hoverOpen.stop();
+        flyoutDismiss.stop();
+        pendingHoverFlyoutId = "";
         flyoutId = "";
         edited(Draft.select(draft, parentId, Draft.selection(draft, parentId, selectedId)));
         if (visible) forceActiveFocus();
@@ -158,6 +164,9 @@ QQC2.Control {
     function openFlyout(id) {
         if (!draft) return;
         if (!cascadingEnabled) { enter(id); return; }
+        hoverOpen.stop();
+        flyoutDismiss.stop();
+        pendingHoverFlyoutId = "";
         const found = Draft.find(draft.entries, id);
         if (!found || found.entry.kind !== "submenu") return;
         if (found.parentId === draft.parentId) {
@@ -227,6 +236,36 @@ QQC2.Control {
         const index = pane.list.indexAt(point.x, point.y);
         return index >= 0 && index < pane.entries.length ?
             {entry: pane.entries[index], parentId: pane.parentId} : null;
+    }
+    function updateFlyoutHover(x, y) {
+        if (!cascadingEnabled || !draft || busy || expired || dragActive) {
+            hoverOpen.stop();
+            flyoutDismiss.stop();
+            return;
+        }
+        const hit = rowPointer.containsMouse ? rowUnderPointer(x, y) : null;
+        if (hit && hit.entry.kind === "submenu" &&
+                (hit.parentId === draft.parentId ||
+                 (flyoutVisible && hit.parentId === flyoutId))) {
+            flyoutDismiss.stop();
+            if (hit.entry.id !== flyoutId) {
+                if (pendingHoverFlyoutId !== hit.entry.id || !hoverOpen.running) {
+                    pendingHoverFlyoutId = hit.entry.id;
+                    hoverOpen.restart();
+                }
+            } else {
+                hoverOpen.stop();
+                pendingHoverFlyoutId = "";
+            }
+            return;
+        }
+        hoverOpen.stop();
+        pendingHoverFlyoutId = "";
+        if (flyoutVisible && rowPointer.containsMouse && containsPointer(flyoutPane, x, y)) {
+            flyoutDismiss.stop();
+            return;
+        }
+        if (flyoutVisible && !flyoutDismiss.running) flyoutDismiss.start();
     }
     function updateDragTarget() {
         if (!dragActive || dragCanceled || !draft || restoringView) return;
@@ -323,8 +362,16 @@ QQC2.Control {
     }
     Component.onCompleted: { viewReady = true; syncView(); }
     onVisibleChanged: {
-        if (!visible) { rememberView(); cancelDrag(); movesMenu.close(); destinationMenu.close(); }
-        else if (viewReady && draft) Qt.callLater(() => restoreView(false));
+        if (!visible) {
+            rememberView();
+            hoverOpen.stop();
+            flyoutDismiss.stop();
+            pendingHoverFlyoutId = "";
+            cancelDrag();
+            flyoutId = "";
+            movesMenu.close();
+            destinationMenu.close();
+        } else if (viewReady && draft) Qt.callLater(() => restoreView(false));
     }
 
     QQC2.Menu {
@@ -598,9 +645,18 @@ QQC2.Control {
         property bool suppressClick: false
         preventStealing: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        hoverEnabled: control.cascadingEnabled
+        onEntered: control.updateFlyoutHover(mouseX, mouseY)
+        onExited: {
+            hoverOpen.stop();
+            pendingHoverFlyoutId = "";
+            if (control.flyoutVisible && !control.dragActive) flyoutDismiss.restart();
+        }
         drag.target: (pressedButtons & Qt.LeftButton) ? dragPosition : null
         drag.smoothed: false
         onPressed: mouse => {
+            hoverOpen.stop();
+            flyoutDismiss.stop();
             const hit = control.rowUnderPointer(mouse.x, mouse.y);
             if (!hit) { mouse.accepted = false; return; }
             pressedId = hit.entry.id;
@@ -617,8 +673,12 @@ QQC2.Control {
         }
         onPositionChanged: {
             if (drag.active && !control.dragCanceled) {
+                hoverOpen.stop();
+                flyoutDismiss.stop();
                 control.dragActive = true;
                 control.updateDragTarget();
+            } else if (!rowPointer.pressed) {
+                control.updateFlyoutHover(mouseX, mouseY);
             }
         }
         onReleased: mouse => {
@@ -628,6 +688,7 @@ QQC2.Control {
             const accepted = control.dragActive && !control.dragCanceled && control.dropValid;
             if (accepted) control.move(control.draggedId, control.dropParent, control.dropBefore);
             control.cancelDrag(!accepted);
+            control.updateFlyoutHover(mouse.x, mouse.y);
         }
         onClicked: mouse => {
             if (mouse.button === Qt.RightButton) {
@@ -663,6 +724,33 @@ QQC2.Control {
             color: control.palette.highlightedText
             text: !control.dropValid ? "Cannot drop here" : control.draft && control.draggedId ? Draft.find(control.draft.entries, control.draggedId).entry.title : ""
             elide: Text.ElideRight
+        }
+    }
+    Timer {
+        id: hoverOpen
+        interval: control.hoverOpenDelay
+        onTriggered: {
+            if (control.dragActive || !rowPointer.containsMouse || !control.draft) return;
+            const hit = control.rowUnderPointer(rowPointer.mouseX, rowPointer.mouseY);
+            if (hit && hit.entry.kind === "submenu" && hit.entry.id === control.pendingHoverFlyoutId &&
+                    (hit.parentId === control.draft.parentId ||
+                     (control.flyoutVisible && hit.parentId === control.flyoutId)))
+                control.openFlyout(hit.entry.id);
+        }
+    }
+    Timer {
+        id: flyoutDismiss
+        interval: control.flyoutDismissDelay
+        onTriggered: {
+            if (control.dragActive || !control.flyoutVisible) return;
+            if (rowPointer.containsMouse) {
+                const hit = control.rowUnderPointer(rowPointer.mouseX, rowPointer.mouseY);
+                if (hit && hit.parentId === control.draft.parentId && hit.entry.id === control.flyoutId)
+                    return;
+                if (control.containsPointer(flyoutPane, rowPointer.mouseX, rowPointer.mouseY))
+                    return;
+            }
+            control.flyoutId = "";
         }
     }
     Timer {
