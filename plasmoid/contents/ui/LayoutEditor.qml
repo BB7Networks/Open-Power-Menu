@@ -1,6 +1,7 @@
 // Rearrangement only: no command payloads, launch signals or direct file access.
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Window
 import QtQuick.Controls as QQC2
 import "LayoutDraft.js" as Draft
 
@@ -15,9 +16,13 @@ QQC2.Control {
     property bool cascadingEnabled: false
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
-    // The adjacent editor pane is not a second native window: Wayland keeps
-    // the entire drag inside the one, existing Plasma popup.
+    // A real Qt popup is anchored to the hovered row, outside the 328px
+    // main menu. Native Qt drag/drop is used for cross-window moves.
     property string flyoutId: ""
+    property bool flyoutPointerInside: false
+    property real flyoutX: width + 4
+    property real flyoutY: 0
+    property bool nativeDragHandled: false
     property string pendingHoverFlyoutId: ""
     property int hoverOpenDelay: 180
     property int flyoutDismissDelay: 230
@@ -51,7 +56,7 @@ QQC2.Control {
     signal cancelRequested()
     signal closeRequested()
     implicitHeight: 356
-    implicitWidth: flyoutVisible ? 606 : 304
+    implicitWidth: 304
     focusPolicy: Qt.StrongFocus
     Accessible.name: "Power User Menu layout editing. Commands are inactive."
 
@@ -171,21 +176,44 @@ QQC2.Control {
         if (!found || found.entry.kind !== "submenu") return;
         if (found.parentId === draft.parentId) {
             flyoutId = id;
+            Qt.callLater(() => positionFlyout(id));
         } else if (flyoutVisible && found.parentId === flyoutId) {
             // Advance one step deeper while keeping its parent in the left pane.
             navigate(flyoutId, id);
             flyoutId = id;
+            Qt.callLater(() => positionFlyout(id));
         } else {
             navigate(found.parentId, id);
             flyoutId = id;
+            Qt.callLater(() => positionFlyout(id));
         }
+    }
+
+    function positionFlyout(id) {
+        if (!draft || !id) return;
+        const index = rowIndex(id);
+        const row = index >= 0 ? list.itemAtIndex(index) : null;
+        if (!row) return;
+        const local = row.mapToItem(control, 0, 0);
+        const global = row.mapToGlobal(0, 0);
+        const screenLeft = Screen.virtualX;
+        const screenTop = Screen.virtualY;
+        const screenWidth = Screen.desktopAvailableWidth > 0 ? Screen.desktopAvailableWidth : Screen.width;
+        const screenHeight = Screen.desktopAvailableHeight > 0 ? Screen.desktopAvailableHeight : Screen.height;
+        const rightFree = screenLeft + screenWidth - (global.x + row.width);
+        const leftFree = global.x - screenLeft;
+        const openRight = rightFree >= flyoutPane.width + 6 || rightFree >= leftFree;
+        flyoutX = openRight ? local.x + row.width + 3 : local.x - flyoutPane.width - 3;
+        const globalY = Math.max(screenTop + 4, Math.min(global.y,
+            screenTop + screenHeight - flyoutPane.height - 4));
+        flyoutY = local.y + globalY - global.y;
     }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
         if (children) navigate(id, children.length ? children[0].id : "");
     }
     function back() {
-        if (flyoutVisible) { flyoutId = ""; return; }
+        if (flyoutVisible) { flyoutId = ""; flyoutPointerInside = false; return; }
         if (!draft || !draft.parentId) return;
         const parent = Draft.find(draft.entries, draft.parentId);
         navigate(parent.parentId, parent.entry.id);
@@ -217,11 +245,6 @@ QQC2.Control {
                point.x < pane.width && point.y < pane.height;
     }
     function pointerPane(x, y) {
-        if (flyoutVisible && containsPointer(flyoutList, x, y)) {
-            const point = rowPointer.mapToItem(flyoutList, x, y);
-            if (point.x < flyoutList.width - (flyoutScrollBar.visible ? flyoutScrollBar.width : 0))
-                return {list: flyoutList, parentId: flyoutId, entries: flyoutEntries};
-        }
         if (containsPointer(list, x, y)) {
             const point = rowPointer.mapToItem(list, x, y);
             if (point.x < list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0))
@@ -261,7 +284,7 @@ QQC2.Control {
         }
         hoverOpen.stop();
         pendingHoverFlyoutId = "";
-        if (flyoutVisible && rowPointer.containsMouse && containsPointer(flyoutPane, x, y)) {
+        if (flyoutVisible && flyoutPointerInside) {
             flyoutDismiss.stop();
             return;
         }
@@ -369,6 +392,7 @@ QQC2.Control {
             pendingHoverFlyoutId = "";
             cancelDrag();
             flyoutId = "";
+            flyoutPointerInside = false;
             movesMenu.close();
             destinationMenu.close();
         } else if (viewReady && draft) Qt.callLater(() => restoreView(false));
@@ -454,11 +478,6 @@ QQC2.Control {
             text: "Drag between the menu and its flyout. Hover to open a submenu; Back moves up."
             wrapMode: Text.WordWrap
         }
-        RowLayout {
-            id: cascadingEditorRow
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            spacing: 5
         ListView {
             id: list
             objectName: "layoutRows"
@@ -522,22 +541,54 @@ QQC2.Control {
                     visible: control.dragActive && control.dropKind === "end" &&
                              control.dropParent === control.draft.parentId
                 }
+            RowLayout {
+            Layout.fillWidth: true
+            QQC2.Button {
+                objectName: "saveLayout"
+                text: "Save layout"
+                enabled: !!control.draft && !control.busy && !control.expired
+                onClicked: control.saveRequested()
+            }
+            Item { Layout.fillWidth: true }
+            QQC2.Button {
+                objectName: "cancelLayout"
+                text: "Cancel"
+                enabled: !control.busy
+                onClicked: control.cancelRequested()
             }
         }
-        QQC2.Frame {
+    }
+    QQC2.Popup {
             id: flyoutPane
             objectName: "layoutCascadingPane"
+            parent: control
+            popupType: QQC2.Popup.Window
             visible: control.flyoutVisible
-            Layout.preferredWidth: Math.min(292, Math.max(200, control.width * .48))
-            Layout.fillHeight: true
+            modal: false
+            focus: false
+            closePolicy: QQC2.Popup.NoAutoClose
+            x: control.flyoutX
+            y: control.flyoutY
+            width: 280
+            height: Math.max(72, Math.min(410, (control.flyoutEntries.length * 36) + 72))
             padding: 5
             background: Rectangle {
                 color: control.palette.window
                 border.color: control.palette.mid
                 radius: 4
             }
-            contentItem: ColumnLayout {
-                spacing: 4
+            contentItem: Item {
+                id: flyoutSurface
+                HoverHandler {
+                    onHoveredChanged: {
+                        control.flyoutPointerInside = hovered;
+                        if (hovered) flyoutDismiss.stop();
+                        else if (control.flyoutVisible && !control.dragActive) flyoutDismiss.restart();
+                    }
+                }
+                ColumnLayout {
+                    anchors.fill: parent
+                    spacing: 4
                 QQC2.Label {
                     Layout.fillWidth: true
                     font.bold: true
@@ -614,25 +665,9 @@ QQC2.Control {
                     }
                 }
             }
-        }
-        }
-        RowLayout {
-            Layout.fillWidth: true
-            QQC2.Button {
-                objectName: "saveLayout"
-                text: "Save layout"
-                enabled: !!control.draft && !control.busy && !control.expired
-                onClicked: control.saveRequested()
-            }
-            Item { Layout.fillWidth: true }
-            QQC2.Button {
-                objectName: "cancelLayout"
-                text: "Cancel"
-                enabled: !control.busy
-                onClicked: control.cancelRequested()
-            }
-        }
+                }
     }
+
     // One stable pointer owner survives row moves and submenu navigation. Qt's
     // native drag threshold distinguishes a click from movement; no hold delay.
     MouseArea {
@@ -747,8 +782,7 @@ QQC2.Control {
                 const hit = control.rowUnderPointer(rowPointer.mouseX, rowPointer.mouseY);
                 if (hit && hit.parentId === control.draft.parentId && hit.entry.id === control.flyoutId)
                     return;
-                if (control.containsPointer(flyoutPane, rowPointer.mouseX, rowPointer.mouseY))
-                    return;
+                if (control.flyoutPointerInside) return;
             }
             control.flyoutId = "";
         }
