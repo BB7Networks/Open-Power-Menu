@@ -206,6 +206,21 @@ QQC2.Control {
         if (returnToOrigin) navigate(dragOriginParent, draggedId);
         draggedId = "";
     }
+    function scrollDuringDrag(wheel) {
+        if (!dragActive || dragCanceled) { wheel.accepted = false; return; }
+        // ListView is deliberately noninteractive while we own the drag grab.
+        // Qt deltas already incorporate the device's natural-scroll setting.
+        // Pixel deltas preserve smooth touchpad motion; a wheel notch moves
+        // three 36px rows. Consume even at bounds so the outer popup stays put.
+        const delta = wheel.pixelDelta.y || wheel.angleDelta.y / 120 * 108;
+        if (Number.isFinite(delta) && delta !== 0) {
+            list.contentY = Math.max(list.originY, Math.min(list.contentY - delta,
+                list.originY + Math.max(0, list.contentHeight - list.height)));
+            list.forceLayout();
+            updateDragTarget();
+        }
+        wheel.accepted = true;
+    }
     function handleKey(event) {
         if (!draft || busy) return;
         const alt = (event.modifiers & Qt.AltModifier) !== 0;
@@ -446,7 +461,7 @@ QQC2.Control {
             if (entry && entry.entry.kind === "submenu") control.enter(pressedId);
         }
         onCanceled: { suppressClick = true; control.cancelDrag(); }
-        onWheel: wheel => wheel.accepted = false
+        onWheel: wheel => control.scrollDuringDrag(wheel)
     }
     Item { id: dragPosition }
     Rectangle {

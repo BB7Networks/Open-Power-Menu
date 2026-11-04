@@ -8,8 +8,8 @@ os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 import pytest
 
 pytest.importorskip('PySide6.QtQuick', reason='Qt Quick interactions run in the Qt CI job')
-from PySide6.QtCore import QPointF, QUrl, Qt
-from PySide6.QtGui import QColor
+from PySide6.QtCore import QPoint, QPointF, QUrl, Qt
+from PySide6.QtGui import QColor, QWheelEvent
 from PySide6.QtQml import QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickView
 from PySide6.QtTest import QTest
@@ -466,6 +466,85 @@ def test_drag_scroll_and_popup_interruption_keep_the_draft(quick):
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)
     assert not root.property('dragActive')
     assert draft(root)['entries'] == value['entries']
+
+
+@pytest.mark.parametrize('nested', [False, True])
+@pytest.mark.parametrize('initial', [0, 20, 39])
+def test_wheel_during_drag_moves_bounded_view_and_target_without_releasing_grab(quick, nested, initial):
+    app, view, root = quick
+    long_menu(view, root)
+    if nested:
+        evaluate(root, "control.enter('x47')")
+        QTest.qWait(20)
+    evaluate(root, f'list.positionViewAtIndex({initial}, ListView.Beginning)')
+    QTest.qWait(20)
+    rows = child(root, 'layoutRows')
+    at = rows.mapToScene(QPointF(120, rows.height()/2)).toPoint()
+    start = at - QPoint(0, 45)
+    begin_drag(view, start, at)
+    assert root.property('dragActive')
+    before = draft(root)['entries']
+    signals = []
+    root.saveRequested.connect(lambda: signals.append('save'))
+    preview = child(root, 'inMenuDragPreview')
+    ghost = (preview.x(), preview.y())
+    first_target = root.property('dropBefore')
+    wheel_timestamp = 10000
+    def wheel(angle=0, pixel=0, inverted=False, phase=Qt.NoScrollPhase):
+        nonlocal wheel_timestamp
+        event = QWheelEvent(QPointF(at), QPointF(view.mapToGlobal(at)), QPoint(0, pixel), QPoint(0, angle),
+                            Qt.LeftButton, Qt.NoModifier, phase, inverted)
+        wheel_timestamp += 10
+        event.setTimestamp(wheel_timestamp)
+        app.sendEvent(view, event)
+        assert event.isAccepted()
+        assert root.property('dragActive')
+        assert (preview.x(), preview.y()) == ghost
+        assert draft(root)['entries'] == before and signals == []
+        y = rows.property('contentY') - rows.property('originY')
+        maximum = max(0, rows.property('contentHeight') - rows.height())
+        assert 0 <= y <= maximum + 1
+        return y, maximum
+    origin = rows.property('contentY') - rows.property('originY')
+    y, _ = wheel(angle=-120)
+    assert y >= origin
+    if y > origin:
+        assert root.property('dropBefore') != first_target
+    # Qt Quick discards zero-angle ScrollUpdate compatibility events after an
+    # accepted wheel. Native touchpad events normally carry both delta forms;
+    # verify pixel precedence and a pixel-only event at the start of a gesture.
+    y2, _ = wheel(angle=120, pixel=27, phase=Qt.ScrollUpdate)
+    assert y2 == pytest.approx(y - 27)
+    y3, _ = wheel(pixel=-14, inverted=True, phase=Qt.ScrollBegin)
+    assert y3 == pytest.approx(y2 + 14)
+    y, maximum = wheel(angle=-120000)
+    assert y == pytest.approx(maximum)
+    assert wheel(angle=-120)[0] == pytest.approx(maximum)
+    assert wheel(angle=120000)[0] == pytest.approx(0)
+    assert wheel(angle=120)[0] == pytest.approx(0)
+    QTest.keyClick(view, Qt.Key_Escape)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=at)
+    assert not root.property('dragActive') and draft(root)['entries'] == before
+
+
+def test_drop_after_wheel_uses_new_destination_and_preserves_view(quick):
+    app, view, root = quick
+    long_menu(view, root)
+    start = point(root, 'layoutRow-x45')
+    end = start + QPoint(0, 40)
+    begin_drag(view, start, end)
+    event = QWheelEvent(QPointF(end), QPointF(view.mapToGlobal(end)), QPoint(), QPoint(0, -120),
+                        Qt.LeftButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+    app.sendEvent(view, event)
+    destination = root.property('dropBefore')
+    assert destination and root.property('dropValid')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    ids = [entry['id'] for entry in draft(root)['entries']]
+    assert ids.index('x45') == ids.index(destination) - 1
+    rows = child(root, 'layoutRows')
+    assert rows.property('contentY') - rows.property('originY') > 1000
+    assert draft(root)['selectedId'] == 'x45'
 
 
 @pytest.mark.parametrize('background,foreground', [
