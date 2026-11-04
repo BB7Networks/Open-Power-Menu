@@ -278,6 +278,173 @@ def test_dragging_a_whole_submenu_preserves_children_without_opening(quick):
     assert value['entries'][2]['items'][0]['id'] == 'c'
 
 
+def point(root, name, x=120, y=18):
+    item = child(root, name)
+    assert item is not None, name
+    return item.mapToScene(QPointF(x, y)).toPoint()
+
+
+def begin_drag(view, start, end):
+    QTest.mousePress(view, Qt.LeftButton, pos=start)
+    QTest.mouseMove(view, start + (end - start) / 2, delay=20)
+    QTest.mouseMove(view, end, delay=20)
+
+
+def nested_menu(view, root):
+    value = draft(root)
+    value['entries'][1]['items'].append({'id': 'h', 'kind': 'submenu', 'title': 'Nested', 'items': [
+        {'id': 'd', 'kind': 'command', 'title': 'Deep entry'}]})
+    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    root.setProperty('submenuHoverDelay', 120)
+    QTest.qWait(20)
+    return value['entries']
+
+
+def test_spring_navigation_moves_into_two_levels_without_losing_pointer(quick):
+    _, view, root = quick
+    nested_menu(view, root)
+    end = point(root, 'layoutRow-g')
+    begin_drag(view, point(root, 'layoutRow-a'), end)
+    assert root.property('dropKind') == 'inside' and root.property('dropValid')
+    QTest.qWait(40)
+    assert draft(root)['parentId'] == ''  # Passing over a group does not immediately open it.
+    QTest.qWait(100)
+    assert draft(root)['parentId'] == 'g' and root.property('dragActive')
+    QTest.mouseMove(view, point(root, 'layoutRow-h'), delay=10)
+    QTest.qWait(140)
+    assert draft(root)['parentId'] == 'h' and root.property('dragActive')
+    end = point(root, 'layoutRow-d', y=32)
+    QTest.mouseMove(view, end, delay=10)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    value = draft(root)
+    assert [entry['id'] for entry in value['entries']] == ['g', 'b', 's']
+    assert [entry['id'] for entry in value['entries'][0]['items'][1]['items']] == ['d', 'a']
+    assert value['selectedId'] == 'a' and root.property('activeFocus')
+
+
+def test_spring_parent_navigation_moves_out_through_multiple_levels(quick):
+    _, view, root = quick
+    nested_menu(view, root)
+    evaluate(root, "control.enter('g'); control.enter('h')")
+    QTest.qWait(20)
+    end = point(root, 'layoutBack', x=18, y=12)
+    begin_drag(view, point(root, 'layoutRow-d'), end)
+    QTest.qWait(140)
+    assert draft(root)['parentId'] == 'g' and root.property('dragActive')
+    QTest.qWait(140)
+    assert draft(root)['parentId'] == '' and root.property('dragActive')
+    end = point(root, 'layoutRow-b', y=32)
+    QTest.mouseMove(view, end, delay=10)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    value = draft(root)
+    assert [entry['id'] for entry in value['entries']] == ['a', 'g', 'b', 'd', 's']
+    assert value['entries'][1]['items'][1]['items'] == []
+
+
+def test_self_drop_is_marked_invalid_and_does_not_open_or_change_the_group(quick):
+    _, view, root = quick
+    before = nested_menu(view, root)
+    start = point(root, 'layoutRow-g', x=60)
+    end = point(root, 'layoutRow-g', x=160)
+    begin_drag(view, start, end)
+    assert root.property('dragActive') and not root.property('dropValid')
+    assert 'itself' in root.property('dropReason')
+    QTest.qWait(260)
+    assert draft(root)['parentId'] == ''
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    assert draft(root)['entries'] == before
+
+
+def test_brief_submenu_hover_is_canceled_when_pointer_leaves(quick):
+    _, view, root = quick
+    nested_menu(view, root)
+    begin_drag(view, point(root, 'layoutRow-a'), point(root, 'layoutRow-g'))
+    QTest.qWait(30)
+    end = point(root, 'layoutRow-b', y=32)
+    QTest.mouseMove(view, end, delay=10)
+    QTest.qWait(160)
+    assert draft(root)['parentId'] == '' and root.property('dragActive')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    assert [entry['id'] for entry in draft(root)['entries']] == ['g', 'b', 'a', 's']
+
+
+def test_group_drop_into_closed_submenu_preserves_the_entire_subtree(quick):
+    _, view, root = quick
+    before = nested_menu(view, root)
+    value = draft(root)
+    value['entries'].insert(0, {'id': 'e', 'kind': 'submenu', 'title': 'Empty', 'items': []})
+    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    QTest.qWait(20)
+    end = point(root, 'layoutRow-e')
+    begin_drag(view, point(root, 'layoutRow-g'), end)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    assert draft(root)['entries'][0]['items'] == [before[1]]
+    assert draft(root)['parentId'] == 'e' and draft(root)['selectedId'] == 'g'
+
+
+def test_full_parent_can_be_traversed_to_reach_another_submenu(quick):
+    _, view, root = quick
+    value = draft(root)
+    value['entries'] = [{'id': 'e', 'kind': 'submenu', 'title': 'Destination', 'items': []},
+                        value['entries'][1]] + [
+        {'id': f'extra-{i}', 'kind': 'command', 'title': f'Entry {i}'} for i in range(198)]
+    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
+    root.setProperty('submenuHoverDelay', 120)
+    QTest.qWait(20)
+    evaluate(root, "control.enter('g')")
+    QTest.qWait(20)
+    end = point(root, 'layoutBack', x=18, y=12)
+    begin_drag(view, point(root, 'layoutRow-c'), end)
+    assert not root.property('dropValid')  # Cannot add a 201st sibling.
+    QTest.qWait(140)
+    assert draft(root)['parentId'] == ''
+    end = point(root, 'layoutRow-e')
+    QTest.mouseMove(view, end, delay=10)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    assert len(draft(root)['entries']) == 200
+    assert draft(root)['entries'][0]['items'][0]['id'] == 'c'
+
+
+@pytest.mark.parametrize('interruption', ['escape', 'outside', 'popup'])
+def test_interrupted_spring_navigation_preserves_layout_and_returns_to_source(quick, interruption):
+    _, view, root = quick
+    before = nested_menu(view, root)
+    end = point(root, 'layoutRow-g')
+    begin_drag(view, point(root, 'layoutRow-a'), end)
+    QTest.qWait(140)
+    assert draft(root)['parentId'] == 'g'
+    if interruption == 'escape':
+        QTest.keyClick(view, Qt.Key_Escape)
+    elif interruption == 'popup':
+        root.setVisible(False)
+    else:
+        end = QPointF(-20, -20).toPoint()
+        QTest.mouseMove(view, end, delay=10)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    assert draft(root)['entries'] == before
+    assert draft(root)['parentId'] == '' and not root.property('dragActive')
+
+
+def test_dragging_at_bottom_keeps_stable_viewport_and_moved_item_visible(quick):
+    _, view, root = quick
+    long_menu(view, root)
+    rows = child(root, 'layoutRows')
+    anchor = point(root, 'layoutRow-x42').y()
+    for destination, y in [('x46', 32), ('x44', 2)]:
+        end = point(root, 'layoutRow-' + destination, y=y)
+        begin_drag(view, point(root, 'layoutRow-x45'), end)
+        QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+        QTest.qWait(20)
+        assert abs(point(root, 'layoutRow-x42').y() - anchor) <= 1
+        assert rows.property('contentY') > 1000 and draft(root)['selectedId'] == 'x45'
+        assert root.property('activeFocus')
+
+
 def test_drag_scroll_and_popup_interruption_keep_the_draft(quick):
     _, view, root = quick
     value = draft(root)

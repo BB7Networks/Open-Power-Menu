@@ -17,6 +17,15 @@ QQC2.Control {
     property bool dragCanceled: false
     property string dropRow: ""
     property bool dropBelow: false
+    property string dropKind: ""
+    property bool dropValid: false
+    property string dropReason: ""
+    property string dropParent: ""
+    property string dropBefore: ""
+    property string hoverKey: ""
+    property string hoverParent: ""
+    property string dragOriginParent: ""
+    property int submenuHoverDelay: 450
     property bool viewReady: false
     property bool restoringView: false
     property bool revealSelection: false
@@ -96,6 +105,7 @@ QQC2.Control {
             restoreView(reveal);
             restoringView = false;
             rememberView();
+            if (dragActive) updateDragTarget();
         });
     }
     function navigate(parentId, selectedId) {
@@ -139,11 +149,62 @@ QQC2.Control {
         const parent = Draft.find(draft.entries, draft.parentId);
         navigate(parent.parentId, parent.entry.id);
     }
-    function cancelDrag() {
+    function clearTarget() {
+        dropRow = ""; dropKind = ""; dropValid = false; dropReason = "";
+        hoverKey = "";
+        springOpen.stop();
+    }
+    function target(row, kind, parentId, beforeId, hover) {
+        dropRow = row;
+        dropKind = kind;
+        dropParent = parentId;
+        dropBefore = beforeId;
+        dropReason = Draft.moveError(draft, draggedId, parentId, beforeId);
+        dropValid = dropReason.length === 0;
+        // A full parent can still be traversed to reach another submenu.
+        const key = hover && Draft.canEnter(draft, draggedId, parentId) ? kind + ":" + row : "";
+        if (key !== hoverKey) {
+            hoverKey = key;
+            hoverParent = parentId;
+            if (key) springOpen.restart(); else springOpen.stop();
+        }
+    }
+    function updateDragTarget() {
+        if (!dragActive || dragCanceled || !draft || restoringView) return;
+        const backPoint = rowPointer.mapToItem(navigationBar, rowPointer.mouseX, rowPointer.mouseY);
+        if (draft.parentId && backPoint.x >= 0 && backPoint.x < navigationBar.width
+                && backPoint.y >= 0 && backPoint.y < navigationBar.height) {
+            const parent = Draft.find(draft.entries, draft.parentId);
+            const next = parent.container[parent.index + 1];
+            target("parent:" + draft.parentId, "parent", parent.parentId, next ? next.id : "", true);
+            return;
+        }
+        const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
+        if (point.x < 0 || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)
+                || point.y < 0 || point.y >= list.height) { clearTarget(); return; }
+        const content = rowPointer.mapToItem(list.contentItem, rowPointer.mouseX, rowPointer.mouseY);
+        const index = list.indexAt(content.x, content.y);
+        if (index < 0) { target("end", "end", draft.parentId, "", false); return; }
+        const row = list.itemAtIndex(index);
+        if (!row) { clearTarget(); return; }
+        const entry = rows[index];
+        const y = content.y - row.y;
+        if (entry.kind === "submenu" && y >= row.height * .25 && y < row.height * .75) {
+            target(entry.id, "inside", entry.id, "", true);
+        } else {
+            dropBelow = y >= row.height / 2;
+            const next = rows[index + 1];
+            target(entry.id, dropBelow ? "after" : "before", draft.parentId,
+                   dropBelow ? (next ? next.id : "") : entry.id, false);
+        }
+    }
+    function cancelDrag(restoreOrigin) {
+        const returnToOrigin = restoreOrigin !== false && dragActive && draft;
         dragCanceled = true;
         dragActive = false;
+        clearTarget();
+        if (returnToOrigin) navigate(dragOriginParent, draggedId);
         draggedId = "";
-        dropRow = "";
     }
     function handleKey(event) {
         if (!draft || busy) return;
@@ -177,11 +238,13 @@ QQC2.Control {
     contentItem: ColumnLayout {
         spacing: 4
         RowLayout {
+            id: navigationBar
             Layout.fillWidth: true
             QQC2.ToolButton {
                 objectName: "layoutBack"
                 text: "Back"
                 icon.name: "go-previous"
+                icon.color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.buttonText
                 enabled: !!control.draft && !!control.draft.parentId && !control.busy
                 onClicked: control.back()
                 Accessible.name: "Back to parent menu"
@@ -193,11 +256,12 @@ QQC2.Control {
                 text: control.draft && control.draft.parentId ? Draft.find(control.draft.entries, control.draft.parentId).entry.title : "Top level"
                 elide: Text.ElideMiddle
                 font.bold: true
+                color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.windowText
             }
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag an entry to move it. Click a submenu to open it."
+            text: "Drag an entry. Pause over a submenu or Back to move between levels."
             wrapMode: Text.WordWrap
         }
         ListView {
@@ -240,29 +304,12 @@ QQC2.Control {
                     anchors.rightMargin: 12
                     text: row.entry.kind === "submenu" ? "›" : ""
                 }
-                DropArea {
-                    anchors.fill: parent
-                    keys: ["opm-layout"]
-                    onEntered: drag => {
-                        if (drag.source !== dragProxy) { drag.accepted = false; return; }
-                        control.dropRow = row.entry.id;
-                        control.dropBelow = drag.y >= height / 2;
-                    }
-                    onPositionChanged: drag => control.dropBelow = drag.y >= height / 2
-                    onExited: if (control.dropRow === row.entry.id) control.dropRow = ""
-                    onDropped: drop => {
-                        if (drop.source !== dragProxy || !control.draggedId) return;
-                        const next = control.rows[row.index + 1];
-                        const before = control.dropBelow ? (next ? next.id : "") : row.entry.id;
-                        control.move(control.draggedId, control.draft.parentId, before);
-                        drop.acceptProposedAction();
-                    }
-                }
                 Rectangle {
                     width: parent.width
-                    height: 2
-                    y: control.dropBelow ? parent.height - height : 0
-                    color: control.palette.highlight
+                    height: control.dropKind === "inside" ? parent.height : 2
+                    y: control.dropKind !== "inside" && control.dropBelow ? parent.height - height : 0
+                    color: control.dropValid ? control.palette.highlight : "#da4453"
+                    opacity: control.dropKind === "inside" ? .25 : 1
                     visible: control.dragActive && control.dropRow === row.entry.id
                 }
             }
@@ -273,14 +320,11 @@ QQC2.Control {
                     anchors.centerIn: parent
                     text: control.dragActive ? "Drop at end" : list.count ? "" : "Empty submenu"
                 }
-                DropArea {
-                    anchors.fill: parent
-                    keys: ["opm-layout"]
-                    onDropped: drop => {
-                        if (drop.source !== dragProxy || !control.draggedId) return;
-                        control.move(control.draggedId, control.draft.parentId, "");
-                        drop.acceptProposedAction();
-                    }
+                Rectangle {
+                    width: parent.width
+                    height: 2
+                    color: control.dropValid ? control.palette.highlight : "#da4453"
+                    visible: control.dragActive && control.dropKind === "end"
                 }
             }
         }
@@ -377,16 +421,24 @@ QQC2.Control {
             suppressClick = false;
             control.dragCanceled = false;
             control.draggedId = pressedId;
+            control.dragOriginParent = control.draft.parentId;
             dragProxy.x = mouse.x - 8;
             dragProxy.y = mouse.y - 18;
             control.choose(pressedId);
             control.forceActiveFocus();
         }
-        onPositionChanged: if (drag.active && !control.dragCanceled) control.dragActive = true
+        onPositionChanged: {
+            if (drag.active && !control.dragCanceled) {
+                control.dragActive = true;
+                control.updateDragTarget();
+            }
+        }
         onReleased: {
             suppressClick = control.dragActive || control.dragCanceled;
-            if (control.dragActive && !control.dragCanceled) dragProxy.Drag.drop();
-            control.cancelDrag();
+            control.updateDragTarget();
+            const accepted = control.dragActive && !control.dragCanceled && control.dropValid;
+            if (accepted) control.move(control.draggedId, control.dropParent, control.dropBefore);
+            control.cancelDrag(!accepted);
         }
         onClicked: {
             if (suppressClick || !control.draft) return;
@@ -402,21 +454,25 @@ QQC2.Control {
         height: 36
         z: 100
         visible: control.dragActive
-        color: control.palette.highlight
+        color: !control.dropValid ? "#da4453" : control.palette.highlight
         opacity: 0.85
         radius: 3
-        Drag.active: control.dragActive
-        Drag.source: dragProxy
-        Drag.keys: ["opm-layout"]
-        Drag.supportedActions: Qt.MoveAction
-        Drag.hotSpot.x: 8
-        Drag.hotSpot.y: 18
         QQC2.Label {
             anchors.fill: parent
             anchors.margins: 6
             color: control.palette.highlightedText
-            text: control.draft && control.draggedId ? Draft.find(control.draft.entries, control.draggedId).entry.title : ""
+            text: !control.dropValid ? "Cannot drop here" : control.draft && control.draggedId ? Draft.find(control.draft.entries, control.draggedId).entry.title : ""
             elide: Text.ElideRight
+        }
+    }
+    Timer {
+        id: springOpen
+        interval: control.submenuHoverDelay
+        onTriggered: {
+            if (!control.dragActive || !control.hoverKey) return;
+            const parentId = control.hoverParent;
+            control.clearTarget();
+            control.navigate(parentId, "");
         }
     }
     Timer {
@@ -424,10 +480,12 @@ QQC2.Control {
         repeat: true
         running: control.dragActive
         onTriggered: {
-            const y = dragProxy.mapToItem(list, 0, 18).y;
-            if (y < 24) list.contentY = Math.max(list.originY, list.contentY - 12);
-            else if (y > list.height - 24)
+            const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
+            if (point.x < 0 || point.x > list.width || point.y < 0 || point.y > list.height) return;
+            if (point.y < 24) list.contentY = Math.max(list.originY, list.contentY - 12);
+            else if (point.y > list.height - 24)
                 list.contentY = Math.min(list.originY + Math.max(0, list.contentHeight - list.height), list.contentY + 12);
+            control.updateDragTarget();
         }
     }
 }
