@@ -37,3 +37,9 @@ until Save; Cancel discards them.
 cross-window Plasma flyout and still needs real Wayland acceptance, especially
 on a right-edge panel, narrow display and fractional scaling. The stable PR #5
 branch has not been modified.
+
+## Optional single-pane fallback
+
+In the Plasma widget's **General** configuration, uncheck **Show adjacent
+submenu while rearranging** to return to the proven navigation-based editor.
+This is a widget-only preference; it does not alter or migrate menu.json.

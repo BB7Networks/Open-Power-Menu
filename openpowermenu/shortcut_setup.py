@@ -56,18 +56,14 @@ def create_shortcut_dialog(parent=None):
             self.saw_active = False
             layout = QVBoxLayout(self)
             explanation = QLabel(
-                '<b>Meta+X: use the native panel widget shortcut</b>'
-                '<p>Assign Meta+X to the <b>Open Power Menu Start Button</b> widget in its Plasma Keyboard Shortcuts settings. It then opens the panel menu, not a separate window.</p>'
-                '<p>In Panel Edit Mode, open this widget’s settings and assign Meta+X in the Keyboard Shortcuts tab. KDE handles conflicts. Remove the old application/command Meta+X assignment first if needed.</p>'
-                '<b>Optional standalone shortcut</b>'
-                '<ol><li>Test the standalone menu below. Press Esc to dismiss it.</li>'
-                '<li>Open KDE Shortcuts. Choose <b>Add New → Application… → Open Power Menu</b>.</li>'
-                '<li>Assign <b>Meta+X</b> and select <b>Apply</b>.</li></ol>'
-                '<p>If KDE reports a conflict, choose another shortcut or cancel. '
-                'For a stale Command or Script assignment, remove only that old OPM assignment, Apply, '
-                'then add the application entry and Apply again. Test Meta+X on your desktop.</p>'
-                '<p>If the launch test works but the key does nothing, check the assignment in KDE. '
-                'Starting this test does not verify the keyboard binding.</p>', self)
+                '<b>Meta+X — open the menu beside your Start button</b>'
+                '<ol><li>Remove an old Open Power Menu Meta+X application shortcut, if assigned.</li>'
+                '<li>Enter Plasma Panel Edit Mode and open this widget’s settings.</li>'
+                '<li>Under <b>Keyboard Shortcuts</b>, assign <b>Meta+X</b> and apply.</li></ol>'
+                '<p>KDE checks conflicts. OPM never overrides another shortcut automatically.</p>'
+                '<b>Optional: standalone menu test</b>'
+                '<p>Use Test menu launch below to check the separate application. '
+                'It does not test Meta+X and may appear near the screen center.</p>', self)
             explanation.setTextFormat(Qt.RichText)
             explanation.setWordWrap(True)
             layout.addWidget(explanation)

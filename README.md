@@ -96,11 +96,12 @@ checks for conflicts and preserves your command definitions; **Cancel** leaves
 the saved menu untouched. Closing the popup keeps the draft for your next visit.
 See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
 
-For **Meta+X**, open **Configure → General → Keyboard shortcut → Set up Meta+X…**.
-Use **Test menu launch**, then choose **Add New → Application… → Open Power Menu**
-in KDE Shortcuts and assign/apply the key. This opens the standalone menu.
-KDE handles conflicts and lets you change or remove the assignment. See the
-[shortcut and AppGrid diagnostic guide](docs/SHORTCUT-APPGRID-DIAGNOSTICS.md) if nothing appears.
+For **Meta+X** on this experimental branch, assign the shortcut in the
+**Open Power Menu Start Button widget's native Keyboard Shortcuts setting**
+(through Plasma Panel Edit Mode). This opens the panel menu beside the Start
+button. Remove an older OPM application or command shortcut using Meta+X first.
+The standalone menu remains available for troubleshooting. See
+[the experimental shortcut and flyout guide](docs/NATIVE-SHORTCUT-CASCADE.md).
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in

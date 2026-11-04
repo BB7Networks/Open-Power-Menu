@@ -496,7 +496,10 @@ def create_editor(path: Path | None = None):
 
             shortcut_group = QGroupBox("Keyboard shortcut", general)
             shortcut_layout = QVBoxLayout(shortcut_group)
-            shortcut_help = QLabel("Use KDE Shortcuts to open the standalone Power User Menu with Meta+X.", shortcut_group)
+            shortcut_help = QLabel(
+                "Assign Meta+X to the Open Power Menu Start Button widget in Plasma's "
+                "Keyboard Shortcuts settings. It opens the menu beside your Start button.",
+                shortcut_group)
             shortcut_help.setWordWrap(True)
             shortcut_layout.addWidget(shortcut_help)
             shortcut_button = QPushButton("Set up Meta+X…", shortcut_group)

@@ -11,5 +11,9 @@
       <label>Action on left click</label>
       <default>launcher</default>
     </entry>
+    <entry name="useCascadingEdit" type="Bool">
+      <label>Show an adjacent submenu pane while rearranging</label>
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

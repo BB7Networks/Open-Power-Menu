@@ -938,7 +938,7 @@ PlasmoidItem {
             }
             LayoutEditor {
                 id: layoutEditor
-                cascadingEnabled: true
+                cascadingEnabled: Plasmoid.configuration.useCascadingEdit !== false
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: 6
