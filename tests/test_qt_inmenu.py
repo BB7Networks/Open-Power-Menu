@@ -135,8 +135,8 @@ def test_mouse_drag_reorders_and_escape_cancels_a_drag(quick):
     first = child(root, 'layoutRow-a')
     last = child(root, 'layoutRow-b')
     assert first is not None and last is not None
-    start = first.mapToScene(QPointF(12, 18)).toPoint()
-    end = last.mapToScene(QPointF(12, 32)).toPoint()
+    start = first.mapToScene(QPointF(120, 18)).toPoint()
+    end = last.mapToScene(QPointF(120, 32)).toPoint()
     QTest.mousePress(view, Qt.LeftButton, pos=start)
     QTest.mouseMove(view, start + (end - start) / 2, delay=20)
     QTest.mouseMove(view, end, delay=20)
@@ -236,13 +236,19 @@ def test_draft_viewport_survives_popup_component_recreation(quick):
     assert draft(replacement)['selectedId'] == 'x45'
 
 
-def test_handle_click_and_outside_drop_leave_layout_unchanged(quick):
+def test_row_click_threshold_opens_submenu_but_outside_drag_cancels(quick):
     _, view, root = quick
     before = draft(root)['entries']
     row = child(root, 'layoutRow-g')
-    start = row.mapToScene(QPointF(12, 18)).toPoint()
-    QTest.mouseClick(view, Qt.LeftButton, pos=start)
-    assert draft(root)['parentId'] == ''
+    start = row.mapToScene(QPointF(120, 18)).toPoint()
+    QTest.mousePress(view, Qt.LeftButton, pos=start)
+    QTest.mouseMove(view, start + QPointF(1, 1).toPoint(), delay=20)
+    assert not root.property('dragActive')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=start)
+    QTest.qWait(20)
+    assert draft(root)['parentId'] == 'g'
+    QTest.keyClick(view, Qt.Key_Left)
+    QTest.qWait(20)
     assert draft(root)['selectedId'] == 'g'
     assert draft(root)['entries'] == before
     QTest.mousePress(view, Qt.LeftButton, pos=start)
@@ -252,6 +258,24 @@ def test_handle_click_and_outside_drop_leave_layout_unchanged(quick):
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)
     assert draft(root)['entries'] == before
     assert not root.property('dragActive')
+
+
+def test_dragging_a_whole_submenu_preserves_children_without_opening(quick):
+    _, view, root = quick
+    group = child(root, 'layoutRow-g')
+    last = child(root, 'layoutRow-b')
+    start = group.mapToScene(QPointF(160, 18)).toPoint()
+    end = last.mapToScene(QPointF(160, 32)).toPoint()
+    QTest.mousePress(view, Qt.LeftButton, pos=start)
+    QTest.qWait(40)
+    QTest.mouseMove(view, start + (end - start) / 2, delay=20)
+    QTest.mouseMove(view, end, delay=20)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    value = draft(root)
+    assert value['parentId'] == ''
+    assert [entry['id'] for entry in value['entries']] == ['a', 'b', 'g', 's']
+    assert value['entries'][2]['items'][0]['id'] == 'c'
 
 
 def test_drag_scroll_and_popup_interruption_keep_the_draft(quick):

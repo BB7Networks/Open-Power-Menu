@@ -197,7 +197,7 @@ QQC2.Control {
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag the handles to reorder. Open a submenu to arrange its entries."
+            text: "Drag an entry to move it. Click a submenu to open it."
             wrapMode: Text.WordWrap
         }
         ListView {
@@ -210,7 +210,7 @@ QQC2.Control {
             interactive: !control.dragActive
             onContentYChanged: control.rememberView()
             boundsBehavior: Flickable.StopAtBounds
-            QQC2.ScrollBar.vertical: QQC2.ScrollBar {}
+            QQC2.ScrollBar.vertical: QQC2.ScrollBar { id: layoutScrollBar }
             delegate: QQC2.ItemDelegate {
                 id: row
                 required property string itemId
@@ -221,7 +221,7 @@ QQC2.Control {
                 objectName: "layoutRow-" + entry.id
                 width: list.width
                 height: 36
-                leftPadding: 34
+                leftPadding: 12
                 rightPadding: 30
                 text: entry.title
                 highlighted: control.draft && entry.id === control.draft.selectedId
@@ -239,39 +239,6 @@ QQC2.Control {
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.rightMargin: 12
                     text: row.entry.kind === "submenu" ? "›" : ""
-                }
-                QQC2.Label {
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 30
-                    horizontalAlignment: Text.AlignHCenter
-                    text: "≡"
-                    Accessible.name: "Drag " + row.entry.title
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: !control.busy && !control.expired
-                        preventStealing: true
-                        drag.target: dragProxy
-                        drag.axis: Drag.YAxis
-                        drag.smoothed: false
-                        onPressed: mouse => {
-                            control.dragCanceled = false;
-                            control.draggedId = row.entry.id;
-                            const point = mapToItem(control, mouse.x, mouse.y);
-                            dragProxy.x = point.x - 8;
-                            dragProxy.y = point.y - 18;
-                            control.choose(row.entry.id);
-                            control.forceActiveFocus();
-                        }
-                        onPositionChanged: if (drag.active && !control.dragCanceled) control.dragActive = true
-                        onReleased: {
-                            // Dropping rebuilds the model and can destroy this delegate.
-                            const editor = control;
-                            if (editor.dragActive && !editor.dragCanceled) dragProxy.Drag.drop();
-                            editor.cancelDrag();
-                        }
-                        onCanceled: control.cancelDrag()
-                    }
                 }
                 DropArea {
                     anchors.fill: parent
@@ -385,6 +352,49 @@ QQC2.Control {
                 onClicked: control.cancelRequested()
             }
         }
+    }
+    // One stable pointer owner survives row moves and submenu navigation. Qt's
+    // native drag threshold distinguishes a click from movement; no hold delay.
+    MouseArea {
+        id: rowPointer
+        anchors.fill: parent
+        z: 50
+        enabled: !control.busy && !control.expired
+        property string pressedId: ""
+        property bool suppressClick: false
+        preventStealing: true
+        drag.target: dragProxy
+        drag.smoothed: false
+        onPressed: mouse => {
+            const point = mapToItem(list, mouse.x, mouse.y);
+            const content = mapToItem(list.contentItem, mouse.x, mouse.y);
+            const index = list.indexAt(content.x, content.y);
+            if (point.x < 0 || point.y < 0 || point.y >= list.height || index < 0
+                    || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)) {
+                mouse.accepted = false; return;
+            }
+            pressedId = rowModel.get(index).itemId;
+            suppressClick = false;
+            control.dragCanceled = false;
+            control.draggedId = pressedId;
+            dragProxy.x = mouse.x - 8;
+            dragProxy.y = mouse.y - 18;
+            control.choose(pressedId);
+            control.forceActiveFocus();
+        }
+        onPositionChanged: if (drag.active && !control.dragCanceled) control.dragActive = true
+        onReleased: {
+            suppressClick = control.dragActive || control.dragCanceled;
+            if (control.dragActive && !control.dragCanceled) dragProxy.Drag.drop();
+            control.cancelDrag();
+        }
+        onClicked: {
+            if (suppressClick || !control.draft) return;
+            const entry = Draft.find(control.draft.entries, pressedId);
+            if (entry && entry.entry.kind === "submenu") control.enter(pressedId);
+        }
+        onCanceled: { suppressClick = true; control.cancelDrag(); }
+        onWheel: wheel => wheel.accepted = false
     }
     Rectangle {
         id: dragProxy
