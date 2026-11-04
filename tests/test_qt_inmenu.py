@@ -668,12 +668,15 @@ def test_native_flyout_hover_state_prevents_premature_dismissal(quick):
     QTest.mouseMove(view, parent.mapToScene(QPointF(70,18)).toPoint())
     QTest.qWait(280)
     assert root.property('flyoutVisible')
-    root.setProperty('flyoutPointerInside', True)
-    outside = child(root,'layoutRow-a')
-    QTest.mouseMove(view, outside.mapToScene(QPointF(70,18)).toPoint())
+    popup_window = evaluate(root, 'flyoutSurface.Window.window')
+    nested = evaluate(root, 'flyoutList.itemAtIndex(0)')
+    assert popup_window is not None and nested is not None
+    # Send pointer events to the *other window*, not to the parent QQuickView.
+    QTest.mouseMove(popup_window, nested.mapToScene(QPointF(45, 18)).toPoint())
     QTest.qWait(310)
     assert root.property('flyoutVisible')
-    root.setProperty('flyoutPointerInside', False)
+    outside = child(root,'layoutRow-a')
+    QTest.mouseMove(view, outside.mapToScene(QPointF(70,18)).toPoint())
     QTest.qWait(320)
     assert not root.property('flyoutVisible')
     assert draft(root)['entries'] == initial
