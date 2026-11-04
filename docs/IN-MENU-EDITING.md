@@ -128,6 +128,11 @@ The starting full suite passed **281 tests, with 8 historical-baseline skips and
 8 historical-baseline skips and 18 passing subtests**, in 21.44 seconds on Python
 3.12.14, PySide6 6.10.2 and Node 24. CI uses Node 22.
 
+GitHub Actions at implementation head `baa5150` also passed: **275 portable tests,
+12 skips, 18 passing subtests**, and **58 Qt/D-Bus tests**. Portable skips include
+the unavailable historical trees and Qt-dependent checks covered by the required
+Qt job. Both the push and pull-request workflows completed successfully.
+
 Python compilation, individual syntax checks for all seven Bash scripts, QML
 parsing, full ZIP/TAR and widget archive integrity, checksums, extracted-backend
 diagnostics, case-insensitive filename checks and version consistency pass.
