@@ -180,9 +180,12 @@ QQC2.Control {
             flyoutId = id;
             Qt.callLater(() => positionFlyout(id));
         } else if (flyoutVisible && found.parentId === flyoutId) {
-            // Advance one step deeper while keeping its parent in the left pane.
-            navigate(flyoutId, id);
+            // Advance the level without tearing down/reopening the native popup.
+            rememberView();
             flyoutId = id;
+            edited(Draft.select(draft, found.parentId,
+                Draft.selection(draft, found.parentId, id)));
+            if (visible) forceActiveFocus();
             Qt.callLater(() => positionFlyout(id));
         } else {
             navigate(found.parentId, id);
@@ -611,7 +614,11 @@ QQC2.Control {
             onAboutToShow: control.positionFlyout(control.flyoutId)
             onClosed: {
                 control.flyoutPointerInside = false;
-                if (control.flyoutId) control.flyoutId = "";
+                // A nested level may have replaced the popup's contents before
+                // the previous close notification reaches this event loop.
+                Qt.callLater(() => {
+                    if (!flyoutPane.visible && control.flyoutId) control.flyoutId = "";
+                });
             }
             x: control.flyoutX
             y: control.flyoutY
