@@ -33,6 +33,18 @@ cat > "$dbus_dir/org.openpowermenu.Service.service" <<SERVICE
 Name=org.openpowermenu.Service
 Exec=$bin_home/open-power-menu --service
 SERVICE
+# Desktop Entry Exec has two escaping layers (string, then quoted argument)
+# and literal percent signs must not become field codes. Never use shell eval.
+desktop_exec=$(python3 - "$bin_home/open-power-menu" <<'PY'
+import sys
+argument = sys.argv[1].replace('%', '%%')
+for character in ('\\', '"', '`', '$'):
+    argument = argument.replace(character, '\\' + character)
+value = '"' + argument + '"'
+value = value.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+print(value)
+PY
+)
 cat > "$applications_dir/org.openpowermenu.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application
@@ -40,7 +52,7 @@ Version=1.0
 Name=Open Power Menu
 GenericName=Power User Menu
 Comment=Standalone Windows-like Win+X system menu
-Exec=$bin_home/open-power-menu
+Exec=$desktop_exec
 Icon=open-power-menu
 Terminal=false
 Categories=System;Utility;

@@ -5,7 +5,7 @@ import shlex
 
 import pytest
 
-from openpowermenu.shortcut_setup import installed_command, settings_command
+from openpowermenu.shortcut_setup import installed_application, installed_command, settings_command
 
 
 def executable(path):
@@ -39,3 +39,20 @@ def test_only_supported_kde_settings_commands_are_selected(tmp_path, monkeypatch
     for name in available: executable(tmp_path / name)
     monkeypatch.setenv('PATH', str(tmp_path))
     assert settings_command() == ([str(tmp_path / expected), 'kcm_keys'] if expected else None)
+
+
+def test_application_entry_respects_xdg_precedence_and_hidden_override(tmp_path, monkeypatch):
+    monkeypatch.setenv('XDG_DATA_HOME', str(tmp_path / 'user'))
+    monkeypatch.setenv('XDG_DATA_DIRS', str(tmp_path / 'system'))
+    assert installed_application() is None
+    desktop = '[Desktop Entry]\nType=Application\nName=Open Power Menu\nExec=/bin/true\n'
+    system = tmp_path / 'system/applications/org.openpowermenu.desktop'
+    system.parent.mkdir(parents=True)
+    system.write_text(desktop)
+    assert installed_application() == system
+    user = tmp_path / 'user/applications/org.openpowermenu.desktop'
+    user.parent.mkdir(parents=True)
+    user.write_text(desktop)
+    assert installed_application() == user
+    user.write_text(desktop + 'Hidden=true\n')
+    assert installed_application() is None

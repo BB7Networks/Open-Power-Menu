@@ -536,6 +536,92 @@ def test_general_shortcut_setup_is_discoverable_and_does_not_dirty_editor(editor
     assert not editor.is_dirty()
 
 
+@pytest.mark.parametrize('result', ['missing', 'error', 'quiet', 'exposed'])
+def test_shortcut_test_invokes_installed_process_and_distinguishes_outcomes(editor, app, tmp_path, monkeypatch, result):
+    import shlex
+    import sys
+    from PySide6.QtCore import QProcess
+    from openpowermenu.shortcut_setup import create_shortcut_dialog
+    program = tmp_path / "installed menu ' $literal"
+    argv_log = tmp_path / 'argv.json'
+    body = {
+        'error': "print('Missing Qt dependency', file=sys.stderr); sys.exit(2)",
+        'quiet': 'sys.exit(0)',
+        'exposed': "print('OPM_LAUNCH broken'); print('OPM_LAUNCH []'); "
+                   "print('OPM_LAUNCH '+json.dumps(dict(exposed=True, active=True)), flush=True)",
+    }.get(result, '')
+    if result != 'missing':
+        program.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                           f'Path({str(argv_log)!r}).write_text(json.dumps(sys.argv[1:]))\n' + body + '\n')
+        program.chmod(0o755)
+    monkeypatch.setattr('openpowermenu.shortcut_setup.installed_command', lambda: shlex.join([str(program)]))
+    before = editor.configuration()
+    dialog = create_shortcut_dialog(editor)
+    dialog.test_button.click()
+    for _ in range(100):
+        QTest.qWait(10)
+        if dialog.test_button.isEnabled() and dialog.process.state() == QProcess.NotRunning:
+            break
+    assert dialog.test_button.isEnabled()
+    if result == 'missing':
+        assert 'Could not start' in dialog.status.text()
+    else:
+        assert json.loads(argv_log.read_text()) == ['--diagnose-launch']
+        if result == 'error':
+            assert 'failed (exit 2)' in dialog.status.text()
+            assert 'Missing Qt dependency' in dialog.details.toPlainText()
+        elif result == 'quiet':
+            assert 'without reporting an exposed' in dialog.status.text()
+        else:
+            assert 'exposed window with focus' in dialog.status.text()
+            assert 'Meta+X separately' in dialog.status.text()
+    assert editor.configuration() == before and not editor.is_dirty()
+    dialog.reject()
+    dialog.deleteLater()
+
+
+@pytest.mark.parametrize('dismissal', ['escape', 'deactivate', 'action', 'submenu'])
+def test_wayland_standalone_is_a_toplevel_with_menu_navigation(app, monkeypatch, dismissal):
+    from PySide6.QtWidgets import QMenu
+    from openpowermenu.gui import launch_menu
+    config = deepcopy(DEFAULT_CONFIG)
+    config['menu'] = [{'label': 'Safe test', 'command': ['echo', 'test']},
+                      {'submenu': 'Group', 'items': [{'label': 'Child', 'command': ['echo', 'child']}]}]
+    monkeypatch.setattr(QApplication, 'platformName', staticmethod(lambda: 'wayland'))
+    launched, reports, errors = [], [], []
+    monkeypatch.setattr('openpowermenu.gui.launch_detached', lambda argv: launched.append(argv))
+    def inspect():
+        menu = next(w for w in app.topLevelWidgets() if isinstance(w, QMenu) and w.isVisible() and w.objectName() == 'OpenPowerMenu')
+        try:
+            assert menu.windowType() == Qt.Window
+            if dismissal == 'escape':
+                QTest.keyClick(menu, Qt.Key_Escape)
+            elif dismissal == 'deactivate':
+                app.applicationStateChanged.emit(Qt.ApplicationActive)
+                app.applicationStateChanged.emit(Qt.ApplicationInactive)
+            elif dismissal == 'action':
+                QTest.mouseClick(menu, Qt.LeftButton, pos=menu.actionGeometry(menu.actions()[0]).center())
+            else:
+                menu.setActiveAction(menu.actions()[1])
+                QTest.keyClick(menu, Qt.Key_Right)
+                QTest.qWait(30)
+                submenu = menu.actions()[1].menu()
+                assert submenu.isVisible() and menu.isVisible()
+                QTest.keyClick(submenu, Qt.Key_Escape)
+                assert menu.isVisible()
+                QTest.keyClick(menu, Qt.Key_Escape)
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            menu.close()
+    QTimer.singleShot(100, inspect)
+    assert launch_menu(config, diagnostic=lambda event, **state: reports.append((event, state))) == 0
+    if errors: raise errors[0]
+    assert launched == ([['echo', 'test']] if dismissal == 'action' else [])
+    assert any(state['exposed'] for _, state in reports)
+    assert reports[-1][0] == 'dismissed'
+
+
 def test_nested_edit_save_reopen_round_trip(editor):
     editor.tree.setCurrentItem(editor.item_for((0,)))
     editor.duplicate_selected()

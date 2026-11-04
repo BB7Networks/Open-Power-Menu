@@ -100,6 +100,45 @@ def test_fresh_install_generates_current_defaults_and_repeat_install_preserves_t
     assert (temp / 'data/dbus-1/services/org.openpowermenu.Service.service').is_file()
 
 
+def test_installed_application_entry_with_spaces_and_percent(isolated_install):
+    from openpowermenu.desktop_apps import desktop_exec_argv, read_desktop_application
+    temp, env = isolated_install
+    env['XDG_BIN_HOME'] = str(temp / 'user bin 100%')
+    run('bash', 'scripts/install-core.sh', env=env)
+    desktop = read_desktop_application(temp / 'data/applications/org.openpowermenu.desktop')
+    argv = desktop_exec_argv(desktop.exec_line, desktop.name, desktop.icon, desktop.desktop_file)
+    assert argv == [str(temp / 'user bin 100%/open-power-menu')]
+    assert 'Open Power Menu v' in run(*argv, '--check', env=env).stdout
+
+
+def test_installed_standalone_reports_window_exposure(isolated_install):
+    pytest.importorskip('PySide6.QtWidgets')
+    import selectors
+    import time
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    env['QT_QPA_PLATFORM'] = 'offscreen'
+    launcher = str(temp / 'bin/open-power-menu')
+    run(launcher, '--check', env=env)
+    child = subprocess.Popen([launcher, '--diagnose-launch'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output = b''
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(child.stdout, selectors.EVENT_READ)
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline and b'"exposed": true' not in output:
+                if selector.select(timeout=0.1):
+                    chunk = os.read(child.stdout.fileno(), 4096)
+                    if not chunk: break
+                    output += chunk
+        assert b'"event": "cli-start"' in output
+        assert b'"exposed": true' in output, output.decode()
+        assert child.poll() is None
+    finally:
+        child.terminate()
+        child.communicate(timeout=5)
+
+
 def test_friendly_wrappers(isolated_install):
     pytest.importorskip('PySide6.QtDBus')
     temp, env = isolated_install
