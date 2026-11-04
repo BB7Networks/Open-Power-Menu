@@ -407,7 +407,7 @@ QQC2.Control {
         property string pressedId: ""
         property bool suppressClick: false
         preventStealing: true
-        drag.target: dragProxy
+        drag.target: dragPosition
         drag.smoothed: false
         onPressed: mouse => {
             const point = mapToItem(list, mouse.x, mouse.y);
@@ -422,8 +422,8 @@ QQC2.Control {
             control.dragCanceled = false;
             control.draggedId = pressedId;
             control.dragOriginParent = control.draft.parentId;
-            dragProxy.x = mouse.x - 8;
-            dragProxy.y = mouse.y - 18;
+            dragPosition.x = mouse.x - 8;
+            dragPosition.y = mouse.y - 18;
             control.choose(pressedId);
             control.forceActiveFocus();
         }
@@ -448,8 +448,12 @@ QQC2.Control {
         onCanceled: { suppressClick = true; control.cancelDrag(); }
         onWheel: wheel => wheel.accepted = false
     }
+    Item { id: dragPosition }
     Rectangle {
         id: dragProxy
+        objectName: "inMenuDragPreview"
+        x: Math.max(0, Math.min(dragPosition.x, control.width - width))
+        y: dragPosition.y
         width: control.width - 30
         height: 36
         z: 100

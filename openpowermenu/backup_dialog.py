@@ -1,4 +1,5 @@
 """Non-executing configuration history browser and explicit atomic restore."""
+from html import escape
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
                               QMessageBox, QPlainTextEdit, QPushButton,
@@ -128,7 +129,9 @@ class BackupDialog(QDialog):
                    'Deleting it removes this rollback point.' if protected else '')
         message = (f'Delete this backup permanently?\n\n{name}\nSaved: {revision.local_time}\n'
                    f'Size: {revision.size:,} bytes{warning}\n\nThis cannot be undone. The active configuration stays intact.')
-        if QMessageBox.question(self, 'Delete configuration backup', message,
+        # A manual backup name may contain '<' or '&'; display it literally.
+        prompt = '<p>' + escape(message).replace('\n', '<br>') + '</p>'
+        if QMessageBox.question(self, 'Delete configuration backup', prompt,
                 QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel) != QMessageBox.Yes:
             return
         try:
@@ -148,7 +151,7 @@ class BackupDialog(QDialog):
             return
         if QMessageBox.question(self, 'Restore configuration',
                 'Replace the current configuration with this backup? A separate pre-restore recovery '
-                'copy of the current file will be kept. Unsaved editor changes will be discarded only after success.',
+                'copy of the current file will be kept. The backup is validated before replacement.',
                 QMessageBox.Yes | QMessageBox.Cancel, QMessageBox.Cancel) != QMessageBox.Yes:
             return
         try:

@@ -141,6 +141,8 @@ def test_mouse_drag_reorders_and_escape_cancels_a_drag(quick):
     QTest.mouseMove(view, start + (end - start) / 2, delay=20)
     QTest.mouseMove(view, end, delay=20)
     assert root.property('dragActive')
+    preview = child(root, 'inMenuDragPreview')
+    assert 0 <= preview.x() <= root.width() - preview.width()
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)
     QTest.qWait(10)
     assert [e['id'] for e in draft(root)['entries']] == ['g', 'b', 'a', 's']
@@ -267,7 +269,7 @@ def test_dragging_a_whole_submenu_preserves_children_without_opening(quick):
     start = group.mapToScene(QPointF(160, 18)).toPoint()
     end = last.mapToScene(QPointF(160, 32)).toPoint()
     QTest.mousePress(view, Qt.LeftButton, pos=start)
-    QTest.qWait(40)
+    QTest.qWait(QApplication.styleHints().mousePressAndHoldInterval() + 30)
     QTest.mouseMove(view, start + (end - start) / 2, delay=20)
     QTest.mouseMove(view, end, delay=20)
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)

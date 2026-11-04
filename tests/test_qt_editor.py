@@ -454,6 +454,20 @@ def test_backup_delete_conflicts_and_errors_keep_active_configuration(editor, mo
     dialog.deleteLater()
 
 
+def test_backup_delete_confirmation_displays_literal_manual_name(editor, monkeypatch):
+    source = editor.target.with_name('menu.json.bak-<old>&saved')
+    source.write_bytes(editor.target.read_bytes())
+    dialog = BackupDialog(editor.target, editor)
+    dialog.files.setCurrentItem(dialog.files.topLevelItem(1))
+    prompts = []
+    monkeypatch.setattr(QMessageBox, 'question', lambda parent, title, prompt, *args:
+                        prompts.append(prompt) or QMessageBox.Cancel)
+    dialog.delete_selected()
+    assert 'menu.json.bak-&lt;old&gt;&amp;saved' in prompts[0]
+    assert source.exists()
+    dialog.deleteLater()
+
+
 def test_snapshot_refresh_updates_count_without_changing_unsaved_settings(editor, app, tmp_path, monkeypatch):
     from openpowermenu.widget_snapshots import recovery_path
     monkeypatch.setenv('XDG_DATA_HOME', str(tmp_path / 'data'))

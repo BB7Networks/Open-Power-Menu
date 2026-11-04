@@ -128,6 +128,7 @@ def test_release_archives_complete_clean_consistent_and_extractable(tmp_path):
         for relative in ['install.sh', 'uninstall.sh', 'scripts/install-core.sh', 'scripts/uninstall-core.sh',
                          'openpowermenu/launching.py', 'openpowermenu/layout_edit.py',
                          'openpowermenu/editor_toolbar.py', 'plasmoid/metadata.json', 'docs/KDE-STORE.md',
+                         'openpowermenu/shortcut_setup.py',
                          'docs/IN-MENU-EDITING.md', 'plasmoid/contents/ui/LayoutEditor.qml',
                          'plasmoid/contents/ui/LayoutDraft.js', 'plasmoid/contents/ui/LayoutController.js']:
             assert prefix + relative in names
