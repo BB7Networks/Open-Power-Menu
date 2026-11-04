@@ -280,5 +280,5 @@
 ### Packaging correction (Windows Git checkout)
 
 - Moved lower-case installation scripts into `scripts/*-core.sh` to prevent
-  Windows case-insensitive filename collisions with `Install.sh` and `Uninstall.sh`.
+  Windows case-insensitive filename collisions with `install.sh` and `uninstall.sh`.
   No widget or application-runtime behavior changed.

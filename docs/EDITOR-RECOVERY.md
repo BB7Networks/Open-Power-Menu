@@ -128,7 +128,7 @@ After successful installation only, the newest five generated widget snapshots
 are retained. Set an independent limit of 1–1,000 for that installer invocation:
 
 ```bash
-OPM_WIDGET_BACKUP_RETENTION=10 bash Install.sh
+OPM_WIDGET_BACKUP_RETENTION=10 bash install.sh
 ```
 
 The minimum is one so every successful upgrade keeps a rollback candidate.

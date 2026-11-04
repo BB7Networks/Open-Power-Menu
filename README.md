@@ -55,7 +55,7 @@ if you already have a custom menu. OPM never installs these optional tools silen
 2. Open a terminal **inside the extracted folder**, then run:
 
    ```bash
-   bash Install.sh
+   bash install.sh
    ```
 
    Run as your normal desktop user, without `sudo`. Setup checks for Python 3,
@@ -66,16 +66,16 @@ if you already have a custom menu. OPM never installs these optional tools silen
 4. Right-click the new button → gear icon → **General**. Choose your launcher,
    test both mouse buttons, then optionally hide the original button.
 
-For updates, run the new package's `Install.sh` again. Existing `menu.json`
+For updates, run the new package's `install.sh` again. Existing `menu.json`
 contents are preserved. Previous OPM widgets are backed up under
 `~/.local/share/open-power-menu-recovery/widget-backups/`. The newest five
 snapshots are kept; existing snapshots are migrated automatically and survive
 uninstall. To choose a different limit, run
-`OPM_WIDGET_BACKUP_RETENTION=10 bash Install.sh` (1–1,000).
+`OPM_WIDGET_BACKUP_RETENTION=10 bash install.sh` (1–1,000).
 No automatic Plasma restart is performed. Test a widget refresh locally rather
 than interrupting remote access.
 
-The `Install.sh` / `Uninstall.sh` wrappers use distinct core filenames under
+The `install.sh` / `uninstall.sh` wrappers use distinct core filenames under
 `scripts/`. The source and complete archives are safe to clone or extract on
 Windows; **running OPM still requires Linux and Plasma 6**.
 
@@ -129,7 +129,7 @@ Restore the original launcher button:
 The widget applies this reversible preference on its next refresh. OPM never
 removes the original launcher or edits its favorites or panel configuration.
 
-Remove **only the OPM Start button** from the panel, then run `bash Uninstall.sh`
+Remove **only the OPM Start button** from the panel, then run `bash uninstall.sh`
 from the complete extracted package. Your menu remains at
 `~/.config/open-power-menu/menu.json`, together with its backups. Widget snapshots
 remain in the separate recovery directory above; legacy snapshots are moved there

@@ -9,7 +9,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install pytest
 python -m pytest -q -ra
-for script in Install.sh Uninstall.sh scripts/*.sh tools/*.sh; do
+for script in install.sh uninstall.sh scripts/*.sh tools/*.sh; do
     bash -n "$script"
 done
 python -m compileall -q openpowermenu tests run.py

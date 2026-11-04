@@ -131,7 +131,7 @@ Plasma/Wayland. Portable tests cannot reproduce compositor focus transitions.
 ```bash
 tar -xzf OpenPowerMenu-EZ-v0.4.17.tar.gz
 cd OpenPowerMenu-v0.4.17
-bash Install.sh
+bash install.sh
 ```
 
 The installer changes only Open Power Menu files. It backs up the previously

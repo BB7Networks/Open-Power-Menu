@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
@@ -104,11 +105,13 @@ def test_friendly_wrappers(isolated_install):
     temp, env = isolated_install
     if os.geteuid() == 0:
         pytest.skip('Friendly installer intentionally refuses root')
-    assert 'SUCCESS' in run('bash', 'Install.sh', env=env).stdout
+    source = temp / 'source with spaces'
+    shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns('.git', '.venv', 'dist', '__pycache__', '.pytest_cache'))
+    assert 'SUCCESS' in run('bash', 'install.sh', cwd=source, env=env).stdout
     assert (temp / 'bin/open-power-menu').exists()
-    assert 'Cancelled' in run('bash', 'Uninstall.sh', env=env, input='n\n').stdout
+    assert 'Cancelled' in run('bash', 'uninstall.sh', cwd=source, env=env, input='n\n').stdout
     assert (temp / 'bin/open-power-menu').exists()
-    run('bash', 'Uninstall.sh', env=env, input='y\n')
+    run('bash', 'uninstall.sh', cwd=source, env=env, input='y\n')
     assert not (temp / 'bin/open-power-menu').exists()
     assert (temp / 'config/open-power-menu/menu.json').exists()
 
@@ -122,10 +125,12 @@ def test_release_archives_complete_clean_consistent_and_extractable(tmp_path):
     with zipfile.ZipFile(archive) as zipped:
         assert zipped.testzip() is None
         names = {name for name in zipped.namelist() if not name.endswith('/')}
-        for relative in ['Install.sh', 'Uninstall.sh', 'scripts/install-core.sh', 'scripts/uninstall-core.sh',
+        for relative in ['install.sh', 'uninstall.sh', 'scripts/install-core.sh', 'scripts/uninstall-core.sh',
                          'openpowermenu/launching.py', 'plasmoid/metadata.json', 'docs/KDE-STORE.md']:
             assert prefix + relative in names
         assert len({name.casefold() for name in names}) == len(names)
+        for wrapper in ('install.sh', 'uninstall.sh'):
+            assert prefix + wrapper.capitalize() not in names
         assert not any('__pycache__' in name or name.endswith('.pyc') or name.endswith('/menu.json') for name in names)
         assert json.loads(zipped.read(prefix + 'plasmoid/metadata.json'))['KPlugin']['Version'] == version
         extracted = tmp_path / 'extracted source with spaces'

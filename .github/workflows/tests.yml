@@ -19,7 +19,7 @@ jobs:
       - run: python -m pytest -q
       - name: Check every shell script
         run: |
-          for script in Install.sh Uninstall.sh scripts/*.sh tools/*.sh; do
+          for script in install.sh uninstall.sh scripts/*.sh tools/*.sh; do
             bash -n "$script"
           done
   qt-runtime:
