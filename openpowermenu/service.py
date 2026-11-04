@@ -25,6 +25,9 @@ def run_service() -> int:
 
     from .core import load_config
     from .menu_api import public_json, command_at_key
+    from .layout_edit import LayoutEdits, reply as layout_reply
+
+    layouts = LayoutEdits()
 
     app = QCoreApplication(sys.argv[:1])
     app.setApplicationName("Open Power Menu backend")
@@ -52,6 +55,26 @@ def run_service() -> int:
     class MenuService(QObject):
         def touch(self):
             idle_timer.start()
+
+        @Slot(result=str)
+        def BeginLayoutEdit(self):
+            self.touch()
+            return layout_reply(layouts.begin)
+
+        @Slot(str, str, result=str)
+        def SaveLayoutEdit(self, token, references):
+            self.touch()
+            return layout_reply(lambda: layouts.save(token, references))
+
+        @Slot(str, result=bool)
+        def CancelLayoutEdit(self, token):
+            self.touch()
+            return layouts.cancel(token)
+
+        @Slot(str, result=str)
+        def KeepLayoutEdit(self, token):
+            self.touch()
+            return layout_reply(lambda: {'ok': layouts.keep(token)})
 
         @Slot(result=str)
         def GetMenu(self):
@@ -100,11 +123,12 @@ def run_service() -> int:
                 return json.dumps({"hide_original_launcher": cfg.get("hide_original_launcher", False),
                                    "launcher_applet_id": cfg.get("launcher_applet_id", 0),
                                    "button_icon_mode": cfg.get("button_icon_mode", "launcher"),
-                                   "button_icon": cfg.get("button_icon", "")})
+                                   "button_icon": cfg.get("button_icon", ""),
+                                   "appearance": cfg.get("appearance", "native")})
             except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
                 print("Open Power Menu integration configuration error:", exc, file=sys.stderr)
                 return json.dumps({"hide_original_launcher": False, "launcher_applet_id": 0,
-                                   "button_icon_mode": "launcher", "button_icon": ""})
+                                   "button_icon_mode": "launcher", "button_icon": "", "appearance": "native"})
 
         @Slot(result=str)
         def Ping(self):

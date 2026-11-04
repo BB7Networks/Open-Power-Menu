@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.mark.parametrize('mode', ['backend-term', 'backend-kill', 'backend-idle',
                                  'backend-upgrade', 'backend-reap', 'backend-accounting',
-                                 'standalone', 'editor', 'configuration'])
+                                 'standalone', 'editor', 'configuration', 'layout'])
 def test_runtime(mode):
     if not shutil.which('dbus-run-session'):
         pytest.skip('dbus-run-session is required')

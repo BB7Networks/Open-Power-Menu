@@ -38,6 +38,9 @@ def main(mode):
         if mode == 'configuration':
             configuration_flow(temp)
             return
+        if mode == 'layout':
+            layout_flow(temp)
+            return
         info = temp / 'child.json'
         heartbeat = temp / 'heartbeat'
         stop = temp / 'stop'
@@ -192,6 +195,65 @@ raise SystemExit(run_service())'''
                     os.waitpid(child_pid, 0)
                 except ChildProcessError:
                     pass  # already reaped by the live backend
+
+
+def layout_flow(temp):
+    """Exercise actual D-Bus reference editing, including a backend restart."""
+    from openpowermenu.core import config_path
+    config = deepcopy(DEFAULT_CONFIG)
+    marker = temp / 'must-not-launch'
+    config['menu'] = [{'separator': True}, {'label': 'Safe test command', 'command': [
+        sys.executable, '-c', 'import pathlib,sys;pathlib.Path(sys.argv[1]).touch()', str(marker)]},
+        {'submenu': 'Empty', 'items': []}]
+    save_config(config)
+    def start():
+        process = subprocess.Popen([sys.executable, str(ROOT / 'run.py'), '--service'], cwd=ROOT,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        until(lambda: QDBusConnection.sessionBus().interface().isServiceRegistered('org.openpowermenu.Service').value())
+        return process
+    def call(method, *args):
+        interface = QDBusInterface('org.openpowermenu.Service', '/OpenPowerMenu',
+                                   'org.openpowermenu.Service', QDBusConnection.sessionBus())
+        response = interface.call(method, *args)
+        assert response.type() != QDBusMessage.ErrorMessage, response.errorMessage()
+        return response.arguments()[0]
+    def order(entries):
+        return [{'id': e['id'], **({'items': order(e['items'])} if e['kind'] == 'submenu' else {})} for e in entries]
+    backend = start()
+    try:
+        initial = config_path().read_bytes()
+        view = json.loads(call('BeginLayoutEdit'))
+        assert view['ok'] and len(view['entries']) == 3
+        assert call('Run', view['entries'][1]['id']) is False
+        assert json.loads(call('KeepLayoutEdit', view['token']))['ok']
+        proposal = order(view['entries'])
+        injected = deepcopy(proposal)
+        injected[1]['command'] = ['untrusted']
+        assert not json.loads(call('SaveLayoutEdit', view['token'], json.dumps(injected)))['ok']
+        assert config_path().read_bytes() == initial
+        proposal[2]['items'].append(proposal.pop(1))
+        assert json.loads(call('SaveLayoutEdit', view['token'], json.dumps(proposal)))['ok']
+        saved = load_config()
+        assert saved['menu'][1]['items'][0] == config['menu'][1]
+        assert saved['menu'][0] == config['menu'][0] and not marker.exists()
+        assert list(config_path().parent.glob('menu.json.bak-*'))[0].read_bytes() == initial
+        view = json.loads(call('BeginLayoutEdit'))
+        content = config_path().read_bytes()
+        assert call('CancelLayoutEdit', view['token']) is True
+        assert config_path().read_bytes() == content
+        view = json.loads(call('BeginLayoutEdit'))
+        saved['backup_retention'] = 0
+        save_config(saved)
+        result = json.loads(call('SaveLayoutEdit', view['token'], json.dumps(order(view['entries']))))
+        assert result['code'] == 'conflict' and load_config()['backup_retention'] == 0
+        backend.terminate()
+        backend.communicate(timeout=5)
+        backend = start()
+        result = json.loads(call('KeepLayoutEdit', view['token']))
+        assert result['code'] == 'expired' and not marker.exists()
+    finally:
+        backend.terminate()
+        backend.communicate(timeout=5)
 
 
 def configuration_flow(temp):
