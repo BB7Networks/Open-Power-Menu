@@ -876,10 +876,9 @@ PlasmoidItem {
             Screen.desktopAvailableHeight > 140
                 ? Screen.desktopAvailableHeight - 48 : 590)
 
-        // A submenu edit flyout lives beside its parent inside ONE Plasma popup.
-        // Clamp the expanded width to the active desktop's available area.
-        Layout.preferredWidth: root.layoutEditing && layoutEditor.flyoutVisible
-            ? Math.max(328, Math.min(650, Screen.desktopAvailableWidth - 32)) : 328
+        // Edit submenus are independent row-anchored popup windows.
+        // Do not inflate the parent menu into a split-pane editor.
+        Layout.preferredWidth: 328
         Layout.preferredHeight: Math.max(76, Math.min(heightCap, naturalHeight))
         Layout.minimumWidth: 285
         Layout.minimumHeight: 76
