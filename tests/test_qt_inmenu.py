@@ -650,3 +650,41 @@ def test_cascading_parent_and_child_are_visible_and_drag_across_one_popup(quick)
     value = draft(root)
     assert value['entries'][0]['id'] == 'b'
     assert [e['id'] for e in next(e for e in value['entries'] if e['id'] == 'g')['items']] == ['c']
+
+
+def test_cascading_hover_opens_and_dismisses_after_pointer_leaves(quick):
+    """Open on hover, preserve flyout when crossing into it, then dismiss."""
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(650, 430)
+    QTest.qWait(30)
+    initial = draft(root)['entries']
+    parent = child(root, 'layoutRow-g')
+    QTest.mouseMove(view, parent.mapToScene(QPointF(70, 18)).toPoint())
+    QTest.qWait(280)
+    assert root.property('flyoutVisible')
+    nested = child(root, 'layoutFlyoutRow-c')
+    QTest.mouseMove(view, nested.mapToScene(QPointF(45, 18)).toPoint())
+    QTest.qWait(300)
+    assert root.property('flyoutVisible')
+    outside = child(root, 'layoutRow-a')
+    QTest.mouseMove(view, outside.mapToScene(QPointF(70, 18)).toPoint())
+    QTest.qWait(330)
+    assert not root.property('flyoutVisible')
+    assert draft(root)['entries'] == initial
+    assert draft(root)['parentId'] == ''
+
+
+def test_cascading_flyout_closes_when_popup_hides(quick):
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(650, 430)
+    QTest.qWait(20)
+    click(view, root, 'layoutRow-g')
+    assert root.property('flyoutVisible')
+    initial = draft(root)
+    root.setVisible(False)
+    QTest.qWait(20)
+    assert not root.property('flyoutVisible')
+    root.setVisible(True)
+    assert draft(root) == initial
