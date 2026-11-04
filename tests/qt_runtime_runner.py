@@ -282,7 +282,7 @@ def editor_flow(app, temp, config):
         try:
             dialog = next(w for w in app.topLevelWidgets() if isinstance(w, QDialog) and w.isVisible())
             tabs = dialog.findChild(QTabWidget)
-            assert [tabs.tabText(i) for i in range(tabs.count())] == ['General', 'Layout']
+            assert [tabs.tabText(i) for i in range(tabs.count())] == ['General', 'Layout', 'Backups']
             spin = dialog.findChild(QSpinBox, 'backupRetentionSpin')
             assert (spin.minimum(), spin.maximum(), spin.value()) == (0, 1000, 10)
             spin.setValue(2)

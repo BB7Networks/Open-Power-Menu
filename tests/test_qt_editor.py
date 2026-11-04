@@ -13,7 +13,7 @@ pytest.importorskip('PySide6.QtWidgets', reason='Editor widgets run in the Qt CI
 from PySide6.QtCore import QMimeData, QPointF, Qt, QTimer
 from PySide6.QtGui import QDropEvent
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QDialog, QMessageBox
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QDialog, QLabel, QMessageBox, QPushButton
 
 from openpowermenu.backup_dialog import BackupDialog
 from openpowermenu.core import DEFAULT_CONFIG, save_config
@@ -351,7 +351,6 @@ def test_backup_restore_refreshes_editor_only_after_success(editor, app, monkeyp
     source = editor.target.with_name('menu.json.bak-manual')
     restored = {**editor.saved_config, 'menu': [], 'backup_retention': 0}
     source.write_text(json.dumps(restored))
-    editor.add_entry({'action': 'terminal'}, edit=False)
     def approve(parent, title, *args):
         return QMessageBox.Discard if title == 'Restore backup' else QMessageBox.Yes
     monkeypatch.setattr(QMessageBox, 'question', approve)
@@ -361,6 +360,45 @@ def test_backup_restore_refreshes_editor_only_after_success(editor, app, monkeyp
     modal(app, choose, editor.manage_backups)
     assert menu(editor) == [] and not editor.is_dirty() and editor.undo_stack.count() == 0
     assert editor.revision == current_revision(editor.target)
+
+
+def test_backups_never_discard_unsaved_editor_changes(editor, app, monkeypatch):
+    source = editor.target.with_name('menu.json.bak-manual')
+    source.write_text(json.dumps({**editor.saved_config, 'menu': []}))
+    editor.add_entry({'action': 'terminal'}, edit=False)
+    editor.appearance.setCurrentIndex(1)
+    editor.backup_retention.setValue(3)
+    before, content = editor.configuration(), editor.target.read_bytes()
+    monkeypatch.setattr(QMessageBox, 'question', lambda *args: QMessageBox.Yes)
+    def choose(dialog):
+        dialog.files.setCurrentItem(dialog.files.topLevelItem(1))
+        assert dialog.restore_button.isEnabled()
+        dialog.restore_selected()
+        assert not dialog.restored
+    modal(app, choose, editor.manage_backups)
+    assert editor.configuration() == before and editor.is_dirty()
+    assert editor.target.read_bytes() == content and editor.undo_stack.count() == 1
+    assert 'Save or discard' in editor.warnings[-1]
+
+
+def test_three_tabs_instructions_and_responsive_history_controls(editor, app):
+    assert [editor.tabs.tabText(i) for i in range(editor.tabs.count())] == ['General', 'Layout', 'Backups']
+    assert editor.tabs.widget(2).isAncestorOf(editor.backup_retention)
+    assert editor.findChild(QPushButton, 'manageBackupsButton').text() == 'Manage / Restore Backups…'
+    assert 'widget-backups' in editor.snapshot_location.text()
+    instructions = editor.findChild(QLabel, 'layoutInstructions')
+    assert instructions.text().count('<li>') == 4
+    assert 'Drag' in instructions.accessibleName()
+    editor.resize(1200, 700)
+    app.processEvents()
+    history = editor.toolbar.history
+    assert history.x() > editor.edit_buttons['Move down'].geometry().right()
+    for width in (620, 950):
+        editor.resize(width, 600)
+        app.processEvents()
+        for button in editor.toolbar.editing + [history]:
+            assert button.x() >= 0 and button.geometry().right() < editor.toolbar.width()
+            assert button.y() >= 0 and button.geometry().bottom() < editor.toolbar.height()
 
 
 def test_nested_edit_save_reopen_round_trip(editor):

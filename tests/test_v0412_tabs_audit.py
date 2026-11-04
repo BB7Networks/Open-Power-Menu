@@ -24,7 +24,7 @@ def editor_method(name: str) -> str:
 
 
 class ConfigureTabsTests(unittest.TestCase):
-    def test_two_tabs_are_explicitly_general_then_layout(self):
+    def test_tabs_are_explicitly_general_layout_and_backups(self):
         src = editor_method("__init__")
         self.assertIn('tabs = QTabWidget(self)', src)
         self.assertIn('tabs.addTab(general_scroll, "General")', src)
@@ -33,7 +33,10 @@ class ConfigureTabsTests(unittest.TestCase):
                         src.index('tabs.addTab(layout_tab, "Layout")'))
         self.assertIn('QScrollArea(tabs)', src)
         self.assertIn('setWidgetResizable(True)', src)
-        self.assertEqual(src.count('tabs.addTab('), 2)
+        self.assertIn('tabs.addTab(backups_scroll, "Backups")', src)
+        self.assertLess(src.index('tabs.addTab(layout_tab, "Layout")'),
+                        src.index('tabs.addTab(backups_scroll, "Backups")'))
+        self.assertEqual(src.count('tabs.addTab('), 3)
 
     def test_launchers_and_icons_are_general_not_layout(self):
         src = editor_method("__init__")

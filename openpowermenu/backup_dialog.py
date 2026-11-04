@@ -17,8 +17,8 @@ class BackupDialog(QDialog):
         self.setWindowTitle('Open Power Menu — Configuration backups')
         self.resize(780, 580)
         layout = QVBoxLayout(self)
-        help_text = QLabel('Preview a backup, then restore it when ready. Restoring preserves the current '
-                           'file as a separate pre-restore copy, even when automatic backups are off.')
+        help_text = QLabel('Preview a backup before restoring. A separate recovery copy protects the current '
+                           'file, even when automatic backups are off.')
         help_text.setWordWrap(True)
         layout.addWidget(help_text)
         self.files = QTreeWidget(self)
