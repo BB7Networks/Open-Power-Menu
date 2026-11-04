@@ -68,7 +68,7 @@ class ConfigureTabsTests(unittest.TestCase):
         for unsafe in ('self.appearance.setCurrentIndex', 'self.hide_launcher.setChecked',
                        'self.icon_mode.setCurrentIndex', 'save_config('):
             self.assertNotIn(unsafe, src)
-        # Save still commits both tabs together, with a content conflict check.
+        # Save still commits all tabs together, with a content conflict check.
         self.assertIn('config = self.configuration()', editor_method('accept'))
         self.assertIn('expected_revision=self.revision', editor_method('accept'))
 

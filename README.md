@@ -33,9 +33,10 @@ presented as the application.
 - Optional, reversible hiding of the original launcher's **button**, preserving
   the launcher itself, its configuration and its favorites.
 - Native KDE launcher support and a dedicated AppGrid Center 1.9.6 adapter.
-- **Configure → General** for launcher selection, button icon, appearance and
-  backup preview and restore; **Layout** for drag-and-drop editing, Duplicate,
-  Undo/Redo and command previews.
+- **Configure → General** for launcher selection, button icon and appearance;
+  **Layout** for editing with Duplicate and Undo/Redo; **Backups** for recovery.
+- Unlock the menu to rearrange entries, then **Save layout** or **Cancel**.
+  Commands stay inactive while editing.
 - Per-user installation, upgrades that preserve your menu, and a recovery command.
 
 **System Logs** prefers KSystemLog. Without it, Konsole or XTerm follows the
@@ -85,6 +86,14 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 
 ## Make it yours
 
+For a quick rearrangement, right-click the Start button and select the **lock**
+icon. Drag handles reorder the current level. Open a submenu to arrange its
+entries; use **Move into** or **Move out** to move between levels. All entries
+appear, including unavailable applications and empty submenus. **Save layout**
+checks for conflicts and preserves your command definitions; **Cancel** leaves
+the saved menu untouched. Closing the popup keeps the draft for your next visit.
+See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
+
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
 for review. Save the entry, then Save the complete editor. On KDE, the picker
@@ -107,16 +116,18 @@ entry. Use **Ctrl+Z** to undo and **Ctrl+Shift+Z** or **Ctrl+Y** to redo layout
 changes. Right-click an entry to see editing and keyboard movement shortcuts;
 Move Up/Down buttons remain available.
 
-Changes stay in memory until **Save**. Closing with unsaved General or Layout
+Changes stay in memory until **Save**. Closing with unsaved Configure
 changes offers **Save / Discard / Cancel**. If another editor changes the file,
 choose to keep editing, reload it, or explicitly overwrite with a recovery copy.
 
-**Configure → General → Configuration backups** keeps 10 previous automatic
+**Configure → Backups → Configuration backups** keeps 10 previous automatic
 versions by default, with a limit of 0–1,000. Setting 0 stops new backups and
 preserves existing history. Pruning happens only after a successful save;
-manually named backups remain untouched. Select **Manage backups…** to preview
+manually named backups remain untouched. Select **Manage / Restore Backups…** to preview
 entries and settings, then restore a valid backup. Restore preserves the current
-file as a separate recovery copy even with automatic backups disabled.
+file as a separate recovery copy even with automatic backups disabled. Save or
+discard pending editor changes and reopen Configure before restoring. The Backups
+tab also shows the separate widget recovery directory and generated snapshot count.
 
 ## Recovery and removal
 
@@ -152,6 +163,8 @@ Next priorities:
   evidence; process ancestry alone does not mean an app dies with OPM.
 
 See the [review findings](docs/REVIEW.md) and [process lifecycle report](docs/PROCESS-LIFECYCLE.md).
+The [in-menu editing guide](docs/IN-MENU-EDITING.md#deferred-work) records further
+setup, shortcut, search and packaging work deferred from this change.
 
 ## Development and support
 

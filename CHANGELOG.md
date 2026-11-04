@@ -1,5 +1,23 @@
 # Open Power Menu changelog
 
+## Unreleased - configuration UX and in-menu layout editing
+
+- Standardize the root wrappers as `install.sh` and `uninstall.sh`; rebuild
+  complete archives without stale members and retain the distinct core scripts.
+- Give Configure concise instructions, a responsive toolbar with Undo/Redo on
+  the right, and a dedicated Backups tab with Manage / Restore Backups and
+  separate widget snapshot information. Block restoration while edits are unsaved.
+- Add a locked-by-default menu layout control with drag handles, submenu
+  navigation, Move into/out, and explicit Save layout / Cancel. Keep drafts
+  across popup closure and prevent command activation while editing.
+- Commit complete, reference-only layouts through the backend's existing
+  revision checks, validation, backups and atomic writer. Preserve hidden items,
+  command definitions, metadata and General settings; reject stale or invalid edits.
+- Add menu/flyout keyboard navigation and visible launch/backend errors; follow
+  native theme colors while retaining optional Aero styling and flyout geometry.
+- Extend Node, offscreen Qt Quick and real D-Bus checks. Live Wayland acceptance
+  and real Plasma screenshots remain required; version identifiers stay unchanged.
+
 ## Unreleased - default actions and development review
 
 - Prefer KSystemLog for System Logs; retain warning-priority journal output with
