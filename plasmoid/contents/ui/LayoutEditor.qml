@@ -541,7 +541,9 @@ QQC2.Control {
                     visible: control.dragActive && control.dropKind === "end" &&
                              control.dropParent === control.draft.parentId
                 }
-            RowLayout {
+            }
+        }
+        RowLayout {
             Layout.fillWidth: true
             QQC2.Button {
                 objectName: "saveLayout"
