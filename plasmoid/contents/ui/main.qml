@@ -30,6 +30,13 @@ PlasmoidItem {
                     : maskActive ? "Original launcher hidden by Plasma (experimental) · Left click opens it"
                     : "Left click: launcher · Right click: Power User menu"
 
+    // KDE's native widget shortcut expands PlasmoidItem before QML receives
+    // activated(). Route the event through the guarded OPM popup handoff.
+    Connections {
+        target: Plasmoid
+        function onActivated() { root.activatePowerShortcut(); }
+    }
+
     property var menuEntries: []
     property var visibleEntries: []
     property string menuStatus: "Loading system shortcuts..."
@@ -69,6 +76,8 @@ PlasmoidItem {
     // so the Power User popup and its side flyouts are closed first.
     property int menuSwitchEpoch: 0
     property string requestedMenu: "none"
+    // Tracks an OPM-opened popup, not Plasma's eager shortcut expansion.
+    property bool powerIsOpen: false
     // A popup's expanded=false is not the same as its native dialog having
     // finished losing focus. Wait briefly only when switching from a visible
     // Power Menu to a Plasma launcher, or the old popup can close the new one.
@@ -161,6 +170,7 @@ PlasmoidItem {
         pendingPowerEpoch = -1;
         awaitingAsyncClose = false;
         launcherSwitchError = "";
+        powerIsOpen = true;
         expanded = true;
         fetchMenu();
         launcherCloseFollowup.restart();
@@ -639,6 +649,18 @@ PlasmoidItem {
     function rebuild() {
         visibleEntries = menuEntries;
     }
+    function activatePowerShortcut() {
+        // Plasma's PlasmoidItem first calls setExpanded(true) for activated().
+        // The state below distinguishes a genuine OPM popup or pending handoff
+        // from that eager expansion. Never launch a second standalone window.
+        if (powerIsOpen || (requestedMenu === "power" && launcherClosePoll.running)) {
+            root.openMenu(); // Toggle off an existing/pending power popup.
+            return;
+        }
+        expanded = false; // Undo the eager expand before our handoff begins.
+        root.openMenu();
+    }
+
     function openMenu() {
         fetchIntegration();
         const alreadyOpen = expanded || (launcherClosePoll.running && requestedMenu === "power");
@@ -805,6 +827,7 @@ PlasmoidItem {
             target: root
             function onExpandedChanged() {
                 if (!root.expanded) {
+                    root.powerIsOpen = false;
                     flyout.visible = false;
                     layoutEditor.cancelDrag();
                 } else {

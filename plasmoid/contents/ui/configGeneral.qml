@@ -34,7 +34,7 @@ Kirigami.Page {
             ]
         }
         QQC2.Label {
-            text: "Right-click opens Open Power Menu. To adopt the existing launcher's icon, choose a custom icon, or hide/unhide the original button, use Configure in the Power User menu. This field is the fallback icon when none is available."
+            text: "For Meta+X, use this widget’s Keyboard Shortcuts setting. Right-click opens Open Power Menu. To adopt the existing launcher's icon, choose a custom icon, or hide/unhide the original button, use Configure in the Power User menu. This field is the fallback icon when none is available."
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }

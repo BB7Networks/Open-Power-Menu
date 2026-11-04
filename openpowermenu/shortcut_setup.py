@@ -56,9 +56,11 @@ def create_shortcut_dialog(parent=None):
             self.saw_active = False
             layout = QVBoxLayout(self)
             explanation = QLabel(
-                '<b>Open the standalone Power User Menu with Meta+X</b>'
-                '<p>It uses your saved configuration and opens a separate menu, not the panel instance.</p>'
-                '<ol><li>Test the installed menu below. Press Esc to dismiss it.</li>'
+                '<b>Meta+X: use the native panel widget shortcut</b>'
+                '<p>Assign Meta+X to the <b>Open Power Menu Start Button</b> widget in its Plasma Keyboard Shortcuts settings. It then opens the panel menu, not a separate window.</p>'
+                '<p>In Panel Edit Mode, open this widget’s settings and assign Meta+X in the Keyboard Shortcuts tab. KDE handles conflicts. Remove the old application/command Meta+X assignment first if needed.</p>'
+                '<b>Optional standalone shortcut</b>'
+                '<ol><li>Test the standalone menu below. Press Esc to dismiss it.</li>'
                 '<li>Open KDE Shortcuts. Choose <b>Add New → Application… → Open Power Menu</b>.</li>'
                 '<li>Assign <b>Meta+X</b> and select <b>Apply</b>.</li></ol>'
                 '<p>If KDE reports a conflict, choose another shortcut or cancel. '
