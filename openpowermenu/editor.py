@@ -494,20 +494,6 @@ def create_editor(path: Path | None = None):
             style_form.addRow("Menu style:", self.appearance)
             general_layout.addWidget(style_group)
 
-            shortcut_group = QGroupBox("Keyboard shortcut", general)
-            shortcut_layout = QVBoxLayout(shortcut_group)
-            shortcut_help = QLabel(
-                "Assign Meta+X to the Open Power Menu Start Button widget in Plasma's "
-                "Keyboard Shortcuts settings. It opens the menu beside your Start button.",
-                shortcut_group)
-            shortcut_help.setWordWrap(True)
-            shortcut_layout.addWidget(shortcut_help)
-            shortcut_button = QPushButton("Set up Meta+X…", shortcut_group)
-            shortcut_button.setObjectName("setupMenuShortcut")
-            shortcut_button.clicked.connect(self.setup_shortcut)
-            shortcut_layout.addWidget(shortcut_button, 0, Qt.AlignLeft)
-            general_layout.addWidget(shortcut_group)
-
             general_layout.addStretch(1)
             general_scroll = QScrollArea(tabs)
             general_scroll.setWidgetResizable(True)
@@ -701,10 +687,6 @@ def create_editor(path: Path | None = None):
             except OSError:
                 status = "Snapshot directory is unavailable."
             self.snapshot_location.setText(f"{recovery_path(data_home)}\n{status}")
-
-        def setup_shortcut(self):
-            from .shortcut_setup import create_shortcut_dialog
-            create_shortcut_dialog(self).exec()
 
         def _make_item(self, entry: dict):
             # Build unattached: QTreeWidgetItem cannot be inserted into a
