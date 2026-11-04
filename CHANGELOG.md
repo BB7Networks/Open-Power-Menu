@@ -2,12 +2,20 @@
 
 ## Unreleased - configuration UX and in-menu layout editing
 
+- Preserve viewport anchors, selection and focus when rearranging long menus;
+  restore each visited submenu's view and retain it with unfinished drafts.
+- Support full-row dragging and delayed submenu/parent navigation inside one
+  popup. Keep accessible movement controls until live Wayland validation.
+- Add confirmed, confined deletion of selected configuration backups, including
+  corrupt history, with changed-file checks and protected-copy warnings.
+- Add read-only snapshot Refresh and Meta+X setup through KDE Shortcuts using
+  the standalone menu command; global bindings remain under user/KDE control.
 - Standardize the root wrappers as `install.sh` and `uninstall.sh`; rebuild
   complete archives without stale members and retain the distinct core scripts.
 - Give Configure concise instructions, a responsive toolbar with Undo/Redo on
   the right, and a dedicated Backups tab with Manage / Restore Backups and
   separate widget snapshot information. Block restoration while edits are unsaved.
-- Add a locked-by-default menu layout control with drag handles, submenu
+- Add a locked-by-default menu layout control with full-row dragging, submenu
   navigation, Move into/out, and explicit Save layout / Cancel. Keep drafts
   across popup closure and prevent command activation while editing.
 - Commit complete, reference-only layouts through the backend's existing

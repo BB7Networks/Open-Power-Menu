@@ -110,10 +110,34 @@ that operation's pruning, so the limit can temporarily be exceeded by one.
 Pre-restore and pre-overwrite copies are **independent of automatic retention**,
 including when it is zero. They are never automatically pruned. Manually named
 `menu.json.bak-my-label` files appear in the browser and are also preserved.
-Unrelated names and symlinks are ignored. There is no delete/import/export UI in
-this change; remove unwanted explicit/manual recovery files yourself after
-checking them. Backups stay inside the OPM configuration directory, normally
+Unrelated names and symlinks are ignored. There is no import/export UI.
+Backups stay inside the OPM configuration directory, normally
 `~/.config/open-power-menu/` (`XDG_CONFIG_HOME` is respected).
+
+## Delete a selected configuration backup
+
+Select a history row and choose **Delete selected backup…**. The confirmation
+shows its name, local date and byte size and defaults to Cancel. Deletion is
+permanent and cannot be undone. Pre-restore/pre-overwrite copies have an additional
+warning that deleting them removes a protected rollback point. A corrupt or
+oversized backup can be deleted without parsing it. After success the list selects
+the next nearby history row; a manual Refresh preserves the current selection.
+
+Only one explicitly selected backup is deleted. The active configuration, unrelated
+files and widget snapshot directories are never valid targets. Manually named
+backups remain protected from automatic rotation and can be removed only by an
+explicit deletion action. Deleting history leaves unsaved Configure edits intact.
+
+The backend accepts only recognized basenames within the confined configuration
+directory and opens every directory component without following links. Deletion
+requires a private, user-owned directory and a regular file owned by the current
+user; symlinks, hard links, FIFOs and directories are refused. It fingerprints the
+selection's directory identity, inode, size, mtime and ctime, plus bounded content
+hashing for files within 4 MiB. After confirmation it rechecks the snapshot under
+the existing cooperative writer lock and unlinks relative to that held directory.
+Changed/replaced or missing files and permission failures leave the active file
+untouched and show an error. As with saves, external tools must not bypass OPM's
+cooperative lock while modifying the same directory.
 
 ## Widget upgrade history and uninstall
 
@@ -127,6 +151,10 @@ Migration failure stops installation/removal, preserving remaining history.
 The Backups tab displays the directory, the count of generated snapshot directories,
 and the default retention of five. Manual snapshots and symlinks are excluded
 from that count. Retention remains an installer setting rather than a GUI preference.
+**Refresh** performs a new, read-only count without closing Configure. Enumeration
+is shared with the snapshot helper, with no background polling or filesystem watch.
+The displayed path remains selectable/copyable. Widget snapshot deletion is not
+part of the configuration backup browser.
 
 The installer completes a snapshot of an existing widget **before replacing any
 installed application/widget files**. Snapshot-copy failure aborts the upgrade.
@@ -188,6 +216,9 @@ terminal. Record Plasma/Qt/launcher versions, scaling, panel position and theme.
    history. Repeat with retention zero; verify the pre-restore copy and source
    remain. Try a corrupt/missing backup and confirm the active file is intact.
    With unsaved edits, confirm restore is blocked and the edits remain intact.
+   Delete a disposable corrupt backup; cancel deletion of another and verify it
+   remains. Check the extra warning for protected copies, changed-file refusal,
+   active-row protection, nearby selection after deletion, and snapshot Refresh.
 6. Upgrade an existing disposable installation with legacy snapshots and a custom
    menu, using widget retention two. Verify migration, newest snapshots, the old
    widget contents, and unchanged menu/panel. Test a failed upgrade in the VM and

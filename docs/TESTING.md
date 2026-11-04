@@ -68,6 +68,16 @@ saves, conflicts, cancellation and service restarts. CI also parses the changed
 QML files. These checks do not load a live Plasma shell or prove native flyout
 focus, screen-reader integration or Wayland pointer grabs.
 
+The PR #5 follow-up additionally tests stable viewport anchors/delegate identity,
+parent/child selection, popup recreation, full-row click versus drag thresholds,
+long-held submenu drags, spring-loaded multi-level movement, passing over targets,
+full-parent traversal, invalid/canceled drops and edge scrolling. Backup deletion
+tests cover confirmation, corrupt/oversized files, changed identities/content,
+owner/path/link refusals, protected copies, literal filenames and UI refresh.
+Shortcut tests verify command resolution/quoting, missing KDE tools, failed launches
+and that setup only requests the native settings UI. They cannot verify KDE's actual
+global-key delivery or conflict prompt in a desktop environment without Plasma.
+
 ## Live acceptance matrix (still required)
 
 Use a test account or VM and retain a recovery terminal. Do not restart Plasma
@@ -87,8 +97,11 @@ Qt, Wayland, launcher versions, panel position and display scale for every run.
 | Editor | Search/pick/save/launch an app; spaces, localization, terminal/DBus apps; custom quoting and nested entries |
 | Configure presentation | Three tabs; concise instructions; Undo/Redo right-aligned and wrapping at narrow widths; unsaved changes survive attempted restore |
 | In-menu editing | Locked default; full hidden-entry hierarchy; reorder/reparent; Save/Cancel; interrupted drags; popup close/reopen; no command launches |
+| Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; hover Back through multiple levels; return viewport/selection; long press; edge scrolling |
 | In-menu recovery | External edit conflict; backend unavailable/restarted; retained draft and clear recovery instructions |
 | Keyboard/theme | Up/Down, Enter, Right/Left, Escape; edit move controls; visible focus; native light/dark and optional Aero |
+| Meta+X setup | Configure → General; KDE command assignment, an existing shortcut conflict, Apply/change/remove; standalone menu on Wayland and X11 where available |
+| Backup cleanup | Confirm/Cancel; corrupt and protected copies; changed/missing history; active row never deletable; count Refresh while editor changes are unsaved |
 | Backups | Repeated Save, limit 10 then 2, limit 0, Cancel, restore; manual files unchanged |
 | Lifecycle | Dummy long-running app survives popup close, backend PID stop/restart; compare PID usage with grouped totals |
 | Upgrade | Real archived 0.4.16 and 0.4.17 installs upgraded with a custom menu; verify backend reactivation and widget snapshot |

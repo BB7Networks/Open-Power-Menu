@@ -87,12 +87,17 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 ## Make it yours
 
 For a quick rearrangement, right-click the Start button and select the **lock**
-icon. Drag handles reorder the current level. Open a submenu to arrange its
-entries; use **Move into** or **Move out** to move between levels. All entries
+icon. Drag any part of an entry to move it. Pause over a submenu to open it while
+dragging, or over **Back** to move up a level. The list keeps your place as you
+rearrange entries. Movement buttons and keyboard shortcuts remain available. All entries
 appear, including unavailable applications and empty submenus. **Save layout**
 checks for conflicts and preserves your command definitions; **Cancel** leaves
 the saved menu untouched. Closing the popup keeps the draft for your next visit.
 See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
+
+For **Meta+X**, open **Configure → General → Keyboard shortcut → Set up Meta+X…**.
+The setup explains how to assign the installed standalone menu command in KDE
+Shortcuts. KDE handles conflicts and lets you change or remove the assignment.
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
@@ -128,6 +133,9 @@ entries and settings, then restore a valid backup. Restore preserves the current
 file as a separate recovery copy even with automatic backups disabled. Save or
 discard pending editor changes and reopen Configure before restoring. The Backups
 tab also shows the separate widget recovery directory and generated snapshot count.
+Use its **Refresh** button to update the count. In the backup browser,
+**Delete selected backup…** permanently removes one confirmed backup; the active
+configuration is protected, and recovery copies receive an additional warning.
 
 ## Recovery and removal
 
@@ -164,7 +172,7 @@ Next priorities:
 
 See the [review findings](docs/REVIEW.md) and [process lifecycle report](docs/PROCESS-LIFECYCLE.md).
 The [in-menu editing guide](docs/IN-MENU-EDITING.md#deferred-work) records further
-setup, shortcut, search and packaging work deferred from this change.
+setup, native panel shortcuts, search and packaging work deferred from this change.
 
 ## Development and support
 

@@ -3,6 +3,8 @@
 This unreleased change is based on PR #4 at `5017e33`, on branch
 `feature/in-menu-editing-ux`. PRs #1–4 were open and unmerged when work began.
 Version identifiers remain **0.4.17**. No configuration migration is required.
+The follow-up addressing live Manjaro feedback starts at verified PR #5 head
+`85c9c5e` and continues in the same PR and branch.
 
 ## What the interface looks like
 
@@ -12,13 +14,15 @@ These are descriptions of the implemented UI, not screenshots:
   instruction bullets. Editing actions sit below the tree, with Undo/Redo on
   the right; the toolbar wraps at smaller widths. Backups contains the 0–1,000
   configuration-retention control (default 10), **Manage / Restore Backups…**,
-  and a separate widget snapshot path/count/default-five explanation.
+  and a separate widget snapshot path/count/default-five explanation with Refresh.
+  The backup browser can permanently delete one selected backup after confirmation.
+  General offers **Set up Meta+X…** for KDE's native shortcut settings.
 - **Locked menu:** the header has Lock, Refresh and Configure icons. Normal
   commands and hover flyouts work here. Native flyouts use the KDE color scheme;
   optional Aero retains its dark background and readable light foreground.
 - **Unlocked menu:** a single list shows every entry at the current level,
-  including unavailable commands, separators and empty submenus. Drag handles
-  and insertion lines indicate reordering. A Back button navigates up, while
+  including unavailable commands, separators and empty submenus. Entire rows are
+  draggable, with a ghost and insertion/destination highlighting. Back navigates up, while
   Up/Down and Move into/out controls provide explicit movement. **Save layout**
   and **Cancel** remain visible beneath the list.
 
@@ -27,10 +31,37 @@ submenu preserves its entire subtree. This mode changes positions only; use
 Configure to add, remove, rename or edit commands and icons. Clicking an entry
 or pressing Enter while unlocked never launches its command.
 
-Drag-and-drop is intentionally limited to the current level inside one popup.
-Cross-submenu moves use **Move into** and **Move out**. To move between distant
-groups, move outward to their common parent, then into the destination. Native
-cross-flyout dragging is not implemented. Edge scrolling supports longer lists.
+Drag from any part of a row. Qt's normal movement threshold distinguishes dragging
+from clicking; moving a submenu carries every child. The top/bottom edges of a row
+insert before/after it. Its center is a submenu destination: a short drop appends
+inside, while a **450 ms hover** opens its contents without releasing the pointer.
+Hover over **Back or the parent header** to go up, repeating through several levels.
+Briefly passing over a submenu does not open it. Invalid drops show a red ghost
+and are canceled; Escape or popup interruption restores the source view.
+
+This is **spring-loaded navigation inside one native popup**, not dragging between
+separate flyout windows. One stable pointer surface survives changes of level.
+Locked-mode native flyouts and their placement are unchanged. Edge scrolling works
+in long lists. A full parent can be traversed to reach another submenu even when
+dropping another sibling into that parent would exceed the 200-entry limit.
+
+Up/Down, Move into/out and the destination selector remain visible until **live
+Wayland tests as well as automated checks** validate their replacement. They are
+keyboard-accessible fallbacks. Further removal/consolidation is deliberately deferred.
+
+## Keeping your place
+
+The previous JavaScript array model was replaced after every move, which reset
+ListView state and rebuilt its delegates. The view now updates a stable ListModel
+by opaque item ID and moves existing delegates for same-level edits. Each visited
+menu remembers its top visible item, relative pixel offset and selection in the
+in-memory draft. This handles changing row indexes and ListView's shifting origin.
+
+After a move, the viewport restores that anchor and reveals the selected item
+only as needed. Keyboard focus stays on the editor. New submenus start at the top;
+returning to a visited menu restores its previous view. Popup destruction and
+recreation can restore the same state from the retained draft. These view caches
+are excluded from saved layout references and from dirty-state comparisons.
 
 ## Save, cancellation and recovery
 
@@ -121,10 +152,56 @@ normal command behavior. Launcher adapters, original-button visibility/icon
 handling, popup handoff timers, flyout placement and detached process launching
 retain their existing implementations.
 
+## Meta+X setup
+
+Open **Configure → General → Keyboard shortcut → Set up Meta+X…**. The dialog
+resolves the installed `open-power-menu` executable, respecting `XDG_BIN_HOME`
+and then PATH, and supplies a quoted command that handles spaces and literal
+shell characters. It opens `kcmshell6 kcm_keys`, or `systemsettings kcm_keys` when
+the module runner is unavailable. Missing tools or installation produce guidance.
+
+In KDE Shortcuts, choose **Add New → Command or Script…**, paste the supplied
+command, assign **Meta+X**, and Apply. If KDE reports an existing assignment,
+choose another shortcut or cancel. Change or remove the assignment on that same
+KDE page. OPM never registers a global shortcut, rewrites `kglobalshortcutsrc` or
+KWin files, or reports that the binding has been configured. Settings are opened
+only when the user selects the button.
+
+This uses the explicitly supported **standalone Power User Menu fallback** with
+the same saved configuration. Native panel-menu shortcut activation remains
+unverified: KDE's standard applet activation directly changes expansion, outside
+OPM's asynchronous launcher-close/handoff path. Adding another handler would not
+suppress that default behavior. This follow-up leaves that path untouched pending
+live evidence, and introduces no D-Bus activation workaround or Plasma 5 component.
+
+The supported routes were checked against KDE's current
+[Shortcuts KCM](https://github.com/KDE/plasma-desktop/blob/master/kcms/keys/ui/main.qml),
+[widget Shortcuts page](https://github.com/KDE/plasma-desktop/blob/master/desktoppackage/contents/configuration/ConfigurationShortcuts.qml),
+and [Plasmoid activation implementation](https://github.com/KDE/libplasma/blob/master/src/plasmaquick/plasmoid/plasmoiditem.cpp).
+Global-key delivery and conflict prompts require live Plasma 6 Wayland/X11 testing;
+the cloud test environment does not have a Plasma shell or KDE settings tools.
+
 ## Verification
 
+The follow-up baseline at `85c9c5e` passed **318 tests, 8 historical-baseline skips,
+and 18 subtests** in 21.07 seconds. The completed follow-up passed **370 tests,
+8 historical-baseline skips, and 18 subtests** in 23.75 seconds, using Python
+3.12.14, PySide6 6.10.2 and Node 24. The eight unavailable historical trees remain
+explicitly reported. Python compilation, all seven Bash syntax checks, QML parsing,
+installer/upgrade/uninstall, complete archives, checksums and filename/version
+checks pass. [PR #5 checks](https://github.com/BB7Networks/Open-Power-Menu/pull/5/checks)
+record the CI results for each pushed head (Node 22 in CI).
+
+Compared with the follow-up baseline, 17 files covering core configuration/command
+handling, standalone launching, the D-Bus layout API, launcher adapters/visibility,
+the widget's main popup/handoff, locked flyouts and core installer scripts remain
+byte-identical. The additions exercise actual Qt Quick drags, hover navigation,
+viewport restoration, deletion confirmation/failure paths and shortcut setup.
+
+Earlier PR #5 verification:
+
 The starting full suite passed **281 tests, with 8 historical-baseline skips and
-18 passing subtests**. The final full suite passed **318 tests, with the same
+18 passing subtests**. The initial PR #5 full suite passed **318 tests, with the same
 8 historical-baseline skips and 18 passing subtests**, in 21.44 seconds on Python
 3.12.14, PySide6 6.10.2 and Node 24. CI uses Node 22.
 
@@ -166,12 +243,17 @@ only access. Refresh the widget only through your normal local procedure.
    with unsaved General/Layout/Backups changes and confirm nothing is discarded.
 5. Right-click the Start button. Confirm locked normal behavior, then unlock; all
    commands must remain inactive under clicks, Enter and dragging.
-6. Drag before/after top-level and submenu entries; move whole groups and use Move
-   into/out. Test empty groups, invalid moves, long-list scrolling and Escape.
+6. Drag from row labels and empty row space, including a held submenu press. Test
+   before/after insertion, whole groups, a brief pass over a submenu, a deliberate
+   450 ms hover, and Back-hover through two levels. Include empty/full groups,
+   invalid self/descendant destinations, edge scrolling and Escape. Near the bottom
+   of a long list, repeat moves and verify the viewport, selection and focus stay
+   in place. Keep the fallback movement controls until these live tests pass.
 7. Cancel. Compare `menu.json` bytes and backups with the pre-edit state.
 8. Repeat and Save. Check the order and every definition/General setting, plus the
    prior-configuration backup according to the selected retention policy.
-9. Close/reopen with an unsaved draft and confirm it survives. Save, then stop only
+9. Visit and scroll a parent and child menu; return and verify their saved positions
+   and selections. Close/reopen with an unsaved draft and confirm it survives. Save, then stop only
    the test backend and reopen to check persistence. Restart during a draft and
    confirm its recovery message and retained visible state.
 10. Include an unavailable application, empty submenu and redundant separators.
@@ -179,7 +261,9 @@ only access. Refresh the widget only through your normal local procedure.
 11. Check native light/dark themes and Aero, visible focus/drop lines, tooltips and
     screen-reader labels; capture real screenshots only after validation.
 12. Exercise the keyboard table above through several nested levels. Test small
-    displays, fractional scaling, all panel edges and multi-monitor screen edges.
+    displays and fractional scaling on **top, bottom, left and right panels**,
+    including screen boundaries and multi-monitor placement. Repeat hover navigation
+    and drag cancellation at each position; compare locked flyouts with the baseline.
 13. Use a harmless test command that records invocation; verify editing produces
     none. In locked mode check missing-executable/backend errors and successful
     launch behavior without spurious program-exit alerts.
@@ -192,12 +276,23 @@ only access. Refresh the widget only through your normal local procedure.
     Restore a backup with retention zero and confirm its protected pre-restore
     copy. In the disposable profile, remove only OPM's widget, run
     `bash uninstall.sh`, and verify menu, backups and widget recovery history remain.
+17. In a test profile, open General → Set up Meta+X and KDE Shortcuts. Check the
+    supplied command, including an installation path containing spaces. Try an
+    already assigned key, cancel KDE's conflict prompt and verify the old binding
+    remains. Assign a free Meta+X, Apply, open the standalone menu, then change and
+    remove the assignment. Repeat on Plasma 6 Wayland and X11 where available.
+18. Delete a disposable corrupt backup after confirmation; cancel another deletion.
+    Verify the name/date/size and protected-copy warning. Replace a selected backup
+    before confirming and check refusal. The active row must never be deletable.
+    Check nearby selection afterward, preserve unsaved editor changes, and use
+    snapshot Refresh after an upgrade changes the count without closing Configure.
 
 ## Deferred work
 
 - Full first-run setup wizard and automatic dependency diagnostics.
 - General-purpose configuration import/export.
-- Discoverable Meta+X shortcut configuration.
+- Native panel-menu shortcut activation with verified launcher handoff (the
+  supported KDE setup for the standalone menu is available).
 - Search/filtering for very large menus.
 - KDE Store backend installation/onboarding.
 - Broader cross-distribution packaging and compatibility.
