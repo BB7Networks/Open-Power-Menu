@@ -15,7 +15,7 @@ true; `activatePowerShortcut()` deliberately resets that state when OPM has
 not actually requested the Power menu.
 
 The standalone `open-power-menu` application remains usable separately.
-No change to `menu.json`, KDE shortcut files, or KWin configuration.
+OPM does not edit `menu.json`, shortcut files, or KWin configuration directly; KDE persists its native widget shortcut as usual.
 
 **Live acceptance required:** Meta+X must open the panel-attached Power User
 Menu; a second press should close it. Test AppGrid visible/hidden, drafts,
