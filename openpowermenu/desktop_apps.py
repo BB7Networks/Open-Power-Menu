@@ -26,6 +26,13 @@ class DesktopApplication:
     comment: str = ""
     generic_name: str = ""
     terminal: bool = False
+    working_directory: str = ""
+
+
+def _unescape(value: str) -> str:
+    # Desktop Entry string escaping precedes Exec argument parsing.
+    escapes = {"s": " ", "n": "\n", "t": "\t", "r": "\r", "\\": "\\"}
+    return re.sub(r"\\([sntr\\])", lambda match: escapes[match[1]], value)
 
 
 def _flag(value: str) -> bool:
@@ -36,10 +43,13 @@ def _local_name(section, key: str) -> str:
     language = locale.getlocale()[0] or os.environ.get("LANG", "").split(".", 1)[0]
     choices = []
     if language:
-        choices = [f"{key}[{language}]", f"{key}[{language.split('_')[0]}]"]
+        base, _, modifier = language.partition("@")
+        short = base.split("_")[0]
+        locales = [language, base, short + "@" + modifier, short] if modifier else [base, short]
+        choices = [f"{key}[{value}]" for value in dict.fromkeys(locales)]
     for candidate in (*choices, key):
         if candidate in section:
-            return section[candidate].strip()
+            return _unescape(section[candidate].strip())
     return ""
 
 
@@ -75,12 +85,13 @@ def read_desktop_application(file: Path) -> DesktopApplication | None:
             return None
         return DesktopApplication(
             name=name,
-            icon=meta.get("Icon", "").strip(),
+            icon=_unescape(meta.get("Icon", "").strip()),
             desktop_file=file.resolve(),
             exec_line=exec_line,
             comment=_local_name(meta, "Comment"),
             generic_name=_local_name(meta, "GenericName"),
             terminal=_flag(meta.get("Terminal", "false")),
+            working_directory=_unescape(meta.get("Path", "").strip()),
         )
     except (OSError, UnicodeError, configparser.Error, ValueError):
         return None
@@ -121,7 +132,7 @@ def desktop_exec_argv(exec_line: str, name: str, icon: str, desktop_file: Path) 
     if not exec_line:
         raise ValueError("This application uses desktop activation only; a KDE desktop launcher is required")
     try:
-        parts = shlex.split(exec_line, posix=True)
+        parts = shlex.split(_unescape(exec_line), posix=True)
     except ValueError as exc:
         raise ValueError("Invalid desktop Exec quoting") from exc
     argv: list[str] = []
@@ -153,9 +164,16 @@ def application_command(app: DesktopApplication) -> list[str]:
     if shutil.which("kioclient6"):
         return ["kioclient6", "exec", file]
     if shutil.which("gio"):
+        # `gio launch` constructs an app from file contents, so some GLib
+        # versions drop %k rather than supplying the desktop filename. Do not
+        # silently change such an application's arguments.
+        if "%k" in app.exec_line.replace("%%", ""):
+            raise ValueError("This application needs %k desktop-file substitution. Install kioclient6 to use the picker")
         return ["gio", "launch", file]
     if app.terminal:
         raise ValueError("This application needs terminal handling. Install kioclient6 to use the picker")
+    if app.working_directory:
+        raise ValueError("This application needs a working directory. Install kioclient6 or GIO to use the picker")
     return desktop_exec_argv(app.exec_line, app.name, app.icon, app.desktop_file)
 
 
@@ -165,5 +183,5 @@ def application_menu_item(app: DesktopApplication) -> dict:
         "label": app.name,
         "icon": app.icon or "application-x-executable",
         "command": application_command(app),
-        "desktop_file": str(app.desktop_file),  # editor metadata; core ignores it
+        "desktop_file": str(app.desktop_file),  # preserve picker argv literally
     }

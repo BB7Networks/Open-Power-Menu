@@ -1,6 +1,6 @@
-"""Pure-stdlib configuration, availability and command-resolution logic.
+"""Stdlib configuration, availability and command-resolution logic.
 
-The core intentionally knows nothing about KDE, QML, AppGrid, Qt, or a panel.
+No Qt imports or live panel access; desktop capability probes are read-only.
 UI adapters consume this model and ask the launcher to execute resolved argv.
 """
 from __future__ import annotations
@@ -9,10 +9,13 @@ from copy import deepcopy
 from dataclasses import dataclass
 import json
 import logging
+from functools import lru_cache
 import os
 from pathlib import Path
 import shutil
 import re
+import subprocess
+import time
 from urllib.parse import urlsplit, unquote
 from typing import Any
 
@@ -51,9 +54,11 @@ COMMANDS: dict[str, dict[str, Any]] = {
     },
     "logs": {
         "title": "System Logs", "icon": "view-list-details",
-        "commands": [["konsole", "--hold", "-e", "journalctl", "-b", "-p", "warning", "--no-pager"],
-                     ["xterm", "-hold", "-e", "journalctl", "-b", "-p", "warning", "--no-pager"]],
-        "requires": ["journalctl"],
+        "commands": [["ksystemlog"],
+                     {"argv": ["konsole", "--hold", "-e", "journalctl", "-b", "-p", "warning", "-n", "1000", "--follow", "--no-pager"],
+                      "requires": ["journalctl"]},
+                     {"argv": ["xterm", "-hold", "-e", "journalctl", "-b", "-p", "warning", "-n", "1000", "--follow", "--no-pager"],
+                      "requires": ["journalctl"]}],
     },
     "system": {
         "title": "System Information", "icon": "computer",
@@ -70,6 +75,11 @@ COMMANDS: dict[str, dict[str, Any]] = {
     "disks": {
         "title": "Disk Management", "icon": "drive-harddisk",
         "commands": [["partitionmanager"], ["gnome-disks"], ["gparted"]],
+    },
+    "printers": {
+        "title": "Printers", "icon": "preferences-devices-printer",
+        "commands": [{"argv": ["kcmshell6", "kcm_printer_manager"], "kcm": "kcm_printer_manager"},
+                     ["system-config-printer"]],
     },
     "vms": {
         "title": "Virtual Machine Manager", "icon": "computer",
@@ -147,6 +157,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         {"action": "hardware"},
         {"action": "network"},
         {"action": "disks"},
+        {"action": "printers"},
         {"action": "vms"},
         {"separator": True},
         {"action": "terminal"},
@@ -178,23 +189,13 @@ def load_config(path: Path | None = None) -> dict[str, Any]:
         raise ValueError("menu.json must be an object with a 'menu' array")
     result = deepcopy(DEFAULT_CONFIG)
     result.update(obj)
-    if result["appearance"] not in ("native", "aero"):
-        raise ValueError("appearance must be 'native' or 'aero'")
-    if result["anchor"] not in ("cursor", "bottom-left", "bottom-right"):
-        raise ValueError("anchor must be 'cursor', 'bottom-left', or 'bottom-right'")
-    if type(result["hide_original_launcher"]) is not bool:
-        raise ValueError("hide_original_launcher must be true or false")
-    if type(result["launcher_applet_id"]) is not int or not 0 <= result["launcher_applet_id"] <= 2147483647:
-        raise ValueError("launcher_applet_id must be an integer from 0 to 2147483647")
-    validate_button_icon(result["button_icon_mode"], result["button_icon"])
-    validate_backup_retention(result["backup_retention"])
+    validate_configuration(result)
     return result
 
 
 def which_executable(name: str) -> bool:
     if "/" in name:
-        p = Path(expand_part(name))
-        return p.is_file() and os.access(p, os.X_OK)
+        return any(p.is_file() and os.access(p, os.X_OK) for p in (Path(name), Path(expand_part(name))))
     return shutil.which(name) is not None
 
 
@@ -203,6 +204,54 @@ def desktop_is_available(allowed: list[str] | None) -> bool:
         return True
     current = set(os.environ.get("XDG_CURRENT_DESKTOP", "").upper().replace(";", ":").split(":"))
     return bool(current.intersection(value.upper() for value in allowed))
+
+
+@lru_cache(maxsize=1)
+def _kcm_modules(executable: str, interval: int) -> frozenset[str]:
+    """Ask KDE rather than guessing distro-specific plugin paths.
+
+    Cache for at most 30 seconds so menu/editor refreshes do not repeatedly
+    start kcmshell6, while newly installed modules can be discovered.
+    """
+    try:
+        reply = subprocess.run([executable, "--list"], capture_output=True,
+                               text=True, errors="replace", timeout=2, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return frozenset()
+    if reply.returncode:
+        return frozenset()
+    return frozenset(line.split()[0] for line in reply.stdout.splitlines() if line.split())
+
+
+def kcm_is_available(module: str) -> bool:
+    executable = shutil.which("kcmshell6")
+    return bool(executable and module in _kcm_modules(executable, int(time.monotonic() // 30)))
+
+
+def candidate_argv(candidate: list | dict, *, expand: bool = True) -> tuple[str, ...]:
+    raw = candidate.get("argv") if isinstance(candidate, dict) else candidate
+    if not isinstance(raw, list) or not raw or not all(isinstance(p, str) and p and "\x00" not in p for p in raw):
+        raise ValueError("Invalid command: use a nonempty argv list, not a shell string")
+    return tuple(expand_part(part) if expand else part for part in raw)
+
+
+def candidate_is_available(candidate: list | dict, *, expand: bool = True) -> bool:
+    """The resolver and editor use identical per-candidate requirements."""
+    argv = candidate_argv(candidate, expand=expand)
+    if not which_executable(argv[0]):
+        return False
+    if isinstance(candidate, dict):
+        if not desktop_is_available(candidate.get("desktops")):
+            return False
+        requires = candidate.get("requires", [])
+        if not isinstance(requires, list) or not all(isinstance(name, str) and name for name in requires):
+            raise ValueError("requires must be an array of executable names")
+        if any(not which_executable(name) for name in requires):
+            return False
+        module = candidate.get("kcm")
+        if module and not kcm_is_available(module):
+            return False
+    return True
 
 
 def resolve_action(action_id: str, custom: dict[str, Any] | None = None) -> Command | None:
@@ -226,17 +275,9 @@ def resolve_action(action_id: str, custom: dict[str, Any] | None = None) -> Comm
     if "command" in spec:
         cmds = [spec["command"]]
     for candidate in cmds:
-        if isinstance(candidate, dict):
-            if not desktop_is_available(candidate.get("desktops")):
-                continue
-            cmd = candidate.get("argv")
-        else:
-            cmd = candidate
-        if not isinstance(cmd, list) or not cmd or not all(isinstance(p, str) and p for p in cmd):
-            raise ValueError(f"Invalid command for {action_id}: use a nonempty argv list, not a shell string")
-        expanded = tuple(expand_part(part) for part in cmd)
-        if which_executable(expanded[0]):
-            return Command(expanded, str(spec.get("title") or action_id), str(spec.get("icon") or ""), str(spec.get("description") or ""))
+        expand = spec.get("expand_arguments", True)
+        if candidate_is_available(candidate, expand=expand):
+            return Command(candidate_argv(candidate, expand=expand), str(spec.get("title") or action_id), str(spec.get("icon") or ""), str(spec.get("description") or ""))
     return None
 
 
@@ -260,6 +301,9 @@ def get_item_info(item: dict[str, Any]) -> tuple[str, str, Command | None]:
             "desktops": item.get("desktops"),
             "path_required": item.get("path_required"),
             "requires": item.get("requires", []),
+            # Picker argv already follows desktop-entry substitutions. A name
+            # or filename containing $, ~ or {home} must remain literal.
+            "expand_arguments": not bool(item.get("desktop_file")),
         }
         cmd = resolve_action(str(title), spec)
         return str(title), str(item.get("icon") or "system-run"), cmd
@@ -333,10 +377,22 @@ def validate_menu_definition(items: list[dict[str, Any]], depth: int = 0) -> Non
         commands = [item["command"]] if "command" in item else item.get("commands")
         if not isinstance(commands, list) or not commands:
             raise ValueError("Custom menu items need an argument-array command")
+        validate_requirements(item)
         for candidate in commands:
             argv = candidate.get("argv") if isinstance(candidate, dict) else candidate
-            if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a for a in argv):
+            if not isinstance(argv, list) or not argv or not all(isinstance(a, str) and a and "\x00" not in a for a in argv):
                 raise ValueError("A custom command must be an array of nonempty strings (no shell command string)")
+            if isinstance(candidate, dict):
+                validate_requirements(candidate)
+
+
+def validate_requirements(spec: dict[str, Any]) -> None:
+    for key in ("requires", "desktops"):
+        value = spec.get(key)
+        if value is not None and (not isinstance(value, list) or not all(isinstance(p, str) and p and "\x00" not in p for p in value)):
+            raise ValueError(f"{key} must be an array of nonempty names")
+    if "kcm" in spec and (not isinstance(spec["kcm"], str) or not spec["kcm"]):
+        raise ValueError("kcm must be a module name")
 
 
 def validate_button_icon(mode: str, icon: str) -> None:
@@ -436,8 +492,16 @@ def save_config(config: dict[str, Any], path: Path | None = None) -> Path:
             # Unique names even if two saves happen during the same second.
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
             backup = target.with_name(target.name + ".bak-" + stamp)
-            shutil.copy2(target, backup, follow_symlinks=False)
-            os.chmod(backup, 0o600)
+            # Never overwrite a same-named backup or follow a planted symlink.
+            fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            try:
+                with os.fdopen(fd, "wb") as dest, target.open("rb") as source:
+                    shutil.copyfileobj(source, dest)
+                    dest.flush()
+                    os.fsync(dest.fileno())
+            except BaseException:
+                backup.unlink()
+                raise
         os.replace(name, target)
         # A failed save must never prune the last known-good backups.
         # A cleanup failure should not falsely report that a successful save failed.
