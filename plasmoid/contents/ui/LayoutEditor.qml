@@ -221,10 +221,23 @@ QQC2.Control {
         }
         wheel.accepted = true;
     }
+    function showMoves(x, y) {
+        if (!draft || selectedIndex < 0 || busy || expired || dragActive) return;
+        movesMenu.popup(x, y);
+    }
+    function showDestinations() {
+        if (!draft || selectedIndex < 0 || busy || expired || dragActive) return;
+        movesMenu.close();
+        destinationMenu.popup(12, navigationBar.height);
+    }
     function handleKey(event) {
         if (!draft || busy) return;
         const alt = (event.modifiers & Qt.AltModifier) !== 0;
-        if (event.key === Qt.Key_Escape) {
+        if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) {
+            showMoves(12, navigationBar.height);
+        } else if (event.key === Qt.Key_Right && alt) {
+            showDestinations();
+        } else if (event.key === Qt.Key_Escape) {
             if (dragActive) cancelDrag();
             else if (draft.parentId) back();
             else closeRequested(); // Popup dismissal retains the draft.
@@ -246,8 +259,59 @@ QQC2.Control {
     onDraftChanged: syncView()
     Component.onCompleted: { viewReady = true; syncView(); }
     onVisibleChanged: {
-        if (!visible) { rememberView(); cancelDrag(); }
+        if (!visible) { rememberView(); cancelDrag(); movesMenu.close(); destinationMenu.close(); }
         else if (viewReady && draft) Qt.callLater(() => restoreView(false));
+    }
+
+    QQC2.Menu {
+        id: movesMenu
+        objectName: "layoutMovementMenu"
+        parent: control
+        QQC2.MenuItem {
+            text: "Move up (Alt+Up)"
+            enabled: control.selectedIndex > 0 && !control.busy && !control.expired
+            onTriggered: control.reorder(-1)
+        }
+        QQC2.MenuItem {
+            text: "Move down (Alt+Down)"
+            enabled: control.selectedIndex >= 0 && control.selectedIndex < control.rows.length - 1 && !control.busy && !control.expired
+            onTriggered: control.reorder(1)
+        }
+        QQC2.MenuItem {
+            text: "Move out (Alt+Left)"
+            enabled: !!control.draft && !!control.draft.parentId && control.selectedIndex >= 0 && !control.busy && !control.expired
+            onTriggered: control.outdent()
+        }
+        QQC2.MenuItem {
+            text: "Move into submenu… (Alt+Right)"
+            enabled: destinations.count > 0 && !control.busy && !control.expired
+            onTriggered: control.showDestinations()
+        }
+        onClosed: if (control.visible) control.forceActiveFocus()
+    }
+    QQC2.Menu {
+        id: destinationMenu
+        objectName: "layoutDestinationMenu"
+        parent: control
+        title: "Move into submenu"
+        Instantiator {
+            id: destinations
+            model: control.rows.filter(entry => entry.kind === "submenu" && (!control.draft || entry.id !== control.draft.selectedId))
+            delegate: QQC2.MenuItem {
+                required property var modelData
+                text: modelData.title
+                enabled: !!control.draft && !control.busy && !control.expired &&
+                         Draft.moveError(control.draft, control.draft.selectedId, modelData.id, "").length === 0
+                onTriggered: {
+                    const target = modelData.id;
+                    destinationMenu.close();
+                    control.move(control.draft.selectedId, target, "");
+                }
+            }
+            onObjectAdded: (index, object) => destinationMenu.insertItem(index, object)
+            onObjectRemoved: (index, object) => destinationMenu.removeItem(object)
+        }
+        onClosed: if (control.visible) control.forceActiveFocus()
     }
 
     contentItem: ColumnLayout {
@@ -276,7 +340,7 @@ QQC2.Control {
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag an entry. Pause over a submenu or Back to move between levels."
+            text: "Drag to move; pause over a submenu or Back. Right-click or Shift+F10 for moves."
             wrapMode: Text.WordWrap
         }
         ListView {
@@ -345,58 +409,6 @@ QQC2.Control {
         }
         RowLayout {
             Layout.fillWidth: true
-            QQC2.ToolButton {
-                objectName: "layoutUp"
-                text: "Up"
-                icon.name: "go-up"
-                enabled: control.selectedIndex > 0 && !control.busy && !control.expired
-                onClicked: control.reorder(-1)
-                Accessible.name: "Move selected entry up (Alt+Up)"
-                QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: "Move up (Alt+Up)"
-            }
-            QQC2.ToolButton {
-                objectName: "layoutDown"
-                text: "Down"
-                icon.name: "go-down"
-                enabled: control.selectedIndex >= 0 && control.selectedIndex < control.rows.length - 1 && !control.busy && !control.expired
-                onClicked: control.reorder(1)
-                Accessible.name: "Move selected entry down (Alt+Down)"
-                QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: "Move down (Alt+Down)"
-            }
-            Item { Layout.fillWidth: true }
-            QQC2.ToolButton {
-                objectName: "layoutOut"
-                text: "Move out"
-                enabled: !!control.draft && !!control.draft.parentId && control.selectedIndex >= 0 && !control.busy && !control.expired
-                onClicked: control.outdent()
-                Accessible.name: "Move out of submenu (Alt+Left)"
-                QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: "Move out (Alt+Left)"
-            }
-        }
-        RowLayout {
-            Layout.fillWidth: true
-            QQC2.ComboBox {
-                id: destination
-                objectName: "layoutDestination"
-                Layout.fillWidth: true
-                model: control.rows.filter(entry => entry.kind === "submenu" && (!control.draft || entry.id !== control.draft.selectedId))
-                textRole: "title"
-                valueRole: "id"
-                Accessible.name: "Destination submenu"
-                enabled: control.selectedIndex >= 0 && count > 0 && !control.busy && !control.expired
-            }
-            QQC2.Button {
-                objectName: "layoutMoveInto"
-                text: "Move into"
-                enabled: destination.enabled && destination.currentIndex >= 0
-                onClicked: control.move(control.draft.selectedId, destination.currentValue, "")
-            }
-        }
-        RowLayout {
-            Layout.fillWidth: true
             QQC2.Button {
                 objectName: "saveLayout"
                 text: "Save layout"
@@ -422,7 +434,8 @@ QQC2.Control {
         property string pressedId: ""
         property bool suppressClick: false
         preventStealing: true
-        drag.target: dragPosition
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        drag.target: (pressedButtons & Qt.LeftButton) ? dragPosition : null
         drag.smoothed: false
         onPressed: mouse => {
             const point = mapToItem(list, mouse.x, mouse.y);
@@ -433,14 +446,15 @@ QQC2.Control {
                 mouse.accepted = false; return;
             }
             pressedId = rowModel.get(index).itemId;
+            control.choose(pressedId);
+            control.forceActiveFocus();
+            if (mouse.button === Qt.RightButton) return;
             suppressClick = false;
             control.dragCanceled = false;
             control.draggedId = pressedId;
             control.dragOriginParent = control.draft.parentId;
             dragPosition.x = mouse.x - 8;
             dragPosition.y = mouse.y - 18;
-            control.choose(pressedId);
-            control.forceActiveFocus();
         }
         onPositionChanged: {
             if (drag.active && !control.dragCanceled) {
@@ -448,14 +462,16 @@ QQC2.Control {
                 control.updateDragTarget();
             }
         }
-        onReleased: {
+        onReleased: mouse => {
+            if (mouse.button === Qt.RightButton) return;
             suppressClick = control.dragActive || control.dragCanceled;
             control.updateDragTarget();
             const accepted = control.dragActive && !control.dragCanceled && control.dropValid;
             if (accepted) control.move(control.draggedId, control.dropParent, control.dropBefore);
             control.cancelDrag(!accepted);
         }
-        onClicked: {
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) { control.showMoves(mouse.x, mouse.y); return; }
             if (suppressClick || !control.draft) return;
             const entry = Draft.find(control.draft.entries, pressedId);
             if (entry && entry.entry.kind === "submenu") control.enter(pressedId);

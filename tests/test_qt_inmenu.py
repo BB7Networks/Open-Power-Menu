@@ -93,10 +93,15 @@ def test_keyboard_reorder_navigation_and_explicit_reparent(quick):
     assert [e['id'] for e in draft(root)['entries']] == ['g', 'a', 'b', 's']
     QTest.keyClick(view, Qt.Key_Up, Qt.AltModifier)
     assert [e['id'] for e in draft(root)['entries']] == ['a', 'g', 'b', 's']
-    click(view, root, 'layoutMoveInto')
+    QTest.keyClick(view, Qt.Key_Right, Qt.AltModifier)
+    QTest.qWait(20)
+    QTest.keyClick(view, Qt.Key_Down)
+    QTest.keyClick(view, Qt.Key_Return)
+    QTest.qWait(20)
     assert draft(root)['parentId'] == 'g'
     assert [e['id'] for e in draft(root)['entries'][0]['items']] == ['c', 'a']
-    click(view, root, 'layoutOut')
+    QTest.keyClick(view, Qt.Key_Left, Qt.AltModifier)
+    QTest.qWait(20)
     assert draft(root)['parentId'] == '' and draft(root)['selectedId'] == 'a'
     click(view, root, 'layoutRow-g')
     assert draft(root)['parentId'] == 'g'
@@ -167,15 +172,43 @@ def test_controls_fit_small_popup_and_dismissal_retains_draft(quick):
     for width in (285, 328):
         view.resize(width, 430)
         app.processEvents()
-        for name in ('layoutUp', 'layoutDown', 'layoutOut', 'layoutMoveInto', 'saveLayout', 'cancelLayout'):
+        for name in ('layoutBack', 'saveLayout', 'cancelLayout'):
             item = child(root, name)
             point = item.mapToScene(QPointF(0, 0))
             assert point.x() >= 0 and point.x() + item.width() <= width
+        for name in ('layoutUp', 'layoutDown', 'layoutOut', 'layoutMoveInto', 'layoutDestination'):
+            assert child(root, name) is None
+        assert child(root, 'layoutRows').height() > 280
     before = draft(root)
     root.setVisible(False)
     assert draft(root) == before and not root.property('dragActive')
     root.setVisible(True)
     assert draft(root) == before
+
+
+@pytest.mark.parametrize('trigger', ['right-click', 'shift-f10', 'menu-key'])
+def test_accessible_movement_menu_reorders_and_returns_focus(quick, trigger):
+    _, view, root = quick
+    if trigger == 'right-click':
+        row = child(root, 'layoutRow-b')
+        at = row.mapToScene(QPointF(100, 18)).toPoint()
+        QTest.mouseClick(view, Qt.RightButton, pos=at)
+        assert draft(root)['selectedId'] == 'b'
+    else:
+        evaluate(root, "control.choose('b')")
+        if trigger == 'shift-f10':
+            QTest.keyClick(view, Qt.Key_F10, Qt.ShiftModifier)
+        else:
+            QTest.keyClick(view, Qt.Key_Menu)
+    QTest.qWait(20)
+    assert evaluate(root, 'movesMenu.visible')
+    assert not root.property('dragActive')
+    QTest.keyClick(view, Qt.Key_Down)
+    QTest.keyClick(view, Qt.Key_Return)
+    QTest.qWait(20)
+    assert [e['id'] for e in draft(root)['entries']] == ['a', 'b', 'g', 's']
+    assert root.property('activeFocus')
+    assert not evaluate(root, 'movesMenu.visible')
 
 
 def test_repeated_bottom_moves_keep_anchor_selection_focus_and_delegate(quick):
