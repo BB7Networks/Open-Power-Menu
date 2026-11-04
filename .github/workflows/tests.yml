@@ -17,6 +17,7 @@ jobs:
           node-version: '22'
       - run: python -m pip install pytest
       - run: python -m pytest -q
+      - run: python -m compileall -q openpowermenu tests run.py
       - name: Check every shell script
         run: |
           for script in install.sh uninstall.sh scripts/*.sh tools/*.sh; do
@@ -40,12 +41,23 @@ jobs:
           command -v dbus-run-session
           python - <<'PY'
           try:
-              from PySide6 import QtCore, QtDBus, QtWidgets, QtTest
+              from PySide6 import QtCore, QtDBus, QtWidgets, QtTest, QtQuick, QtQml
           except ImportError as exc:
               print(f"::error title=Qt runtime dependency::{exc}")
               raise
           print("Qt", QtCore.__version__)
           PY
-      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_installation.py
+      - name: Parse widget QML
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import PySide6
+          parser = Path(PySide6.__file__).parent / "qmlformat"
+          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml"]
+          subprocess.run([str(parser), *["plasmoid/contents/ui/" + name for name in files]],
+                         stdout=subprocess.DEVNULL, check=True)
+          PY
+      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_installation.py
         env:
           QT_QPA_PLATFORM: offscreen

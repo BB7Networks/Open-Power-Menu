@@ -9,6 +9,7 @@ import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PC3
+import "LayoutDraft.js" as LayoutDraft
 
 PlasmaCore.PopupPlasmaWindow {
     id: flyout
@@ -25,6 +26,15 @@ PlasmaCore.PopupPlasmaWindow {
 
     property var entries: []
     property var activeChild: null
+    property string appearance: "native"
+    property int activeIndex: -1
+    signal returnToParent()
+    function focusFirst() {
+        activeIndex = LayoutDraft.nextIndex(entries, -1, 1, false);
+        requestActivate();
+        flyoutSurface.forceActiveFocus();
+    }
+    onAppearanceChanged: if (activeChild) activeChild.appearance = appearance
     // The screen rectangle is provided by the Plasmoid, not inferred from
     // which edge the *panel* happens to occupy. This also handles multiple
     // monitors and non-corner launcher positions.
@@ -105,10 +115,36 @@ PlasmaCore.PopupPlasmaWindow {
 
     mainItem: Rectangle {
         id: flyoutSurface
-        color: "#27313D"
-        border.color: "#53718A"
+        color: flyout.appearance === "aero" ? "#27313D" : Kirigami.Theme.backgroundColor
+        border.color: flyout.appearance === "aero" ? "#53718A" : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.25)
         border.width: 1
         radius: 3
+        focus: true
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                flyout.closeChild();
+                flyout.activeIndex = LayoutDraft.nextIndex(flyout.entries, flyout.activeIndex, event.key === Qt.Key_Up ? -1 : 1, false);
+                const row = flyoutRows.itemAt(flyout.activeIndex);
+                const scroll = viewport.contentItem;
+                if (row && scroll && typeof scroll.contentY === "number") {
+                    if (row.y < scroll.contentY) scroll.contentY = row.y;
+                    else if (row.y + row.height > scroll.contentY + viewport.availableHeight)
+                        scroll.contentY = row.y + row.height - viewport.availableHeight;
+                }
+            } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Escape) {
+                flyout.visible = false;
+                flyout.returnToParent();
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                const row = flyoutRows.itemAt(flyout.activeIndex);
+                if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
+                if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
+                else if (event.key !== Qt.Key_Right) {
+                    flyout.triggered(row.entry.key);
+                    flyout.visible = false;
+                }
+            } else return;
+            event.accepted = true;
+        }
 
         // Shared proxy for deeper cascading menus; each nested flyout is
         // positioned on the source row before it becomes visible.
@@ -130,10 +166,12 @@ PlasmaCore.PopupPlasmaWindow {
                 width: viewport.availableWidth
                 spacing: 0
                 Repeater {
+                    id: flyoutRows
                     model: flyout.entries
                     delegate: Item {
                         id: row
                         required property var modelData
+                        required property int index
                         property var entry: modelData
                         property var childPopup: null
                         readonly property rect menuScreen: Qt.rect(
@@ -156,7 +194,8 @@ PlasmaCore.PopupPlasmaWindow {
                                 childPopup = factory.createObject(row, {
                                     "visualParent": childAnchor,
                                     "entries": row.entry.items || [],
-                                    "screenRect": row.menuScreen
+                                    "screenRect": row.menuScreen,
+                                    "appearance": flyout.appearance
                                 });
                                 if (!childPopup) {
                                     console.warn("Open Power Menu: could not open nested flyout");
@@ -166,7 +205,13 @@ PlasmaCore.PopupPlasmaWindow {
                                     flyout.triggered(key);
                                     flyout.visible = false;
                                 });
+                                childPopup.returnToParent.connect(function() {
+                                    if (!flyout.visible) return;
+                                    flyout.requestActivate();
+                                    flyoutSurface.forceActiveFocus();
+                                });
                             }
+                            childPopup.appearance = flyout.appearance;
                             childPopup.screenRect = row.menuScreen;
                             childPopup.positionAtRow(row, childAnchor, row.menuScreen);
                             childPopup.popupDirection = childPopup.chooseSide(childAnchor);
@@ -190,7 +235,7 @@ PlasmaCore.PopupPlasmaWindow {
                             anchors.rightMargin: 3
                             radius: 2
                             color: Kirigami.Theme.highlightColor
-                            opacity: (mouse.containsMouse && row.entry.kind !== "separator") ? 0.28 : 0
+                            opacity: ((mouse.containsMouse || flyout.activeIndex === row.index) && row.entry.kind !== "separator") ? 0.28 : 0
                         }
                         RowLayout {
                             anchors.fill: parent
@@ -200,11 +245,13 @@ PlasmaCore.PopupPlasmaWindow {
                             visible: row.entry.kind !== "separator"
                             Kirigami.Icon {
                                 source: row.entry.icon || "application-x-executable"
+                                color: flyout.appearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
                                 Layout.preferredWidth: 17
                                 Layout.preferredHeight: 17
                             }
                             PC3.Label {
                                 text: row.entry.title || ""
+                                color: flyout.appearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
                                 opacity: row.entry.enabled === false ? 0.5 : 1
@@ -213,6 +260,7 @@ PlasmaCore.PopupPlasmaWindow {
                                 Layout.preferredWidth: 13
                                 Layout.preferredHeight: 13
                                 source: "go-next-symbolic"
+                                color: flyout.appearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
                                 visible: row.entry.kind === "submenu"
                             }
                         }
@@ -222,6 +270,7 @@ PlasmaCore.PopupPlasmaWindow {
                             hoverEnabled: true
                             enabled: row.entry.kind !== "separator" && row.entry.enabled !== false
                             onEntered: {
+                                flyout.activeIndex = row.index;
                                 if (row.entry.kind === "submenu") row.openChild();
                                 else flyout.closeChild();
                             }
@@ -232,6 +281,14 @@ PlasmaCore.PopupPlasmaWindow {
                                     flyout.visible = false;
                                 }
                             }
+                        }
+                        Accessible.role: Accessible.MenuItem
+                        Accessible.name: row.entry.title || "Separator"
+                        Accessible.focused: flyout.activeIndex === row.index
+                        Accessible.onPressAction: {
+                            if (row.entry.enabled === false || row.entry.kind === "separator") return;
+                            if (row.entry.kind === "submenu") row.openChild();
+                            else { flyout.triggered(row.entry.key); flyout.visible = false; }
                         }
                     }
                 }
