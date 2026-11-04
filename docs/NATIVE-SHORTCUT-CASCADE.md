@@ -1,9 +1,12 @@
 # Experimental Plasma-native Meta+X
 
-This branch does **not** assign Meta+X automatically. KDE owns shortcut
-conflicts and the user must opt in through the **Open Power Menu Start Button**
-widget's Keyboard Shortcuts setting. Remove the old OPM application shortcut
-before binding the same key to the widget.
+On first run, each Open Power Menu Start Button widget instance attempts to
+assign Meta+X through Plasma's native global shortcut API. A persistent widget
+flag prevents later restarts from overwriting a user-customized or deliberately
+cleared binding. Existing nonempty shortcuts are preserved. KDE handles
+conflicts without taking a shortcut from another application. If an older OPM
+application shortcut already claims Meta+X, remove it and use the widget's
+native Keyboard Shortcuts setting to select Meta+X.
 
 The widget's Plasma `activated()` signal routes to the existing OPM
 `openMenu()` handoff, preserving the selected launcher's close sequence and
