@@ -60,15 +60,16 @@ The **General** tab now contains:
 - **Start button icon:** adopt the selected launcher's icon (default) or use a
   custom theme icon/local image, with a preview.
 - **Appearance:** choose the standard native theme or Dark Aero for the menu.
-- **Keyboard shortcut:** Set up Meta+X explains the standalone command and opens
-  KDE Shortcuts. KDE owns assignment/conflict handling; OPM does not write bindings.
+- **Keyboard shortcut:** Set up Meta+X tests the installed standalone menu and opens
+  KDE Shortcuts to assign the Application entry. KDE owns conflict handling; OPM
+  does not write bindings. General also separates the Emergency Restore command.
 
 The **Backups** tab contains automatic configuration retention plus preview and
 restore through **Manage / Restore Backups…**. Explicit recovery copies are kept
 even with retention zero. A separate section shows widget snapshot information;
 its retention remains controlled by the installer.
 The browser can permanently delete one confirmed configuration backup, with
-conflict checks and extra warnings for protected copies. Snapshot Refresh updates
+conflict checks and extra warnings for protected copies. Returning to Backups updates
 the separate widget count without touching files or unsaved editor settings.
 
 The **Layout** tab contains the Power User menu entries. Add built-in actions,

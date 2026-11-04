@@ -5,11 +5,20 @@
 - Preserve viewport anchors, selection and focus when rearranging long menus;
   restore each visited submenu's view and retain it with unfinished drafts.
 - Support full-row dragging and delayed submenu/parent navigation inside one
-  popup. Keep accessible movement controls until live Wayland validation.
+  popup, including bounded wheel/touchpad scrolling during a drag. Following
+  confirmed live Wayland drag/hover checks, replace movement button rows with
+  Alt+Arrow and right-click/Shift+F10 movement menus.
 - Add confirmed, confined deletion of selected configuration backups, including
   corrupt history, with changed-file checks and protected-copy warnings.
-- Add read-only snapshot Refresh and Meta+X setup through KDE Shortcuts using
-  the standalone menu command; global bindings remain under user/KDE control.
+- Refresh widget snapshot counts read-only on Backups tab visits, and present
+  Emergency Restore as a separate selectable monospace command with Copy.
+- Prefer KDE's installed Application entry for Meta+X and provide a real Test
+  menu launch with startup/exposure/focus diagnostics. Use a top-level standalone
+  menu on Wayland, explicitly parent submenus, and quote the desktop entry's Exec
+  path. Global bindings remain under user/KDE control; native dispatch is a live check.
+- Stop redundant AppGrid close animations and defer an AppGrid close triggered
+  during its open signal until that call completes. Add sequenced state/callback/
+  input-mask traces and a direct-versus-OPM acceptance procedure for desktop flashes.
 - Standardize the root wrappers as `install.sh` and `uninstall.sh`; rebuild
   complete archives without stale members and retain the distinct core scripts.
 - Give Configure concise instructions, a responsive toolbar with Undo/Redo on

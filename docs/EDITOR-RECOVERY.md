@@ -151,8 +151,9 @@ Migration failure stops installation/removal, preserving remaining history.
 The Backups tab displays the directory, the count of generated snapshot directories,
 and the default retention of five. Manual snapshots and symlinks are excluded
 from that count. Retention remains an installer setting rather than a GUI preference.
-**Refresh** performs a new, read-only count without closing Configure. Enumeration
+Opening or returning to **Backups** performs a new, read-only count. Enumeration
 is shared with the snapshot helper, with no background polling or filesystem watch.
+The separate configuration backup browser retains its manual **Refresh** button.
 The displayed path remains selectable/copyable. Widget snapshot deletion is not
 part of the configuration backup browser.
 
@@ -218,7 +219,7 @@ terminal. Record Plasma/Qt/launcher versions, scaling, panel position and theme.
    With unsaved edits, confirm restore is blocked and the edits remain intact.
    Delete a disposable corrupt backup; cancel deletion of another and verify it
    remains. Check the extra warning for protected copies, changed-file refusal,
-   active-row protection, nearby selection after deletion, and snapshot Refresh.
+   active-row protection, nearby selection after deletion, and snapshot refresh on tab return.
 6. Upgrade an existing disposable installation with legacy snapshots and a custom
    menu, using widget retention two. Verify migration, newest snapshots, the old
    widget contents, and unchanged menu/panel. Test a failed upgrade in the VM and

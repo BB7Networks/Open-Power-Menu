@@ -89,15 +89,18 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 For a quick rearrangement, right-click the Start button and select the **lock**
 icon. Drag any part of an entry to move it. Pause over a submenu to open it while
 dragging, or over **Back** to move up a level. The list keeps your place as you
-rearrange entries. Movement buttons and keyboard shortcuts remain available. All entries
+rearrange entries, including wheel scrolling during a drag. Right-click or press
+Shift+F10 for movement actions; Alt+Arrow shortcuts remain available. All entries
 appear, including unavailable applications and empty submenus. **Save layout**
 checks for conflicts and preserves your command definitions; **Cancel** leaves
 the saved menu untouched. Closing the popup keeps the draft for your next visit.
 See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
 
 For **Meta+X**, open **Configure → General → Keyboard shortcut → Set up Meta+X…**.
-The setup explains how to assign the installed standalone menu command in KDE
-Shortcuts. KDE handles conflicts and lets you change or remove the assignment.
+Use **Test menu launch**, then choose **Add New → Application… → Open Power Menu**
+in KDE Shortcuts and assign/apply the key. This opens the standalone menu.
+KDE handles conflicts and lets you change or remove the assignment. See the
+[shortcut and AppGrid diagnostic guide](docs/SHORTCUT-APPGRID-DIAGNOSTICS.md) if nothing appears.
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
@@ -133,7 +136,8 @@ entries and settings, then restore a valid backup. Restore preserves the current
 file as a separate recovery copy even with automatic backups disabled. Save or
 discard pending editor changes and reopen Configure before restoring. The Backups
 tab also shows the separate widget recovery directory and generated snapshot count.
-Use its **Refresh** button to update the count. In the backup browser,
+The count refreshes when you open or return to Backups. The separate configuration
+backup browser retains its **Refresh** button. In that browser,
 **Delete selected backup…** permanently removes one confirmed backup; the active
 configuration is protected, and recovery copies receive an additional warning.
 

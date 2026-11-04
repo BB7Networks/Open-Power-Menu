@@ -4,7 +4,8 @@ This unreleased change is based on PR #4 at `5017e33`, on branch
 `feature/in-menu-editing-ux`. PRs #1–4 were open and unmerged when work began.
 Version identifiers remain **0.4.17**. No configuration migration is required.
 The follow-up addressing live Manjaro feedback starts at verified PR #5 head
-`85c9c5e` and continues in the same PR and branch.
+`85c9c5e` and continues in the same PR and branch. The latest shortcut, AppGrid,
+wheel and UI follow-up starts at `b236efd`.
 
 ## What the interface looks like
 
@@ -14,16 +15,17 @@ These are descriptions of the implemented UI, not screenshots:
   instruction bullets. Editing actions sit below the tree, with Undo/Redo on
   the right; the toolbar wraps at smaller widths. Backups contains the 0–1,000
   configuration-retention control (default 10), **Manage / Restore Backups…**,
-  and a separate widget snapshot path/count/default-five explanation with Refresh.
+  and a separate widget snapshot path/count/default-five explanation, refreshed on tab visits.
   The backup browser can permanently delete one selected backup after confirmation.
-  General offers **Set up Meta+X…** for KDE's native shortcut settings.
+  General offers **Set up Meta+X…**, a real launch test, and a separate selectable
+  monospace Emergency Restore command with Copy.
 - **Locked menu:** the header has Lock, Refresh and Configure icons. Normal
   commands and hover flyouts work here. Native flyouts use the KDE color scheme;
   optional Aero retains its dark background and readable light foreground.
 - **Unlocked menu:** a single list shows every entry at the current level,
   including unavailable commands, separators and empty submenus. Entire rows are
-  draggable, with a ghost and insertion/destination highlighting. Back navigates up, while
-  Up/Down and Move into/out controls provide explicit movement. **Save layout**
+  draggable, with a ghost and insertion/destination highlighting. Back navigates up.
+  Right-click/Shift+F10 and Alt+Arrow provide accessible movement. **Save layout**
   and **Cancel** remain visible beneath the list.
 
 Click the lock to start. Open a submenu to rearrange its contents. Moving a
@@ -41,13 +43,22 @@ and are canceled; Escape or popup interruption restores the source view.
 
 This is **spring-loaded navigation inside one native popup**, not dragging between
 separate flyout windows. One stable pointer surface survives changes of level.
-Locked-mode native flyouts and their placement are unchanged. Edge scrolling works
+Locked-mode native flyouts and their placement are unchanged. Wheel and edge scrolling work
 in long lists. A full parent can be traversed to reach another submenu even when
 dropping another sibling into that parent would exceed the 200-entry limit.
 
-Up/Down, Move into/out and the destination selector remain visible until **live
-Wayland tests as well as automated checks** validate their replacement. They are
-keyboard-accessible fallbacks. Further removal/consolidation is deliberately deferred.
+The user confirmed full-row dragging and submenu-hover navigation passed live
+Wayland checks before the redundant movement rows were removed. Back, Save layout,
+Cancel and the header lock remain. Alt+Up/Down reorder, Alt+Left moves out, and
+Alt+Right opens a keyboard-operable destination menu. Right-click, Menu, or
+Shift+F10 exposes the same movement actions.
+
+During dragging, the list is deliberately noninteractive to preserve the pointer
+grab. The pointer handler now consumes wheel input explicitly, preferring pixel
+deltas over angle deltas and clamping to the current list's bounds. It recomputes
+the drop target without moving the ghost, releasing the grab, or saving. Qt Quick
+may suppress zero-angle compatibility ScrollUpdate events; device-generated
+touchpad behavior remains part of live acceptance.
 
 ## Keeping your place
 
@@ -108,8 +119,10 @@ not produce alerts. The detached application-launching implementation is unchang
 | Unlocked list | Enter / Right | Open the selected submenu; commands remain inactive |
 | Unlocked list | Left | Return to the parent level |
 | Unlocked list | Alt+Left | Move the entry out, after its parent submenu |
+| Unlocked list | Alt+Right | Choose a destination submenu using arrows and Enter |
+| Unlocked list | Menu / Shift+F10 / right-click | Open the movement context menu |
 | Unlocked list | Escape | Cancel drag, otherwise go back a level, otherwise close and retain draft |
-| Unlocked controls | Tab / Shift+Tab | Reach movement, destination, Save and Cancel controls |
+| Unlocked controls | Tab / Shift+Tab | Reach Back, Save and Cancel |
 | Configure | Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y | Existing layout Undo/Redo; scoped to Configure |
 
 Menu selection and drag insertion points are visible. Buttons have accessible
@@ -148,9 +161,9 @@ normal service idle timer. Stale callbacks cannot replace a newer widget draft.
 
 The widget's activation guard prevents `Run` during unlocking, editing or saving;
 edit IDs are not executable menu keys. Other widgets/CLI clients retain their
-normal command behavior. Launcher adapters, original-button visibility/icon
-handling, popup handoff timers, flyout placement and detached process launching
-retain their existing implementations.
+normal command behavior. The latest follow-up changes AppGrid close sequencing
+and tracing; timer durations, generic launcher behavior, original-button masking,
+icons, flyout placement and detached application launching remain unchanged.
 
 ## Meta+X setup
 
@@ -160,12 +173,24 @@ and then PATH, and supplies a quoted command that handles spaces and literal
 shell characters. It opens `kcmshell6 kcm_keys`, or `systemsettings kcm_keys` when
 the module runner is unavailable. Missing tools or installation produce guidance.
 
-In KDE Shortcuts, choose **Add New → Command or Script…**, paste the supplied
-command, assign **Meta+X**, and Apply. If KDE reports an existing assignment,
+First use **Test menu launch**; it runs the installed command with `--diagnose-launch`
+and displays bounded local output, process failures, Qt exposure and focus reports.
+Then in KDE Shortcuts choose **Add New → Application… → Open Power Menu**,
+assign **Meta+X**, and Apply. If KDE reports an existing assignment,
 choose another shortcut or cancel. Change or remove the assignment on that same
 KDE page. OPM never registers a global shortcut, rewrites `kglobalshortcutsrc` or
 KWin files, or reports that the binding has been configured. Settings are opened
-only when the user selects the button.
+only when the user selects the button. A stale OPM Command or Script assignment
+can be removed in KDE, applied, and replaced with the installed Application entry.
+The test is separate from global-key registration or compositor verification.
+
+Qt's Wayland xdg-shell plugin rejects a grabbing popup without a transient parent
+that has received input. The previous standalone menu used exactly that shape.
+The standalone Wayland root now uses a frameless top-level QMenu, preserving native
+submenu navigation and Esc dismissal; leaving the application dismisses it after
+activation. KWin controls placement and focus. X11 retains its popup path. Explicit
+submenu parenting also avoids invalid wrappers in PySide6 6.10.2. Desktop Entry
+Exec quoting handles spaces, literal percent signs and reserved characters.
 
 This uses the explicitly supported **standalone Power User Menu fallback** with
 the same saved configuration. Native panel-menu shortcut activation remains
@@ -181,50 +206,35 @@ and [Plasmoid activation implementation](https://github.com/KDE/libplasma/blob/m
 Global-key delivery and conflict prompts require live Plasma 6 Wayland/X11 testing;
 the cloud test environment does not have a Plasma shell or KDE settings tools.
 
+See [shortcut and AppGrid diagnostics](SHORTCUT-APPGRID-DIAGNOSTICS.md) for the
+source evidence, failure distinctions and repeated-activation capture procedure.
+
 ## Verification
 
-The follow-up baseline at `85c9c5e` passed **318 tests, 8 historical-baseline skips,
-and 18 subtests** in 21.07 seconds. The completed follow-up passed **370 tests,
-8 historical-baseline skips, and 18 subtests** in 23.75 seconds, using Python
-3.12.14, PySide6 6.10.2 and Node 24. The eight unavailable historical trees remain
-explicitly reported. Python compilation, all seven Bash syntax checks, QML parsing,
-installer/upgrade/uninstall, complete archives, checksums and filename/version
-checks pass. [PR #5 checks](https://github.com/BB7Networks/Open-Power-Menu/pull/5/checks)
-record the CI results for each pushed head (Node 22 in CI).
+The latest baseline at `b236efd` passed **370 tests, 8 historical-source skips,
+and 18 subtests** in 25.12 seconds. The full follow-up suite passes **393 tests,
+8 historical-source skips, and 18 subtests** in 28.20 seconds (Python 3.12.14, PySide6 6.10.2,
+Node 24; CI uses Node 22). The missing historical release trees remain explicit.
+[PR #5 checks](https://github.com/BB7Networks/Open-Power-Menu/pull/5/checks) record
+CI results for each pushed head.
 
-Compared with the follow-up baseline, 17 files covering core configuration/command
-handling, standalone launching, the D-Bus layout API, launcher adapters/visibility,
-the widget's main popup/handoff, locked flyouts and core installer scripts remain
-byte-identical. The additions exercise actual Qt Quick drags, hover navigation,
-viewport restoration, deletion confirmation/failure paths and shortcut setup.
+Coverage includes actual Qt Widgets/Quick input, mouse and touchpad wheel events,
+keyboard/context movement menus, installed-process launch outcomes, standalone
+menu/submenu behavior, isolated session D-Bus, configuration/recovery failures,
+installer upgrades/uninstall, path quoting, ZIP/TAR/widget archives and checksums.
+The shipped AppGrid handlers run 50-cycle scenarios for each combination of
+original-button visibility and retained draft, with rapid clicks and stale
+callbacks. These models establish event ordering, not visual compositor behavior.
+Python compilation, all seven Bash syntax checks and all changed QML parsing pass.
 
-Earlier PR #5 verification:
-
-The starting full suite passed **281 tests, with 8 historical-baseline skips and
-18 passing subtests**. The initial PR #5 full suite passed **318 tests, with the same
-8 historical-baseline skips and 18 passing subtests**, in 21.44 seconds on Python
-3.12.14, PySide6 6.10.2 and Node 24. CI uses Node 22.
-
-GitHub Actions at implementation head `baa5150` also passed: **275 portable tests,
-12 skips, 18 passing subtests**, and **58 Qt/D-Bus tests**. Portable skips include
-the unavailable historical trees and Qt-dependent checks covered by the required
-Qt job. Both the push and pull-request workflows completed successfully.
-
-Python compilation, individual syntax checks for all seven Bash scripts, QML
-parsing, full ZIP/TAR and widget archive integrity, checksums, extracted-backend
-diagnostics, case-insensitive filename checks and version consistency pass.
-The installer tests also cover existing-version upgrades, retention, failed
-upgrades and preservation through uninstall. Compared with PR #4, core loading
-and command definitions, detached launching, launcher adapters/visibility,
-installation core scripts and flyout placement functions remain unchanged.
-
-Coverage includes the actual Qt Quick component and shipped JavaScript, actual
-Qt Configure controls, isolated D-Bus sessions, filesystem failure injection,
-hidden-item preservation, malicious reference requests, conflict/restart recovery,
-and isolated installation/upgrade/uninstall with paths containing spaces. The
-installer uses a stub KPackage command, not a live Plasma session. Native and Aero
-palette checks cover representative light/dark values; they do not prove full
-KDE theme integration. No live Wayland or real Plasma screenshots are claimed.
+Cloud limitations: no Plasma shell, KDE settings tools or real Wayland/X11 session.
+Installed commands are exercised in isolated XDG profiles with a stub KPackage
+command. Qt exposure/focus tests run offscreen, including a forced Wayland code
+branch. The source-confirmed parentless-popup defect and redundant AppGrid closes
+are addressed, but the user's Meta+X failure and intermittent desktop flash cannot
+be declared resolved without live checks. Full-row/hover dragging was separately
+confirmed by the user; new wheel/context interactions still need desktop acceptance.
+Real desktop screenshots and native screen-reader/theme behavior remain live work.
 
 ## Live Manjaro Plasma 6 Wayland acceptance
 
@@ -248,7 +258,10 @@ only access. Refresh the widget only through your normal local procedure.
    450 ms hover, and Back-hover through two levels. Include empty/full groups,
    invalid self/descendant destinations, edge scrolling and Escape. Near the bottom
    of a long list, repeat moves and verify the viewport, selection and focus stay
-   in place. Keep the fallback movement controls until these live tests pass.
+   in place. Full-row/hover checks were confirmed by the user before removing
+   fallback rows; now verify right-click/Shift+F10, Alt+Arrow and the larger list.
+   While holding an item, wheel up/down at top/middle/bottom and through nested
+   levels; test fast input, touchpad deltas, drop/cancel and popup interruption.
 7. Cancel. Compare `menu.json` bytes and backups with the pre-edit state.
 8. Repeat and Save. Check the order and every definition/General setting, plus the
    prior-configuration backup according to the selected retention policy.
@@ -267,17 +280,21 @@ only access. Refresh the widget only through your normal local procedure.
 13. Use a harmless test command that records invocation; verify editing produces
     none. In locked mode check missing-executable/backend errors and successful
     launch behavior without spurious program-exit alerts.
-14. Repeat Kickoff/Kicker and AppGrid Center 1.9.6 left/right switching, popup
-    cancellation and hidden-original-button states; confirm no focus races or
-    altered launcher favorites, icon inheritance or configuration.
+14. Repeat Kickoff/Kicker switching. For AppGrid, follow the [direct-versus-OPM
+    50-cycle procedure](SHORTCUT-APPGRID-DIAGNOSTICS.md#appgrid-desktop-flash): include
+    rapid/mixed clicks, original visible/hidden, and an unfinished draft. Record
+    sequence numbers around any flash; compare Wayland and X11 where available.
 15. Run `open-power-menu --show-launcher-button`; verify the original launcher is
     restored. Confirm a pending draft does not interfere with launcher switching.
 16. Save externally from Configure during a draft and verify conflict rejection.
     Restore a backup with retention zero and confirm its protected pre-restore
     copy. In the disposable profile, remove only OPM's widget, run
     `bash uninstall.sh`, and verify menu, backups and widget recovery history remain.
-17. In a test profile, open General → Set up Meta+X and KDE Shortcuts. Check the
-    supplied command, including an installation path containing spaces. Try an
+17. In a test profile, run the installed executable with --check, then normally,
+    then --diagnose-launch. Use General → Set up Meta+X → Test menu launch. Confirm
+    standalone visibility/focus and Esc, submenu navigation, command selection
+    and outside-click dismissal. In KDE choose the installed Application entry,
+    including an installation path containing spaces. Try an
     already assigned key, cancel KDE's conflict prompt and verify the old binding
     remains. Assign a free Meta+X, Apply, open the standalone menu, then change and
     remove the assignment. Repeat on Plasma 6 Wayland and X11 where available.
@@ -285,7 +302,10 @@ only access. Refresh the widget only through your normal local procedure.
     Verify the name/date/size and protected-copy warning. Replace a selected backup
     before confirming and check refusal. The active row must never be deletable.
     Check nearby selection afterward, preserve unsaved editor changes, and use
-    snapshot Refresh after an upgrade changes the count without closing Configure.
+    return to Backups after an upgrade changes the count without closing Configure.
+    Verify the configuration browser's manual Refresh still rescans. On General,
+    check the separate Emergency Restore command, Copy and selection at narrow
+    widths and increased scaling.
 
 ## Deferred work
 

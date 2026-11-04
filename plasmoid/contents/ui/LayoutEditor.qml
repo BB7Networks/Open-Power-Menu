@@ -226,7 +226,7 @@ QQC2.Control {
         movesMenu.popup(x, y);
     }
     function showDestinations() {
-        if (!draft || selectedIndex < 0 || busy || expired || dragActive) return;
+        if (!draft || selectedIndex < 0 || busy || expired || dragActive || destinations.count === 0) return;
         movesMenu.close();
         destinationMenu.popup(12, navigationBar.height);
     }

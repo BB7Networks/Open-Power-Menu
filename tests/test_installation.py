@@ -120,6 +120,15 @@ def test_installed_standalone_reports_window_exposure(isolated_install):
     env['QT_QPA_PLATFORM'] = 'offscreen'
     launcher = str(temp / 'bin/open-power-menu')
     run(launcher, '--check', env=env)
+    # Exercise the literal installed no-argument command too. Remaining alive
+    # only establishes startup; the diagnostic invocation below checks exposure.
+    plain = subprocess.Popen([launcher], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        with pytest.raises(subprocess.TimeoutExpired):
+            plain.wait(timeout=0.4)
+    finally:
+        plain.terminate()
+        plain.communicate(timeout=5)
     child = subprocess.Popen([launcher, '--diagnose-launch'], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output = b''
     try:

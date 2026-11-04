@@ -10,9 +10,9 @@ in the repository README only after they have been captured and reviewed.
 | `power-user-menu.png` | Right-click menu with System Logs, Printers and one open flyout |
 | `application-launcher.png` | Left-click result using native Kickoff |
 | `appgrid-launcher.png` | Left-click result using AppGrid Center 1.9.6 |
-| `configure-general.png` | Launcher selector, icon preferences, appearance and Set up Meta+X |
+| `configure-general.png` | Launcher selector, separate Emergency Restore command, icon/appearance and Set up Meta+X |
 | `configure-layout.png` | Concise instructions, menu tree and right-aligned Undo/Redo toolbar |
-| `configure-backups.png` | Configuration retention, Manage / Restore Backups and snapshot Refresh |
+| `configure-backups.png` | Configuration retention, Manage / Restore Backups and automatically refreshed snapshot count |
 | `backup-delete.png` | Disposable selected backup and the permanent-deletion confirmation |
 | `in-menu-editing.png` | Full-row drag preview, submenu destination highlight and Save layout / Cancel |
 | `in-menu-conflict.png` | A retained draft and its safe external-change message |

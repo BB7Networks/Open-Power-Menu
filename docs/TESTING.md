@@ -99,9 +99,10 @@ Qt, Wayland, launcher versions, panel position and display scale for every run.
 | In-menu editing | Locked default; full hidden-entry hierarchy; reorder/reparent; Save/Cancel; interrupted drags; popup close/reopen; no command launches |
 | Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; hover Back through multiple levels; return viewport/selection; long press; edge scrolling |
 | In-menu recovery | External edit conflict; backend unavailable/restarted; retained draft and clear recovery instructions |
-| Keyboard/theme | Up/Down, Enter, Right/Left, Escape; edit move controls; visible focus; native light/dark and optional Aero |
-| Meta+X setup | Configure → General; KDE command assignment, an existing shortcut conflict, Apply/change/remove; standalone menu on Wayland and X11 where available |
-| Backup cleanup | Confirm/Cancel; corrupt and protected copies; changed/missing history; active row never deletable; count Refresh while editor changes are unsaved |
+| Keyboard/theme | Up/Down, Enter, Right/Left, Escape; Alt+Arrow and right-click/Shift+F10 movement menus; wheel/touchpad during drag; visible focus; native light/dark and Aero |
+| Meta+X setup | Installed command --check/plain/--diagnose-launch; Test menu launch; KDE Application assignment, conflict, Apply/change/remove; real standalone visibility/focus on Wayland and X11 |
+| AppGrid flash | Compare 50 direct and OPM openings, rapid/mixed clicks, unfinished draft, original visible/hidden; capture sequenced traces per [diagnostic guide](SHORTCUT-APPGRID-DIAGNOSTICS.md) |
+| Backup cleanup | Confirm/Cancel; corrupt/protected/changed/missing history; active row protected; count refresh on tab return with unsaved edits; browser Refresh retained |
 | Backups | Repeated Save, limit 10 then 2, limit 0, Cancel, restore; manual files unchanged |
 | Lifecycle | Dummy long-running app survives popup close, backend PID stop/restart; compare PID usage with grouped totals |
 | Upgrade | Real archived 0.4.16 and 0.4.17 installs upgraded with a custom menu; verify backend reactivation and widget snapshot |
