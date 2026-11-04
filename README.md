@@ -34,7 +34,8 @@ presented as the application.
   the launcher itself, its configuration and its favorites.
 - Native KDE launcher support and a dedicated AppGrid Center 1.9.6 adapter.
 - **Configure → General** for launcher selection, button icon, appearance and
-  backup retention; **Layout** for menu editing and command previews.
+  backup preview and restore; **Layout** for drag-and-drop editing, Duplicate,
+  Undo/Redo and command previews.
 - Per-user installation, upgrades that preserve your menu, and a recovery command.
 
 **System Logs** prefers KSystemLog. Without it, Konsole or XTerm follows the
@@ -67,8 +68,12 @@ if you already have a custom menu. OPM never installs these optional tools silen
 
 For updates, run the new package's `Install.sh` again. Existing `menu.json`
 contents are preserved. Previous OPM widgets are backed up under
-`~/.local/share/open-power-menu/widget-backups/`. No automatic Plasma restart
-is performed. Test a widget refresh locally rather than interrupting remote access.
+`~/.local/share/open-power-menu-recovery/widget-backups/`. The newest five
+snapshots are kept; existing snapshots are migrated automatically and survive
+uninstall. To choose a different limit, run
+`OPM_WIDGET_BACKUP_RETENTION=10 bash Install.sh` (1–1,000).
+No automatic Plasma restart is performed. Test a widget refresh locally rather
+than interrupting remote access.
 
 The `Install.sh` / `Uninstall.sh` wrappers use distinct core filenames under
 `scripts/`. The source and complete archives are safe to clone or extract on
@@ -96,10 +101,22 @@ quotes. OPM passes argument arrays directly; pipes, `>`, `&&` and command
 substitution are not interpreted. Commands needing terminal output should open
 a terminal explicitly; detached applications do not inherit OPM's standard streams.
 
+Drag entries before/after other entries or into submenus. Entire submenus move
+with their children. **Duplicate** makes an independent copy after the selected
+entry. Use **Ctrl+Z** to undo and **Ctrl+Shift+Z** or **Ctrl+Y** to redo layout
+changes. Right-click an entry to see editing and keyboard movement shortcuts;
+Move Up/Down buttons remain available.
+
+Changes stay in memory until **Save**. Closing with unsaved General or Layout
+changes offers **Save / Discard / Cancel**. If another editor changes the file,
+choose to keep editing, reload it, or explicitly overwrite with a recovery copy.
+
 **Configure → General → Configuration backups** keeps 10 previous automatic
 versions by default, with a limit of 0–1,000. Setting 0 stops new backups and
 preserves existing history. Pruning happens only after a successful save;
-manually named backups remain untouched. Cancel saves nothing.
+manually named backups remain untouched. Select **Manage backups…** to preview
+entries and settings, then restore a valid backup. Restore preserves the current
+file as a separate recovery copy even with automatic backups disabled.
 
 ## Recovery and removal
 
@@ -114,9 +131,10 @@ removes the original launcher or edits its favorites or panel configuration.
 
 Remove **only the OPM Start button** from the panel, then run `bash Uninstall.sh`
 from the complete extracted package. Your menu remains at
-`~/.config/open-power-menu/menu.json`. Copy any widget snapshots you want to
-keep before uninstalling; the application directory containing them is removed.
-For configuration/widget rollback steps, see [testing and recovery](docs/TESTING.md).
+`~/.config/open-power-menu/menu.json`, together with its backups. Widget snapshots
+remain in the separate recovery directory above; legacy snapshots are moved there
+before removing application files. For rollback steps, see
+[editor and recovery](docs/EDITOR-RECOVERY.md).
 
 ## Compatibility and roadmap
 

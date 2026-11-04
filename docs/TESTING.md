@@ -30,7 +30,7 @@ before running tests, so a missing runtime cannot silently skip this job.
 
 ```bash
 python -m pip install PySide6-Essentials==6.10.2
-QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_qt_runtime.py
+QT_QPA_PLATFORM=offscreen python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py
 ```
 
 They start temporary session buses, use temporary XDG paths, and stop only their
@@ -45,6 +45,16 @@ execute real core/wrapper scripts, preserve custom configuration, simulate prior
 and inspect actual ZIP/TAR archives. They do not prove KPackage works on a live
 Plasma session or reproduce every byte of the unavailable old installer releases.
 Version identifiers remain at 0.4.17; building archives does not tag or publish.
+
+Editor tests use actual Qt trees, undo stacks, modal dialogs and keyboard events;
+the drop adapter also receives a constructed `QDropEvent`. They cover nested
+moves, cycle/depth/count rejection, metadata, duplication, default reset,
+Save/Discard/Cancel, content conflicts, validation focus, and backup preview and
+restore. Filesystem tests inject write/copy/replace failures and check retention,
+symlink refusal, corrupt/missing history and source preservation. Installer tests
+also cover migration collisions, independent snapshot limits, failed upgrades
+and uninstall preserving history. Native pointer drags still require the live
+[Manjaro editor/recovery procedure](EDITOR-RECOVERY.md#required-manjaro-plasma-6-wayland-acceptance).
 
 ## Live acceptance matrix (still required)
 
@@ -83,17 +93,14 @@ presence alone is insufficient. No tool is installed automatically when missing.
 ~/.local/bin/open-power-menu --launcher-diagnostics
 ```
 
-Back up the current `~/.config/open-power-menu/menu.json` manually before a
-rollback. Copy a chosen `menu.json.bak-<timestamp>` over `menu.json` with the
-editor closed, keep it readable only by your user, then reopen Configure. Never
-replace `plasma-org.kde.plasma.desktop-appletsrc` for an OPM rollback.
+Use General → Configuration backups → Manage backups to preview and restore a
+configuration. Restore retains a separate pre-restore copy even with automatic
+backups off. Never replace `plasma-org.kde.plasma.desktop-appletsrc` for OPM recovery.
 
-Widget snapshots live under `~/.local/share/open-power-menu/widget-backups/`.
-Copy the desired snapshot somewhere safe before uninstalling. On a local desktop,
-install/upgrade that snapshot with `kpackagetool6 --type Plasma/Applet --upgrade
-<snapshot-directory>` and follow Plasma's normal local widget refresh procedure.
-The matching old Python backend must be restored from a trusted complete release
-if required; a widget snapshot alone is not a full application rollback.
+Widget snapshots now live under
+`~/.local/share/open-power-menu-recovery/widget-backups/`; old history is migrated
+and uninstall preserves it. See [Editor and recovery](EDITOR-RECOVERY.md) for
+snapshot retention, matching-backend rollback and the live test procedure.
 
 Do not mark this matrix complete based on offscreen tests. Attach real
 [screenshots](images/README.md) only after live acceptance.
