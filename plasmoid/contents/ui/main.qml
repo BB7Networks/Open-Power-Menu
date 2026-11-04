@@ -37,6 +37,16 @@ PlasmoidItem {
         function onActivated() { root.activatePowerShortcut(); }
     }
 
+    // Set the native shortcut once per widget instance. Plasma/KDE handles
+    // conflicts; subsequent user changes or removals must not be overwritten.
+    function initializeDefaultShortcut() {
+        if (Plasmoid.configuration.opmDefaultShortcutTried) return;
+        const current = String(Plasmoid.globalShortcut || "").trim();
+        Plasmoid.configuration.opmDefaultShortcutTried = true;
+        if (!current) Plasmoid.globalShortcut = "Meta+X";
+    }
+    Component.onCompleted: Qt.callLater(() => root.initializeDefaultShortcut())
+
     property var menuEntries: []
     property var visibleEntries: []
     property string menuStatus: "Loading system shortcuts..."
