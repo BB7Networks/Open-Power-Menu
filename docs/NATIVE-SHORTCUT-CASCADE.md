@@ -24,8 +24,11 @@ tests cannot validate KGlobalAccel or native popup placement.
 
 ## Cascading drag-and-drop preview
 
-While the menu is unlocked, selecting or hovering over a submenu opens an
-adjacent pane inside the **same Plasma popup**. The unchanged saved-menu model
+While the menu is unlocked, clicking a submenu or resting the pointer
+on it briefly opens an adjacent pane inside the **same Plasma popup**.
+The flyout remains open while moving into its child pane; it closes after
+a short delay once the pointer leaves both the parent row and child pane.
+Cross-pane drags suspend hover dismissal until release. The unchanged saved-menu model
 remains authoritative; two visible views only move the same opaque item IDs.
 Dragging between parent and child is supported with native pointer movement
 and no second Wayland window or arbitrary command execution.
