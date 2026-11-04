@@ -13,6 +13,8 @@ icons_dir="$data_home/icons/hicolor/scalable/apps"
 dbus_dir="$data_home/dbus-1/services"
 widget_dir="$data_home/plasma/plasmoids/org.openpowermenu.start"
 
+# Snapshot/migration failure stops the upgrade before replacing installed files.
+python3 "$src/openpowermenu/widget_snapshots.py" prepare "$data_home"
 mkdir -p "$app_dir" "$config_dir" "$bin_home" "$applications_dir" "$icons_dir" "$dbus_dir"
 cp -a "$src/openpowermenu" "$app_dir/"
 cp "$src/run.py" "$app_dir/run.py"
@@ -45,15 +47,6 @@ Categories=System;Utility;
 StartupNotify=true
 DESKTOP
 
-# Back up the previously installed widget before replacing it.
-# This is limited to our own plasmoid directory, never user panel data.
-if [[ -d "$widget_dir" ]]; then
-    backup_dir="$app_dir/widget-backups"
-    mkdir -p "$backup_dir"
-    snapshot="$backup_dir/org.openpowermenu.start-$(date +%Y%m%d-%H%M%S-%N)"
-    cp -a "$widget_dir" "$snapshot"
-    printf 'Previous widget backed up: %s\n' "$snapshot"
-fi
 if command -v kpackagetool6 >/dev/null 2>&1; then
     if [[ -d "$widget_dir" ]]; then
         kpackagetool6 --type Plasma/Applet --upgrade "$src/plasmoid"
@@ -86,6 +79,11 @@ fi
 # user service will relaunch the new version automatically when requested.
 # Never kill plasmashell, AppGrid, or any unrelated process.
 python3 "$src/run.py" --restart-owned-service || true
+# Retention runs only after successful installation. Cleanup failure preserves
+# extra history and reports it without misreporting the completed upgrade.
+if ! python3 "$src/openpowermenu/widget_snapshots.py" prune "$data_home"; then
+    printf 'Warning: installed successfully, but old widget snapshots could not be pruned.\n' >&2
+fi
 printf '\nBefore testing widget, verify backend:\n'
 printf '  %s/open-power-menu --check\n' "$bin_home"
 printf '  qdbus6 org.openpowermenu.Service /OpenPowerMenu org.openpowermenu.Service.Ping\n'
