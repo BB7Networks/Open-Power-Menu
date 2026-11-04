@@ -37,7 +37,7 @@ Kirigami.Page {
         }
         QQC2.CheckBox {
             id: cascadingCheck
-            text: "Show adjacent submenu while rearranging"
+            text: "Use floating submenu flyouts while rearranging"
             Kirigami.FormData.label: "Editing:"
             checked: true
         }
