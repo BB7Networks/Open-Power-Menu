@@ -609,70 +609,74 @@ def test_quick_controls_follow_light_dark_and_aero_palettes(quick, background, f
     assert (bright + .05) / (dark + .05) >= 4.5
 
 
-def test_cascading_parent_and_child_are_visible_and_drag_across_one_popup(quick):
-    """Experimental two-pane path: both lists share one pointer owner/window."""
+def test_editor_flyout_is_a_separate_row_anchored_popup_with_safe_moves(quick):
+    """Popup.Window preserves the narrow parent; a drop references opaque IDs only."""
     _, view, root = quick
     root.setProperty('cascadingEnabled', True)
-    view.resize(650, 430)
+    view.resize(328, 430)
     QTest.qWait(30)
 
     click(view, root, 'layoutRow-g')
-    QTest.qWait(25)
+    QTest.qWait(40)
     assert root.property('flyoutVisible')
     assert root.property('flyoutId') == 'g'
     assert draft(root)['parentId'] == ''
     left = child(root, 'layoutRows')
-    right = child(root, 'layoutFlyoutRows')
+    right = evaluate(root, 'flyoutList')
     assert left is not None and right is not None
-    assert child(root, 'layoutRow-a') is not None
-    assert child(root, 'layoutFlyoutRow-c') is not None
-    assert left.mapToScene(QPointF(0, 0)).x() < right.mapToScene(QPointF(0, 0)).x()
+    assert evaluate(root, 'flyoutPane.popupType === 1')  # QQC2.Popup.Window (Qt 6.8+)
+    assert root.implicitWidth() == 304
+    assert left.width() < 330  # The parent is no longer stretched to 650px.
+    # Flyout sits beyond either edge of the parent, not in a split RowLayout.
+    pos = evaluate(root, 'flyoutPane.x')
+    assert pos >= root.width() or pos < 0
+    assert child(root, 'layoutFlyoutRows') is None  # Separate popup window.
 
-    end = point(root, 'layoutFlyoutRow-c', x=45, y=5)
-    begin_drag(view, point(root, 'layoutRow-b', x=90), end)
-    assert root.property('dragActive')
-    assert root.property('dropValid')
-    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
-    QTest.qWait(30)
+    token = draft(root)['token']
+    def drop_command(item_id, target, row_y):
+        script = """
+            control.nativeDrop({
+                formats: [control.nativeDragFormat, control.nativeTokenFormat],
+                getDataAsString: function(fmt) {
+                    return fmt === control.nativeDragFormat ? %s : %s;
+                },
+                y: %s
+            }, %s, %s, %s)
+        """ % (json.dumps(item_id), json.dumps(token), row_y, target[0], target[1], target[2])
+        return evaluate(root, script)
+
+    assert drop_command('b', ('control.flyoutId','flyoutList','control.flyoutEntries'), 5)
     value = draft(root)
-    group = next(e for e in value['entries'] if e['id'] == 'g')
-    assert [e['id'] for e in group['items']] == ['b', 'c']
-    assert root.property('flyoutVisible')
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['b','c']
     assert value['parentId'] == ''
+    assert root.property('flyoutVisible')
 
-    # Drag the same item back into the parent without a navigation button.
-    start = point(root, 'layoutFlyoutRow-b', x=40)
-    end = point(root, 'layoutRow-a', x=90, y=5)
-    begin_drag(view, start, end)
-    assert root.property('dropValid')
-    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
-    QTest.qWait(30)
+    assert drop_command('b', ("control.draft.parentId","list","control.rows"), 5)
     value = draft(root)
-    assert value['entries'][0]['id'] == 'b'
-    assert [e['id'] for e in next(e for e in value['entries'] if e['id'] == 'g')['items']] == ['c']
+    assert [e['id'] for e in value['entries']][:2] == ['b','a']
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['c']
 
 
-def test_cascading_hover_opens_and_dismisses_after_pointer_leaves(quick):
-    """Open on hover, preserve flyout when crossing into it, then dismiss."""
+def test_native_flyout_hover_state_prevents_premature_dismissal(quick):
+    """When the separate popup gains hover, the parent's timer cannot dismiss it."""
     _, view, root = quick
     root.setProperty('cascadingEnabled', True)
-    view.resize(650, 430)
+    view.resize(328, 430)
     QTest.qWait(30)
     initial = draft(root)['entries']
     parent = child(root, 'layoutRow-g')
-    QTest.mouseMove(view, parent.mapToScene(QPointF(70, 18)).toPoint())
+    QTest.mouseMove(view, parent.mapToScene(QPointF(70,18)).toPoint())
     QTest.qWait(280)
     assert root.property('flyoutVisible')
-    nested = child(root, 'layoutFlyoutRow-c')
-    QTest.mouseMove(view, nested.mapToScene(QPointF(45, 18)).toPoint())
-    QTest.qWait(300)
+    root.setProperty('flyoutPointerInside', True)
+    outside = child(root,'layoutRow-a')
+    QTest.mouseMove(view, outside.mapToScene(QPointF(70,18)).toPoint())
+    QTest.qWait(310)
     assert root.property('flyoutVisible')
-    outside = child(root, 'layoutRow-a')
-    QTest.mouseMove(view, outside.mapToScene(QPointF(70, 18)).toPoint())
-    QTest.qWait(330)
+    root.setProperty('flyoutPointerInside', False)
+    QTest.qWait(320)
     assert not root.property('flyoutVisible')
     assert draft(root)['entries'] == initial
-    assert draft(root)['parentId'] == ''
 
 
 def test_cascading_flyout_closes_when_popup_hides(quick):
