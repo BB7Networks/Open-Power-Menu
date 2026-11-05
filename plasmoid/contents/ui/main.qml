@@ -35,6 +35,26 @@ PlasmoidItem {
     Connections {
         target: Plasmoid
         function onActivated() { root.activatePowerShortcut(); }
+        // Applet::destroyedChanged(true) is an explicit widget-removal event,
+        // unlike Component.onDestruction (which also runs on Plasma restart).
+        function onDestroyedChanged(destroyed) { root.onWidgetRemovalChanged(destroyed); }
+    }
+
+    // Keep the binding on ordinary reload/reinstall. Clear only when Plasma
+    // actually REMOVES this widget instance, so its numbered "activate widget
+    // <id>" action cannot hold Meta+X after the button is gone. If removal is
+    // undone, restore the same key unless another binding has appeared.
+    property string shortcutBeforeRemoval: ""
+    function onWidgetRemovalChanged(removed) {
+        if (removed) {
+            shortcutBeforeRemoval = String(Plasmoid.globalShortcut || "").trim();
+            if (shortcutBeforeRemoval) Plasmoid.globalShortcut = "";
+            return;
+        }
+        if (!shortcutBeforeRemoval) return;
+        if (!String(Plasmoid.globalShortcut || "").trim())
+            Plasmoid.globalShortcut = shortcutBeforeRemoval;
+        shortcutBeforeRemoval = "";
     }
 
     // Set the native shortcut once per widget instance. Plasma/KDE handles
