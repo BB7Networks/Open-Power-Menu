@@ -12,7 +12,7 @@ printf ' KDE Plasma 6 / Manjaro\n'
 printf '================================================\n\n'
 
 [[ $EUID -ne 0 ]] || fail "Run this as your normal desktop user, WITHOUT sudo. Example: bash Install.sh"
-[[ -f "$app_dir/install.sh" && -f "$app_dir/run.py" ]] || fail 'This package is incomplete. Extract the whole ZIP, not just Install.sh.'
+[[ -f "$app_dir/scripts/install-core.sh" && -f "$app_dir/run.py" ]] || fail 'This package is incomplete. Extract the whole ZIP, not just Install.sh.'
 command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required. Install python3 from your distribution.'
 command -v kpackagetool6 >/dev/null 2>&1 || fail 'KDE Plasma 6 is required (kpackagetool6 not found). Please run this on a Plasma 6 desktop.'
 
@@ -45,7 +45,7 @@ else
 fi
 
 printf '\nInstalling Open Power Menu for: %s\n' "${USER:-$(id -un)}"
-if ! bash "$app_dir/install.sh" >"$log" 2>&1; then
+if ! bash "$app_dir/scripts/install-core.sh" >"$log" 2>&1; then
     printf '\nInstallation failed. Details from %s:\n\n' "$log" >&2
     tail -n 45 "$log" >&2
     exit 1
