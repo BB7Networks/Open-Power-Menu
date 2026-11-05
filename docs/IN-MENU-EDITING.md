@@ -1,14 +1,12 @@
 # In-menu layout editing
 
-This unreleased change is based on PR #4 at `5017e33`, on branch
-`feature/in-menu-editing-ux`. PRs #1–4 were open and unmerged when work began.
-Version identifiers remain **0.4.17**. No configuration migration is required.
-The follow-up addressing live Manjaro feedback starts at verified PR #5 head
-`85c9c5e` and continues in the same PR and branch. The latest shortcut, AppGrid,
-wheel and UI follow-up starts at `b236efd`. Draft PR #6 follows PR #5 with
-native widget Meta+X and the restored single-pane editor plus a dedicated
-full-width Go Back drop zone. This document preserves historical PR #5 notes
-where relevant; the current behavior is described below.
+This guide covers the current layout editor in the **0.4.17 source code**.
+It combines full-row dragging, spring-loaded submenu navigation, a full-width
+**Go Back** drop area, configuration recovery and native widget Meta+X.
+The features are in the development source but **not yet a published GitHub
+release**. No configuration migration is required. Some detailed validation
+notes below record earlier development work; live Plasma acceptance remains
+important, especially for Wayland pointer handling.
 
 ## What the interface looks like
 
@@ -314,4 +312,5 @@ only access. Refresh the widget only through your normal local procedure.
 - Broader cross-distribution packaging and compatibility.
 
 Native cross-window drag behavior can be reconsidered after live Wayland evidence.
-This PR does not merge dependencies, tag, release or publish environment changes.
+Merging source changes does not tag, release or publish software; versioning and
+live-desktop release acceptance are handled separately.
