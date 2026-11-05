@@ -18,27 +18,20 @@ familiar workflow without recreating Windows wholesale. It is **not another
 application launcher**. Keep your favorites, launcher and panel. OPM adds the
 right-click tools without insisting on an entire desktop makeover.
 
-> **Beta · v0.4.17 release baseline.** The changes on
-> [draft PR #6](https://github.com/BB7Networks/Open-Power-Menu/pull/6)
-> are **unreleased**, not a new tagged version. Manjaro / Plasma 6 and AppGrid
-> Center 1.9.6 have been tested on a live Wayland desktop, but new widget
-> shortcut and layout-editing changes still need the
-> [desktop acceptance checks](docs/TESTING.md).
+> **Development version · 0.4.17.** The current source includes
+> improvements beyond the last development baseline; **no GitHub release has
+> been published yet**. Manjaro / Plasma 6 and AppGrid Center 1.9.6 have been
+> exercised on a live Wayland desktop. New widget shortcut and in-menu editing
+> behavior still require the [desktop acceptance checks](docs/TESTING.md)
+> before a new public beta release.
 
 ## Screenshots
 
-Three genuine Plasma 6 screenshots have been captured for this development
-branch: the Power User Menu and its panel button, a normal-use submenu, and the
-**Configure → General** window. The image assets still need to be committed
-before they can be displayed here; see the
-[screenshot gallery and capture notes](docs/images/README.md).
-No generated mockups are presented as the application.
-
-<!-- Enable this gallery once these three files are committed to docs/images/:
-![Power User Menu attached to a Manjaro panel](docs/images/power-user-menu.png)
-![Shut down or sign out flyout beside its parent menu](docs/images/submenu-flyout.png)
-![Configure General tab: launcher, icon, and appearance](docs/images/configure-general.png)
--->
+Real Manjaro Plasma 6 captures of the Power User Menu, a normal-use submenu,
+and **Configure → General** have been prepared for the
+[repository screenshot gallery](docs/images/README.md). They will be embedded
+here once the image files are available in the repository. No generated mockups
+are presented as screenshots.
 
 ## Why use it?
 
@@ -226,7 +219,7 @@ prove** physical Wayland pointer behavior, shortcut registration, popup
 placement or focus handling.
 
 Current priorities include live acceptance on more panel positions, launchers,
-display scales and clean-account upgrades; real screenshot publication; and a
+display scales and clean-account upgrades; publishing the captured screenshots; and a
 user-consented backend installation path for KDE Store. Separate desktop
 application scopes will be evaluated only with real Plasma/systemd evidence—
 process ancestry alone doesn't establish an application lifetime.
