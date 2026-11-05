@@ -771,3 +771,63 @@ def test_native_flyout_switches_to_nested_level_without_widening(quick):
     evaluate(root, 'control.back()')
     assert not root.property('flyoutVisible')
     assert draft(root)['parentId'] == 'g'
+
+
+def test_parent_row_drag_remains_nonblocking_while_edit_flyout_is_open(quick):
+    """Native Wayland QDrag must not steal mouse release from parent reordering."""
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(328, 430)
+    QTest.qWait(30)
+    click(view, root, 'layoutRow-g')
+    assert root.property('flyoutVisible')
+    first = child(root, 'layoutRow-a')
+    last = child(root, 'layoutRow-b')
+    start = first.mapToScene(QPointF(110, 18)).toPoint()
+    end = last.mapToScene(QPointF(110, 32)).toPoint()
+    QTest.mousePress(view, Qt.LeftButton, pos=start)
+    QTest.mouseMove(view, start + (end-start)/2, delay=20)
+    QTest.mouseMove(view, end, delay=20)
+    assert root.property('dragActive')
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(30)
+    assert not root.property('dragActive')
+    assert [entry['id'] for entry in draft(root)['entries']] == ['g', 'b', 'a', 's']
+    source = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
+    assert 'Drag.dragType: Drag.Automatic' not in source
+    assert 'Item { id: dragPosition }' in source
+
+
+def test_hover_flyout_move_selected_here_without_native_cross_window_drag(quick):
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(328, 430)
+    QTest.qWait(30)
+    click(view, root, 'layoutRow-b')
+    assert draft(root)['selectedId'] == 'b'
+    evaluate(root, "control.openFlyout('g')")
+    assert root.property('flyoutVisible')
+    assert evaluate(root, 'control.canMoveSelectionIntoFlyout()')
+    evaluate(root, 'control.moveSelectedIntoFlyout()')
+    value = draft(root)
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['c','b']
+    assert value['parentId'] == ''
+    assert not root.property('dragActive')
+
+
+def test_plasma_native_flyout_is_only_loaded_by_widget():
+    editor = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
+    widget = (ROOT / 'plasmoid/contents/ui/main.qml').read_text()
+    plasma = (ROOT / 'plasmoid/contents/ui/LayoutPlasmaFlyout.qml').read_text()
+    normal = (ROOT / 'plasmoid/contents/ui/SideFlyout.qml').read_text()
+    assert 'preferPlasmaFlyout: true' in widget
+    assert 'property bool preferPlasmaFlyout: false' in editor
+    assert 'Qt.createComponent(Qt.resolvedUrl("LayoutPlasmaFlyout.qml"))' in editor
+    assert 'PlasmaCore.PopupPlasmaWindow {' in plasma
+    assert 'visualParent' in editor and 'plasmaFlyoutAnchor' in editor
+    # Both popup implementations use the stable one-pixel proxy and the
+    # same bottom-to-bottom preferred placement, never top-of-window y=0.
+    for src in (plasma, normal):
+        assert 'const requestedTop = rowGlobal.y + row.height - popupH;' in src
+        assert 'proxy.y = rowLocal.y + targetTop + popupH / 2 - rowGlobal.y - 0.5;' in src
+    assert 'Drag.dragType: Drag.Automatic' not in editor
