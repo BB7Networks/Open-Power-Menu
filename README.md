@@ -1,13 +1,13 @@
 # Open Power Menu
 
-**One Start button. Two useful menus.**
+**One launcher button. Two useful menus.**
 
 The Windows right-click Start / Win+X menu is a good idea. Microsoft has made
 some questionable decisions over the years, but this is one worth keeping.
 Open Power Menu (OPM) brings that workflow to **KDE Plasma 6**, alongside the
 application launcher you already like.
 
-| Use the OPM Start button | What happens |
+| Use the OPM launcher button | What happens |
 | --- | --- |
 | **Left-click** | Opens your existing launcher—Kickoff, Kicker, or a supported alternative |
 | **Right-click** | Opens the configurable, panel-attached Power User Menu |
@@ -28,7 +28,7 @@ right-click tools without insisting on an entire desktop makeover.
 ## Screenshots
 
 Three genuine Plasma 6 screenshots have been captured for this development
-branch: the main menu and Start button, a normal-use submenu, and the
+branch: the Power User Menu and its panel button, a normal-use submenu, and the
 **Configure → General** window. The image assets still need to be committed
 before they can be displayed here; see the
 [screenshot gallery and capture notes](docs/images/README.md).
@@ -165,7 +165,7 @@ See [shortcut lifecycle and testing](docs/NATIVE-SHORTCUT-CASCADE.md) or the
 ## Configure your menu
 
 **General** controls the launcher association, reversible hiding of its
-original panel button, the Start button icon, and the menu's appearance.
+original panel button, the OPM button icon, and the menu's appearance.
 You can follow the original launcher's icon or use a custom theme icon/image.
 Optional Aero styling is available; the normal desktop theme remains a choice.
 
@@ -211,7 +211,7 @@ Lost the original launcher button? There is a way back, no treasure map required
 The widget applies that reversible preference on its next refresh. OPM never
 removes the underlying launcher or edits your panel's favorites.
 
-To uninstall, remove **only the OPM Start Button** from your panel, then run
+To uninstall, remove **only the OPM widget** from your panel, then run
 `bash uninstall.sh` from the complete extracted package. Your configuration
 and backups remain in `~/.config/open-power-menu/`; widget recovery snapshots
 remain under `~/.local/share/open-power-menu-recovery/`.
