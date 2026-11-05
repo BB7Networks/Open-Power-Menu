@@ -135,8 +135,8 @@ Widget snapshots now live under
 `~/.local/share/open-power-menu-recovery/widget-backups/`; old history is migrated
 and uninstall preserves it. See [Editor and recovery](EDITOR-RECOVERY.md) for
 snapshot retention, matching-backend rollback and the live test procedure.
-Run the [PR #5 Manjaro acceptance procedure](IN-MENU-EDITING.md#live-manjaro-plasma-6-wayland-acceptance)
-after upgrading from PR #4.
+Run the [in-menu editing Manjaro acceptance procedure](IN-MENU-EDITING.md#live-manjaro-plasma-6-wayland-acceptance)
+on a current 1.0.1 installation, including upgrades from an earlier release.
 
 Do not mark this matrix complete based on offscreen tests. Attach real
 [screenshots](images/README.md) only after live acceptance.

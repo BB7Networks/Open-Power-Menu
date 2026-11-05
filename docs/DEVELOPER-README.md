@@ -1,12 +1,13 @@
-# Open Power Menu 0.4.17
+# Open Power Menu — developer guide
 
-For the current branch's action/lifecycle changes, automated checks and remaining
-desktop acceptance, read [REVIEW.md](REVIEW.md), [TESTING.md](TESTING.md) and
-[PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md). For the subsequent editor changes,
-read [EDITOR-RECOVERY.md](EDITOR-RECOVERY.md), and for the new widget controls read
-[IN-MENU-EDITING.md](IN-MENU-EDITING.md). The release-history notes below do
-not replace those results. Optional PySide6 offscreen tests now run in CI; actual
-Plasma/Wayland acceptance remains separate.
+This guide retains detailed **0.4.17-era** implementation history. The current
+source version is **1.0.1** on `main`; for its release status and remaining
+desktop acceptance checks, see [RELEASE-1.0.1.md](RELEASE-1.0.1.md) and
+[TESTING.md](TESTING.md). For earlier lifecycle reviews, see
+[REVIEW.md](REVIEW.md) and [PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md).
+For editing and recovery, see [EDITOR-RECOVERY.md](EDITOR-RECOVERY.md) and
+[IN-MENU-EDITING.md](IN-MENU-EDITING.md). Optional offscreen Qt tests run
+in CI; actual Plasma/Wayland acceptance remains separate.
 
 A launcher-independent Power User menu for KDE Plasma 6, with an optional unified
 launcher-button widget. **Left-click** delegates to an existing launcher; **right-click**

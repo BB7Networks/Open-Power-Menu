@@ -1,25 +1,23 @@
 # Version 1.0.1 release review
 
-This is an unpublished release candidate. The version bump was explicitly
-approved; merge, tagging and publication remain pending.
+This is an unpublished release candidate. The version bump and integration
+into `main` are complete; tagging and public release publication remain
+pending physical Manjaro Wayland acceptance and explicit approval.
 
 ## Integration
 
-Based on [PR #8](https://github.com/BB7Networks/Open-Power-Menu/pull/8) at
-`9d3c876e3fc86ff01c97759a7e70b27cd9943c69`, on
-`feature/final-polish-ez-installer`. Target the PR #8 branch until it merges.
+The 1.0.1 code is now in `main`, after merging
+[PR #8](https://github.com/BB7Networks/Open-Power-Menu/pull/8) at
+`01fbd159991b0918d45f9c8544a032401d9f9e30` and
+[PR #9](https://github.com/BB7Networks/Open-Power-Menu/pull/9) at
+`046464686d94edaae99848fd11cbd0d7bd8ffa84`. PRs #1–#6 were merged
+earlier; their history remains accessible in Git.
 
-Main at `ac9e057` contains PRs #1–#6, in that order. Their original heads and
-merge commits are ancestors of main, and retained feature branches contain no
-additional work outside main. They remain historical references.
-
-[PR #7](https://github.com/BB7Networks/Open-Power-Menu/pull/7) overlaps the
-gallery and README. Its useful consolidation findings are preserved here.
-Its bounded Qt delegate-wait correction is already present in PR #8; no
-additional application changes need to be imported. Retain PR #8's four
-user-provided screenshots alongside the new gallery. Do not merge the obsolete
-README/gallery over this version. Close or supersede #7 after documentation
-review; no PRs were merged or closed by this work.
+[PR #7](https://github.com/BB7Networks/Open-Power-Menu/pull/7) was closed
+as superseded after review. Its bounded Qt delegate-wait correction was
+included in PR #8, and its useful consolidation findings are reflected here.
+The current gallery keeps the owner's PR #8 screenshots and the newer 1.0.1
+dark-theme captures rather than replacing them with the historical images.
 
 The earlier runtime-loading follow-up is already integrated:
 `load_config()` uses recovery's bounded, no-symlink reads. Its oversized,
@@ -147,7 +145,8 @@ widget with `bash scripts/build-widget-only.sh`.
 
 ## Publication gates
 
-Finish the physical acceptance checklist, review and merge PR #8 followed by
-this stacked change, and confirm both CI jobs pass at the approved release
-commit. Then obtain explicit approval to tag and publish 1.0.1. No release or
-tag is created automatically. See [publishing](PUBLISHING.md).
+Finish the physical acceptance checklist, confirm both CI jobs pass on the
+approved `main` release commit, and rebuild/verify the EZ archives from
+that exact commit. Obtain explicit approval before tagging or publishing
+1.0.1. Source integration is complete; no GitHub release or tag has been
+created. See [publishing](PUBLISHING.md).

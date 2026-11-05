@@ -16,9 +16,10 @@ application launcher you already like.
 Keep your favorites, launcher and panel. OPM adds quick access to system tools
 without insisting on an entire desktop makeover.
 
-**Version 1.0.1 is prepared for release review on this branch.** Public release
-packages will appear on [GitHub Releases](https://github.com/BB7Networks/Open-Power-Menu/releases)
-after final desktop checks. Until then, use the source installation below.
+**Version 1.0.1 is now integrated into `main`.** The first public release is
+being prepared; no release package has been published yet. Complete the
+[desktop acceptance checklist](docs/RELEASE-1.0.1.md#physical-manjaro-wayland-acceptance-before-publication)
+before relying on it as a stable release.
 
 ## See it in action
 
@@ -52,9 +53,10 @@ after final desktop checks. Until then, use the source installation below.
 You need **KDE Plasma 6**, Python 3, PySide6 (QtCore, QtDBus and QtWidgets) and
 `kpackagetool6`. Run the installer as your normal desktop user, **without sudo**.
 
-1. Open [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases) and
-   download the complete **OpenPowerMenu-EZ ZIP**, when available.
-2. Extract the entire ZIP. Open a terminal inside the extracted folder.
+1. For now, choose **Code → Download ZIP** on this repository and extract the
+   complete source archive. When the first public release is published, use the
+   complete **OpenPowerMenu-EZ ZIP** from [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases).
+2. Open a terminal inside the extracted directory.
 3. Run:
 
    ```bash
@@ -63,8 +65,8 @@ You need **KDE Plasma 6**, Python 3, PySide6 (QtCore, QtDBus and QtWidgets) and
 
 4. Right-click your Plasma panel → **Add Widgets**. Add **Open Power Menu Start
    Button** to the same panel as your existing launcher.
-5. Right-click OPM, then select the **settings icon** in its menu. In General, choose your launcher and
-   test both mouse buttons before optionally hiding its original button.
+5. Right-click OPM and select the **settings icon**. In General, choose your
+   launcher and test both mouse buttons before optionally hiding its original button.
 
 If PySide6 is missing on Manjaro, setup asks before using the system package
 manager. It never silently installs packages or restarts Plasma.

@@ -94,7 +94,7 @@ PlasmoidItem {
         onTriggered: LayoutController.keep(root)
     }
 
-    // Both launcher visibility and the Start icon are shared editor settings.
+    // Both launcher visibility and the panel button icon are shared editor settings.
     // A missing/unsupported original icon falls back to the widget's saved
     // icon, without mutating the underlying launcher's configuration.
     property string buttonIconMode: "launcher" // "launcher" or "custom"
@@ -780,7 +780,7 @@ PlasmoidItem {
         Layout.minimumHeight: Kirigami.Units.iconSizes.small
         Layout.preferredWidth: Math.max(height, Kirigami.Units.iconSizes.medium)
         activeFocusOnTab: true
-        Accessible.name: "Start menu and Power User menu"
+        Accessible.name: "Launcher and Power User Menu"
         Accessible.role: Accessible.Button
 
         Kirigami.Icon {
@@ -797,7 +797,7 @@ PlasmoidItem {
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onPressed: mouse => {
                 if (mouse.button === Qt.RightButton) {
-                    console.info("Open Power Menu: right-click received by Start button");
+                    console.info("Open Power Menu: right-click received by launcher button");
                     root.openMenu();
                     mouse.accepted = true;
                 }

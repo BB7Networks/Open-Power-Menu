@@ -1,8 +1,10 @@
 # Menu flyout UX refinements
 
-This change starts from main at `ac9e057`, after PRs #1–#6. It preserves the
-launcher handoff, native widget shortcut lifecycle, single-pane editor and
-configuration/recovery paths. Version identifiers remain 0.4.17.
+Historical development notes: these refinements began from `main` at
+`ac9e057` while the project was version 0.4.17. They were merged in PR #8
+and are now part of the **1.0.1 source** on `main`. The launcher handoff,
+native shortcut lifecycle, single-pane editor and recovery paths remain
+unchanged. See [release review](RELEASE-1.0.1.md) for current status.
 
 ## Behavior
 
@@ -83,7 +85,7 @@ No Configure or layout editor capture was included in this delivery.
 | `opm - left - left click.png` | `images/application-launcher.png` |
 | `opm - center - combined.png` | `images/combined-launcher.png` |
 
-PR #7 remains a separate open consolidation-review change. This branch uses
-these supplied product images instead of its earlier Debian capture set; the
-README/gallery portions should retain this presentation when integrating both
-PRs. Neither PR is merged automatically.
+PR #7 was closed as superseded after its consolidation findings and Qt
+delegate timing correction were reviewed. The current gallery retains
+the supplied product screenshots rather than the older Debian capture set.
+PRs #8 and #9 are merged into `main`.

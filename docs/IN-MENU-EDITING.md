@@ -169,8 +169,8 @@ icons, flyout placement and detached application launching remain unchanged.
 
 ## Native Meta+X and optional standalone diagnostics
 
-With PR #6, the Open Power Menu **Start Button widget** attempts to register
-**Meta+X once per widget instance** using Plasma's native shortcut API. It
+The Open Power Menu **Start Button widget** attempts to register **Meta+X
+once per widget instance** using Plasma's native shortcut API. It
 activates the panel-attached Power User Menu rather than launching a separate
 standalone window. KDE owns conflicts: OPM will not steal an occupied key.
 Later user customization/removal of the key is respected across restarts
@@ -306,7 +306,7 @@ only access. Refresh the widget only through your normal local procedure.
 - Full first-run setup wizard and automatic dependency diagnostics.
 - General-purpose configuration import/export.
 - Broader real-desktop acceptance of native widget Meta+X on different panel
-  placements and launcher adapters; the implementation exists in PR #6.
+  placements and launcher adapters; implementation is in the current source.
 - Search/filtering for very large menus.
 - KDE Store backend installation/onboarding.
 - Broader cross-distribution packaging and compatibility.

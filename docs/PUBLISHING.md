@@ -6,16 +6,18 @@ stable and preserve existing menu/panel settings.
 
 ## Review gates
 
-1. Review PR #8 and its dependent final-polish PR. PR #7's consolidation report
-   is useful history; do not overwrite the newer gallery with its earlier images.
+1. Confirm `main` includes merged PRs #8 and #9, with the current 1.0.1
+   gallery. PR #7 was reviewed and closed as superseded; do not replace the
+   newer captures with its historical gallery.
 2. Run [automated and physical checks](TESTING.md), including the
    [1.0.1 release checklist](RELEASE-1.0.1.md). Verify real Manjaro Wayland
    Desktop toggling, cross-window pointer dismissal and launcher/shortcut behavior.
 3. Test clean installation, upgrade, failure rollback and uninstall from the
    extracted EZ package. Preserve custom menus, widget instances and recovery
    history. Review exact archive checksums and contents before distribution.
-4. Obtain explicit approval before merging, tagging or publishing. No release
-   or KDE Store listing is created by the build scripts.
+4. The feature merges are complete. Obtain explicit approval before **tagging,
+   publishing a GitHub Release, or submitting to KDE Store**. The build
+   scripts do not publish anything.
 
 ## Build review artifacts
 

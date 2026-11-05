@@ -1,5 +1,10 @@
 # Review: default actions, lifecycle and release readiness
 
+*Historical 0.4.17 development review.* The early PR and branch states below
+are preserved for context, not as the current repository status. For the
+integrated **1.0.1** source and release checklist see
+[RELEASE-1.0.1.md](RELEASE-1.0.1.md).
+
 ## Base and scope
 
 The fetched `main` at `ed5c9aa` is the initial 0.4.17 beta. On this review,
