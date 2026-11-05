@@ -74,9 +74,12 @@ long-held submenu drags, spring-loaded multi-level movement, passing over target
 full-parent traversal, invalid/canceled drops and edge scrolling. Backup deletion
 tests cover confirmation, corrupt/oversized files, changed identities/content,
 owner/path/link refusals, protected copies, literal filenames and UI refresh.
-Shortcut tests verify command resolution/quoting, missing KDE tools, failed launches
-and that setup only requests the native settings UI. They cannot verify KDE's actual
-global-key delivery or conflict prompt in a desktop environment without Plasma.
+Shortcut tests verify native widget activation/close routing, one-time Meta+X
+assignment, preservation of customized or disabled bindings, immediate
+instance-removal cleanup and Undo restoration. Standalone launch diagnostics
+still test command resolution/quoting, missing KDE tools and failed launches.
+These tests **cannot** prove KWin's actual global-key delivery or lifecycle
+signals on a physical Plasma desktop.
 
 ## Live acceptance matrix (still required)
 
@@ -97,10 +100,11 @@ Qt, Wayland, launcher versions, panel position and display scale for every run.
 | Editor | Search/pick/save/launch an app; spaces, localization, terminal/DBus apps; custom quoting and nested entries |
 | Configure presentation | Three tabs; concise instructions; Undo/Redo right-aligned and wrapping at narrow widths; unsaved changes survive attempted restore |
 | In-menu editing | Locked default; full hidden-entry hierarchy; reorder/reparent; Save/Cancel; interrupted drags; popup close/reopen; no command launches |
-| Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; hover Back through multiple levels; return viewport/selection; long press; edge scrolling |
+| Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; drag and hold anywhere on the 48px-wide-strip **Go Back** target through multiple levels; return viewport/selection; long press; edge scrolling |
 | In-menu recovery | External edit conflict; backend unavailable/restarted; retained draft and clear recovery instructions |
 | Keyboard/theme | Up/Down, Enter, Right/Left, Escape; Alt+Arrow and right-click/Shift+F10 movement menus; wheel/touchpad during drag; visible focus; native light/dark and Aero |
-| Meta+X setup | Installed command --check/plain/--diagnose-launch; Test menu launch; KDE Application assignment, conflict, Apply/change/remove; real standalone visibility/focus on Wayland and X11 |
+| Native Meta+X | Fresh OPM widget on a free binding; press twice to open/close at **current** button; occupied binding; customize/disable; restart/reinstall preserves preferences; remove and promptly re-add; Undo restores prior key; no orphaned per-instance shortcut |
+| Standalone diagnostics | Separate --check/plain/--diagnose-launch; verify Qt visibility/focus and independent Application shortcut with another unused key when needed |
 | AppGrid flash | Compare 50 direct and OPM openings, rapid/mixed clicks, unfinished draft, original visible/hidden; capture sequenced traces per [diagnostic guide](SHORTCUT-APPGRID-DIAGNOSTICS.md) |
 | Backup cleanup | Confirm/Cancel; corrupt/protected/changed/missing history; active row protected; count refresh on tab return with unsaved edits; browser Refresh retained |
 | Backups | Repeated Save, limit 10 then 2, limit 0, Cancel, restore; manual files unchanged |
