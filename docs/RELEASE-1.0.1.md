@@ -1,8 +1,9 @@
 # Version 1.0.1 release review
 
-This is an unpublished release candidate. The version bump and integration
-into `main` are complete; tagging and public release publication remain
-pending physical Manjaro Wayland acceptance and explicit approval.
+This document preserves the 1.0.1 pre-publication technical review.
+The source was integrated into `main`, and the owner approved public
+release after workstation testing. For the current publication status,
+tag and downloads, see [GitHub Releases](https://github.com/BB7Networks/Open-Power-Menu/releases).
 
 ## Integration
 
@@ -125,7 +126,7 @@ Rebuild the complete packages with `bash scripts/build-release.sh`; verify
 the gallery, backend, widget and current release notes. Build the separate
 widget with `bash scripts/build-widget-only.sh`.
 
-## Physical Manjaro Wayland acceptance before publication
+## Physical Manjaro Wayland acceptance checklist
 
 - Install the complete extracted EZ package as a normal user, then run
   `open-power-menu --check`.
@@ -145,8 +146,10 @@ widget with `bash scripts/build-widget-only.sh`.
 
 ## Publication gates
 
-Finish the physical acceptance checklist, confirm both CI jobs pass on the
-approved `main` release commit, and rebuild/verify the EZ archives from
-that exact commit. Obtain explicit approval before tagging or publishing
-1.0.1. Source integration is complete; no GitHub release or tag has been
-created. See [publishing](PUBLISHING.md).
+The owner approved this first public release after workstation review.
+The [versioned release workflow](../.github/workflows/publish-release.yml)
+builds EZ packages from the approved commit, verifies checksums and creates
+the corresponding tag and release. The checklist above remains the regression
+baseline for future Plasma, Wayland and launcher updates. For currently
+published artifacts see [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases);
+for the release process see [publishing](PUBLISHING.md).

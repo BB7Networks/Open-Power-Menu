@@ -1,6 +1,6 @@
 # Open Power Menu changelog
 
-## 1.0.1 - public release candidate
+## 1.0.1 - first public release
 
 - Add Desktop to new/default top-level menus using KDE’s registered Show Desktop
   toggle, closing the popup before dispatch. Existing menus are preserved.
@@ -13,9 +13,10 @@
 - Read Plasma's settled popup direction so arrows stay correct after moving
   the panel, including Plasma 6.3's early direction notification.
 
-Publication remains subject to final desktop review and approval.
+This is the first public release. Earlier entries below document pre-release
+development work already included in version 1.0.1.
 
-## Unreleased - menu flyout UX refinements
+## Pre-release development - menu flyout UX refinements
 
 - Place submenu indicators on the side where each flyout opens, following
   Plasma's effective direction with stable arrow gutters and aligned labels.
@@ -26,7 +27,7 @@ Publication remains subject to final desktop review and approval.
   menus without changing launcher or toolbar icons or saved menu definitions.
 - Add four supplied desktop screenshots and concise product captions.
 
-## Unreleased - native widget shortcut and single-pane editor
+## Pre-release development - native widget shortcut and single-pane editor
 
 - Attempt **Meta+X once per new Plasma widget instance**, invoking the existing
   panel-attached Power User Menu and guarded launcher handoff. Respect
@@ -46,7 +47,7 @@ Publication remains subject to final desktop review and approval.
 - At this development stage, version identifiers remained **0.4.17** pending
   approval. The authorized **1.0.1** candidate above supersedes that hold.
 
-## Unreleased - configuration UX and in-menu layout editing
+## Pre-release development - configuration UX and in-menu layout editing
 
 - Preserve viewport anchors, selection and focus when rearranging long menus;
   restore each visited submenu's view and retain it with unfinished drafts.
@@ -82,7 +83,7 @@ Publication remains subject to final desktop review and approval.
 - Extend Node, offscreen Qt Quick and real D-Bus checks. Live Wayland acceptance
   and real Plasma screenshots remain required; version identifiers stay unchanged.
 
-## Unreleased - default actions and development review
+## Pre-release development - default actions and development review
 
 - Prefer KSystemLog for System Logs; retain warning-priority journal output with
   a live 1,000-line terminal fallback and per-candidate dependency checks.
@@ -97,7 +98,7 @@ Publication remains subject to final desktop review and approval.
 - Refresh the README, add a real screenshot capture plan, and document process
   accounting findings, recovery, live acceptance and the separate Store roadmap.
 
-## Unreleased - configurable configuration backup retention
+## Pre-release development - configurable configuration backup retention
 
 - Keep the latest 10 timestamped configuration backups by default.
 - Add Configure -> General -> Configuration backups with a 0-1000 limit.
@@ -226,7 +227,7 @@ Publication remains subject to final desktop review and approval.
 
 # Changelog
 
-## Unreleased - editor usability and recovery
+## Pre-release development - editor usability and recovery
 
 - Add validated drag-and-drop between submenus, independent Duplicate, Qt
   Undo/Redo, keyboard movement, context actions and selection-aware controls.

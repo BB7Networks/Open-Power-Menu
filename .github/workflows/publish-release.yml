@@ -1,0 +1,81 @@
+# SPDX-License-Identifier: MIT
+# A reviewed commit on main titled 'release: publish v<version>' publishes
+# complete EZ assets only after version and package integrity checks.
+name: Publish versioned release
+on:
+  push:
+    branches:
+      - main
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'release: publish v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify approved version and commit
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(python3 - <<'PY_VERSION'
+          import json
+          from openpowermenu import __version__
+          with open('plasmoid/metadata.json', encoding='utf-8') as file:
+              metadata_version = json.load(file)['KPlugin']['Version']
+          if metadata_version != __version__:
+              raise SystemExit('Python and Plasma metadata versions disagree')
+          print(metadata_version)
+          PY_VERSION
+          )
+          if [[ "$COMMIT_MESSAGE" != "release: publish v$version" ]]; then
+              echo "::error::Release commit message must match the package version"
+              exit 1
+          fi
+          test -s "RELEASE-NOTES-v$version.md"
+          printf 'VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+      - name: Build and verify complete EZ archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/build-release.sh
+          (cd dist && sha256sum -c SHA256SUMS)
+          unzip -t "dist/OpenPowerMenu-EZ-v${VERSION}.zip" >/dev/null
+          tar -tzf "dist/OpenPowerMenu-EZ-v${VERSION}.tar.gz" >/dev/null
+          test -s "dist/OpenPowerMenu-EZ-v${VERSION}.zip"
+          test -s "dist/OpenPowerMenu-EZ-v${VERSION}.tar.gz"
+      - name: Refuse to replace an existing tag or release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VERSION}" >/dev/null 2>&1; then
+              echo "::error::Tag v${VERSION} already exists; release aborted"
+              exit 1
+          fi
+          if gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "::error::Release v${VERSION} already exists; release aborted"
+              exit 1
+          fi
+      - name: Publish complete GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "v${VERSION}" \
+            "dist/OpenPowerMenu-EZ-v${VERSION}.zip" \
+            "dist/OpenPowerMenu-EZ-v${VERSION}.tar.gz" \
+            "dist/SHA256SUMS" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Open Power Menu ${VERSION}" \
+            --notes-file "RELEASE-NOTES-v${VERSION}.md" \
+            --latest
+          gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY"

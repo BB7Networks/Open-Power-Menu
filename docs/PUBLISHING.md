@@ -1,8 +1,8 @@
 # Reviewing and preparing releases
 
-Version **1.0.1** is authorized as the public release candidate. A versioned
-build is not a published release. Keep the widget ID `org.openpowermenu.start`
-stable and preserve existing menu/panel settings.
+Version **1.0.1** is the first public release. Keep the widget ID
+`org.openpowermenu.start` stable and preserve existing menu/panel settings.
+GitHub Releases is the source of truth for published versions and assets.
 
 ## Review gates
 
@@ -15,9 +15,10 @@ stable and preserve existing menu/panel settings.
 3. Test clean installation, upgrade, failure rollback and uninstall from the
    extracted EZ package. Preserve custom menus, widget instances and recovery
    history. Review exact archive checksums and contents before distribution.
-4. The feature merges are complete. Obtain explicit approval before **tagging,
-   publishing a GitHub Release, or submitting to KDE Store**. The build
-   scripts do not publish anything.
+4. Publishing must be explicitly approved. The approved release commit uses
+   `release: publish v<version>` to trigger the guarded GitHub Actions release
+   workflow, which builds archives, verifies checksums, creates the tag and
+   uploads the complete EZ assets. KDE Store remains a separate process.
 
 ## Build review artifacts
 
@@ -34,9 +35,9 @@ selection. Python/CLI/D-Bus report the matching package version, covered by test
 The complete ZIP/TAR contain backend, widget, assets, screenshots, documentation
 and both installer wrappers. Widget-only packaging remains separate.
 
-After review and explicit publication approval, attach the complete EZ ZIP,
-TAR.GZ and SHA256SUMS to the approved GitHub release. Do not replace published
-versioned artifacts with different contents. Update the README's candidate notice
-only when the actual public release exists.
+The release workflow creates the tag from the exact approved source commit
+and attaches the complete EZ ZIP, TAR.GZ and SHA256SUMS. Do not replace
+published versioned assets with different contents. The widget-only archive
+is separate and must not be advertised as a complete installer.
 
 See [KDE Store](KDE-STORE.md) before considering that separate distribution path.

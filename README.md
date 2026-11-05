@@ -16,10 +16,10 @@ application launcher you already like.
 Keep your favorites, launcher and panel. OPM adds quick access to system tools
 without insisting on an entire desktop makeover.
 
-**Version 1.0.1 is now integrated into `main`.** The first public release is
-being prepared; no release package has been published yet. Complete the
-[desktop acceptance checklist](docs/RELEASE-1.0.1.md#physical-manjaro-wayland-acceptance-before-publication)
-before relying on it as a stable release.
+**Version 1.0.1** is the first public release of Open Power Menu.
+Download the complete installer from [GitHub Releases](https://github.com/BB7Networks/Open-Power-Menu/releases),
+or install directly from the source repository. See the
+[release review and compatibility notes](docs/RELEASE-1.0.1.md).
 
 ## See it in action
 
@@ -53,10 +53,9 @@ before relying on it as a stable release.
 You need **KDE Plasma 6**, Python 3, PySide6 (QtCore, QtDBus and QtWidgets) and
 `kpackagetool6`. Run the installer as your normal desktop user, **without sudo**.
 
-1. For now, choose **Code → Download ZIP** on this repository and extract the
-   complete source archive. When the first public release is published, use the
-   complete **OpenPowerMenu-EZ ZIP** from [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases).
-2. Open a terminal inside the extracted directory.
+1. Download **OpenPowerMenu-EZ-v1.0.1.zip** from [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases).
+2. Extract the entire ZIP and open a terminal inside the extracted
+   `OpenPowerMenu-v1.0.1` directory.
 3. Run:
 
    ```bash
@@ -71,8 +70,9 @@ You need **KDE Plasma 6**, Python 3, PySide6 (QtCore, QtDBus and QtWidgets) and
 If PySide6 is missing on Manjaro, setup asks before using the system package
 manager. It never silently installs packages or restarts Plasma.
 
-**Installing from source:** choose GitHub's **Code → Download ZIP**, extract it
-and run the same command. If you already use Git:
+**Installing from source instead:** choose **Code → Download ZIP** on this
+repository, extract the entire archive, and run `bash install.sh` in it.
+If you already use Git:
 
 ```bash
 git clone https://github.com/BB7Networks/Open-Power-Menu.git
