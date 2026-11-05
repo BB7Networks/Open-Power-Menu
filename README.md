@@ -107,8 +107,12 @@ on its first run, opening the panel-attached menu. KDE handles conflicts instead
 of taking an occupied key from another application. Remove any older OPM
 application shortcut using Meta+X if necessary. You can change or disable the
 binding in the widget's native **Keyboard Shortcuts** settings; subsequent
-restarts will respect that preference. The standalone menu remains available
-for diagnostics. See [native shortcut and single-pane editor notes](docs/NATIVE-SHORTCUT-CASCADE.md).
+restarts will respect that preference. Removing a widget now releases its
+instance-specific shortcut immediately, and choosing KDE's **Undo** restores
+the prior key when available. Existing shortcut entries left by older removed
+instances may need to be cleared once through KDE Shortcuts.
+The standalone menu remains available for diagnostics. See
+[native shortcut and single-pane editor notes](docs/NATIVE-SHORTCUT-CASCADE.md).
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
