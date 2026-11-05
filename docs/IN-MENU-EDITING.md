@@ -37,7 +37,7 @@ Drag from any part of a row. Qt's normal movement threshold distinguishes draggi
 from clicking; moving a submenu carries every child. The top/bottom edges of a row
 insert before/after it. Its center is a submenu destination: a short drop appends
 inside, while a **450 ms hover** opens its contents without releasing the pointer.
-Hover over **Back or the parent header** to go up, repeating through several levels.
+Hold a dragged item over the **full-width Go Back strip** at the top of a nested menu to open its parent; repeat through several levels. The same strip works as a normal click target, and shows **Top level** when there is no parent.
 Briefly passing over a submenu does not open it. Invalid drops show a red ghost
 and are canceled; Escape or popup interruption restores the source view.
 
