@@ -65,9 +65,9 @@ def test_default_shortcut_only_once_and_preserves_user_preference():
     js = r"""
 const assert=require('node:assert/strict'),vm=require('node:vm');
 const code=process.env.QML_FUNCTION;
-function run(initialShortcut,attempted){
+function run(initialShortcut,attempted,removalPending=false){
  const Plasmoid={globalShortcut:initialShortcut,configuration:{opmDefaultShortcutTried:attempted}};
- const context={Plasmoid};vm.createContext(context);vm.runInContext(code,context);
+ const context={Plasmoid,widgetRemovalPending:removalPending};vm.createContext(context);vm.runInContext(code,context);
  context.initializeDefaultShortcut();
  return {Plasmoid,context};
 }
@@ -81,6 +81,9 @@ let b=run('Ctrl+Alt+X',false);
 assert.equal(b.Plasmoid.globalShortcut,'Ctrl+Alt+X');
 let c=run('',true);
 assert.equal(c.Plasmoid.globalShortcut,'');
+let d=run('',false,true);
+assert.equal(d.Plasmoid.globalShortcut,''); // Removal beat deferred first-run callback
+assert.equal(d.Plasmoid.configuration.opmDefaultShortcutTried,false);
 """
     result = subprocess.run(['node','-e',js],
         env={**os.environ,'QML_FUNCTION':function(qml,'initializeDefaultShortcut')},
