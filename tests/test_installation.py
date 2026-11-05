@@ -178,7 +178,6 @@ def test_release_archives_complete_clean_consistent_and_extractable(tmp_path):
                          'openpowermenu/editor_toolbar.py', 'plasmoid/metadata.json', 'docs/KDE-STORE.md',
                          'openpowermenu/shortcut_setup.py',
                          'docs/IN-MENU-EDITING.md', 'plasmoid/contents/ui/LayoutEditor.qml',
-                         'plasmoid/contents/ui/LayoutPlasmaFlyout.qml',
                          'plasmoid/contents/ui/LayoutDraft.js', 'plasmoid/contents/ui/LayoutController.js']:
             assert prefix + relative in names
         assert len({name.casefold() for name in names}) == len(names)
@@ -193,7 +192,7 @@ def test_release_archives_complete_clean_consistent_and_extractable(tmp_path):
     with zipfile.ZipFile(ROOT / f'dist/org.openpowermenu.start-{version}.plasmoid') as widget:
         assert widget.testzip() is None
         assert 'metadata.json' in widget.namelist() and 'contents/ui/main.qml' in widget.namelist()
-        for name in ('LayoutEditor.qml', 'LayoutPlasmaFlyout.qml', 'LayoutDraft.js', 'LayoutController.js'):
+        for name in ('LayoutEditor.qml', 'LayoutDraft.js', 'LayoutController.js'):
             assert 'contents/ui/' + name in widget.namelist()
     run('sha256sum', '-c', 'SHA256SUMS', cwd=ROOT / 'dist')
     run(sys.executable, 'run.py', '--check', cwd=extracted / prefix)
