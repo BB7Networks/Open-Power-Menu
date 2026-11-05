@@ -177,6 +177,9 @@ QQC2.Control {
         const found = Draft.find(draft.entries, id);
         if (!found || found.entry.kind !== "submenu") return;
         if (found.parentId === draft.parentId) {
+            // Position before the native window becomes visible; otherwise
+            // Wayland can briefly show it at the popup's default y=0.
+            positionFlyout(id);
             flyoutId = id;
             Qt.callLater(() => positionFlyout(id));
         } else if (flyoutVisible && found.parentId === flyoutId) {
@@ -213,10 +216,16 @@ QQC2.Control {
         const openRight = rightFree >= flyoutPane.width + 6 || rightFree >= leftFree;
         flyoutX = openRight ? local.x + row.width + 3 : local.x - flyoutPane.width - 3;
         const childCount = (Draft.children(draft.entries, id) || []).length;
-        const desiredHeight = Math.max(72, Math.min(410, (childCount * 36) + 72));
-        const globalY = Math.max(screenTop + 4, Math.min(global.y,
-            screenTop + screenHeight - desiredHeight - 4));
-        flyoutY = local.y + globalY - global.y;
+        const popupH = Math.max(72, Math.min(410, (childCount * 36) + 72));
+        const border = 4;
+        // Match the normal-use SideFlyout.positionAtRow() rule: the flyout's
+        // BOTTOM edge meets the hovered parent's BOTTOM edge. Only adjust
+        // vertically when the actual display boundary makes that impossible.
+        const screenBottom = screenTop + screenHeight - border;
+        const topLimit = Math.max(screenTop + border, screenBottom - popupH);
+        const requestedTop = global.y + row.height - popupH;
+        const targetTop = Math.max(screenTop + border, Math.min(requestedTop, topLimit));
+        flyoutY = local.y + targetTop - global.y;
     }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
