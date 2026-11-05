@@ -876,8 +876,8 @@ PlasmoidItem {
             Screen.desktopAvailableHeight > 140
                 ? Screen.desktopAvailableHeight - 48 : 590)
 
-        // Edit submenus are independent row-anchored popup windows.
-        // Do not inflate the parent menu into a split-pane editor.
+        // The unlocked layout editor stays in this single Plasma popup.
+        // Spring-loaded submenu navigation does not create native child windows.
         Layout.preferredWidth: 328
         Layout.preferredHeight: Math.max(76, Math.min(heightCap, naturalHeight))
         Layout.minimumWidth: 285
@@ -947,8 +947,6 @@ PlasmoidItem {
             }
             LayoutEditor {
                 id: layoutEditor
-                cascadingEnabled: Plasmoid.configuration.useCascadingEdit !== false
-                preferPlasmaFlyout: true
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: 6
