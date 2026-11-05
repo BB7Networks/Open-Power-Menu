@@ -182,9 +182,12 @@ QQC2.Control {
         } else if (flyoutVisible && found.parentId === flyoutId) {
             // Advance the level without tearing down/reopening the native popup.
             rememberView();
-            flyoutId = id;
+            // Update the parent level before switching the child's ID so the
+            // flyoutVisible binding never compares the new child with the old
+            // draft parent during onDraftChanged.
             edited(Draft.select(draft, found.parentId,
                 Draft.selection(draft, found.parentId, id)));
+            flyoutId = id;
             if (visible) forceActiveFocus();
             Qt.callLater(() => positionFlyout(id));
         } else {
