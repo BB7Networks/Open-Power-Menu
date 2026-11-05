@@ -35,6 +35,9 @@ def main(mode):
         temp = Path(temporary)
         os.environ.update(XDG_CONFIG_HOME=str(temp / 'config'), XDG_DATA_HOME=str(temp / 'data'),
                           XDG_DATA_DIRS=str(temp / 'system-data'), OPM_RUNTIME_MARKER='desktop-inherited')
+        if mode == 'configuration':
+            configuration_flow(temp)
+            return
         info = temp / 'child.json'
         heartbeat = temp / 'heartbeat'
         stop = temp / 'stop'
@@ -191,6 +194,76 @@ raise SystemExit(run_service())'''
                     pass  # already reaped by the live backend
 
 
+def configuration_flow(temp):
+    """Live D-Bus calls use the safe loader and recover after rejected inputs."""
+    from openpowermenu.recovery import MAX_CONFIG_BYTES
+    target = temp / 'config/open-power-menu/menu.json'
+    marker = temp / 'unexpected-launch'
+    config = {'menu': [{'label': 'Must not execute', 'command': [sys.executable, '-c',
+              'import pathlib,sys; pathlib.Path(sys.argv[1]).touch()', str(marker)]}],
+              'hide_original_launcher': True}
+    payload = json.dumps(config).encode('utf-8')
+    backend = subprocess.Popen([sys.executable, str(ROOT / 'run.py'), '--service'], cwd=ROOT,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        bus = QDBusConnection.sessionBus()
+        until(lambda: bus.interface().isServiceRegistered('org.openpowermenu.Service').value())
+        interface = QDBusInterface('org.openpowermenu.Service', '/OpenPowerMenu', 'org.openpowermenu.Service', bus)
+        def call(method, *args):
+            reply = interface.call(method, *args)
+            assert reply.type() != QDBusMessage.ErrorMessage, reply.errorMessage()
+            return reply.arguments()[0]
+        def assert_missing_defaults():
+            entries = json.loads(call('GetMenu'))
+            assert not any('Invalid menu.json' in entry.get('title', '') for entry in entries)
+            assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
+            assert not target.exists()
+        def assert_rejected():
+            entries = json.loads(call('GetMenu'))
+            assert len(entries) == 1 and entries[0]['enabled'] is False
+            assert 'Invalid menu.json' in entries[0]['title']
+            assert call('Run', '0') is False
+            assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
+            assert not marker.exists()
+            assert backend.poll() is None
+
+        assert_missing_defaults()
+        assert not target.parent.exists()
+        target.parent.mkdir(parents=True)
+        target.write_bytes(payload)
+        assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
+        assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
+        for invalid in (payload + b' ' * MAX_CONFIG_BYTES, b'{broken'):
+            target.write_bytes(invalid)
+            assert_rejected()
+            assert target.read_bytes() == invalid
+        target.unlink()
+        outside = temp / 'outside.json'
+        outside.write_bytes(payload)
+        for destination in (outside, temp / 'missing.json'):
+            target.symlink_to(destination)
+            assert_rejected()
+            assert target.is_symlink() and outside.read_bytes() == payload
+            target.unlink()
+        assert_missing_defaults()
+        target.write_bytes(payload)
+        moved = temp / 'external-config'
+        target.parent.rename(moved)
+        target.parent.symlink_to(moved, target_is_directory=True)
+        try:
+            assert_rejected()
+            assert (moved / target.name).read_bytes() == payload
+        finally:
+            target.parent.unlink()
+            moved.rename(target.parent)
+        assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
+        assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
+        assert not marker.exists() and target.read_bytes() == payload
+    finally:
+        backend.terminate()
+        backend.communicate(timeout=5)
+
+
 def editor_flow(app, temp, config):
     from openpowermenu.editor import launch_editor
     from openpowermenu.desktop_apps import installed_applications
@@ -236,7 +309,7 @@ def editor_flow(app, temp, config):
             errors.append(repr(exc))
             for widget in app.topLevelWidgets():
                 if isinstance(widget, QDialog):
-                    widget.reject()
+                    QDialog.reject(widget)
             app.quit()
     QTimer.singleShot(0, exercise)
     assert launch_editor() == 0
@@ -258,8 +331,14 @@ def editor_flow(app, temp, config):
     # Cancel must not save even an in-memory preference change.
     original = (temp / 'config/open-power-menu/menu.json').read_bytes()
     def cancel():
+        from PySide6.QtWidgets import QMessageBox
         dialog = app.activeModalWidget()
         dialog.backup_retention.setValue(0)
+        def discard():
+            # Keep the PySide wrapper alive while using its button.
+            message = app.activeModalWidget()
+            message.button(QMessageBox.Discard).click()
+        QTimer.singleShot(50, discard)
         dialog.reject()
     QTimer.singleShot(0, cancel)
     assert launch_editor() == 0

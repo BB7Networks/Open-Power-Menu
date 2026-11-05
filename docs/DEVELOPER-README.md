@@ -2,7 +2,8 @@
 
 For the current branch's action/lifecycle changes, automated checks and remaining
 desktop acceptance, read [REVIEW.md](REVIEW.md), [TESTING.md](TESTING.md) and
-[PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md). The release-history notes below do
+[PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md). For the subsequent editor changes,
+read [EDITOR-RECOVERY.md](EDITOR-RECOVERY.md). The release-history notes below do
 not replace those results. Optional PySide6 offscreen tests now run in CI; actual
 Plasma/Wayland acceptance remains separate.
 
@@ -58,6 +59,8 @@ The **General** tab now contains:
 - **Start button icon:** adopt the selected launcher's icon (default) or use a
   custom theme icon/local image, with a preview.
 - **Appearance:** choose the standard native theme or Dark Aero for the menu.
+- **Configuration backups:** automatic retention plus preview/restore through
+  Manage backups. Explicit recovery copies are kept even with retention zero.
 
 The **Layout** tab contains the Power User menu entries. Add built-in actions,
 custom argv commands, nested submenus and separators; edit/remove/reorder them.
@@ -65,8 +68,11 @@ Select a submenu before adding an entry to place it inside. **Restore default
 layout** changes only the unsaved Layout tab; it will not reset General settings.
 
 **Save** and **Cancel** apply to the complete editor. No files are edited until
-Save; the existing JSON is backed up and replaced atomically. Your personal
-shortcuts and submenu structure remain intact on upgrade.
+Save or an explicitly confirmed backup restore. Closing dirty state offers
+Save / Discard / Cancel; external modifications require reload or explicit
+overwrite with a recovery copy. Layout now supports nested drag-and-drop,
+Duplicate and Qt Undo/Redo. Your personal shortcuts and submenu structure remain
+intact on upgrade. See the [editor guide](EDITOR-RECOVERY.md) for shortcuts.
 
 ### Launcher compatibility
 
@@ -130,8 +136,10 @@ bash Install.sh
 
 The installer changes only Open Power Menu files. It backs up the previously
 installed OPM widget in
-`~/.local/share/open-power-menu/widget-backups/` and preserves
+`~/.local/share/open-power-menu-recovery/widget-backups/` and preserves
 `~/.config/open-power-menu/menu.json` and Plasma's panel settings.
+Legacy snapshots are migrated; the default retention is five and uninstall
+preserves history. See [recovery](EDITOR-RECOVERY.md#widget-upgrade-history-and-uninstall).
 
 The editor can be tested immediately after the installer. **A Plasma restart is
 not required just to test this two-tab editor**, because it's a separate Qt
@@ -160,8 +168,9 @@ deletes the original launcher.
 ## Testing / limitations
 
 Portable Python and JavaScript tests cover the launcher mask, input geometry,
-menu switching, editor structure, config validation and rollback. The build container does not include PySide6 or a live Plasma/Wayland
-compositor. The actual v0.4.11 left/right behavior was confirmed by a user
+menu switching, editor structure, config validation and rollback. Offscreen
+PySide6 tests run in the Qt CI job; the build environment has no live
+Plasma/Wayland compositor. The actual v0.4.11 left/right behavior was confirmed by a user
 running AppGrid Center 1.9.6; **v0.4.16's focus handoff and visual diagnostics still require local
 acceptance**. UI layout, menu editor code, configuration, and masking geometry
 were preserved from the previous releases.

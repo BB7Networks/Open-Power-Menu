@@ -73,7 +73,7 @@ def test_upgrade_preserves_menu_panel_and_widget_backup(isolated_install, previo
     assert config.read_bytes() == before
     assert panel.read_text() == 'existing favorites and panel layout'
     assert not (widget / 'previous.txt').exists()
-    backups = list((temp / 'data/open-power-menu/widget-backups').iterdir())
+    backups = list((temp / 'data/open-power-menu-recovery/widget-backups').iterdir())
     assert len(backups) == 1
     assert (backups[0] / 'previous.txt').read_text() == 'old widget'
     assert json.loads((backups[0] / 'metadata.json').read_text())['KPlugin']['Version'] == previous_version
@@ -84,6 +84,7 @@ def test_upgrade_preserves_menu_panel_and_widget_backup(isolated_install, previo
     assert config.read_bytes() == before
     assert panel.read_text() == 'existing favorites and panel layout'
     assert not launcher.exists() and not widget.exists()
+    assert (backups[0] / 'previous.txt').read_text() == 'old widget'
 
 
 def test_fresh_install_generates_current_defaults_and_repeat_install_preserves_them(isolated_install):
@@ -136,3 +137,129 @@ def test_release_archives_complete_clean_consistent_and_extractable(tmp_path):
         assert 'metadata.json' in widget.namelist() and 'contents/ui/main.qml' in widget.namelist()
     run('sha256sum', '-c', 'SHA256SUMS', cwd=ROOT / 'dist')
     run(sys.executable, 'run.py', '--check', cwd=extracted / prefix)
+
+
+def seed_snapshots(root, count=7):
+    root.mkdir(parents=True, exist_ok=True)
+    result = []
+    for i in range(count):
+        path = root / f'org.openpowermenu.start-20250101-0000{i:02d}-000000000'
+        path.mkdir()
+        (path / 'old.txt').write_text(str(i))
+        result.append(path)
+    return result
+
+
+@pytest.mark.parametrize('keep', [5, 2])
+def test_successful_upgrade_prunes_only_generated_snapshots(isolated_install, keep):
+    from openpowermenu.widget_snapshots import recovery_path
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    root = recovery_path(temp / 'data')
+    old = seed_snapshots(root)
+    manual = root / 'my-important-widget'
+    manual.mkdir()
+    (manual / 'keep').write_text('manual')
+    external = temp / 'outside'
+    external.mkdir()
+    (external / 'keep').write_text('external')
+    linked = root / 'org.openpowermenu.start-20000101-000000-000000000'
+    linked.symlink_to(external, target_is_directory=True)
+    # A nested link in a pruned snapshot must also preserve its destination.
+    (old[0] / 'nested-link').symlink_to(external, target_is_directory=True)
+    if keep != 5:
+        env['OPM_WIDGET_BACKUP_RETENTION'] = str(keep)
+    run('bash', 'scripts/install-core.sh', env=env)
+    assert all(path.exists() for path in old[-(keep-1):])
+    assert not any(path.exists() for path in old[:-(keep-1)])
+    assert (external / 'keep').read_text() == 'external'
+    assert linked.is_symlink() and (manual / 'keep').read_text() == 'manual'
+    assert len([p for p in root.iterdir() if p.is_dir() and not p.is_symlink()]) == keep + 1
+
+
+def test_failed_upgrade_preserves_all_history_and_previous_widget_snapshot(isolated_install):
+    from openpowermenu.widget_snapshots import recovery_path
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    root = recovery_path(temp / 'data')
+    old = seed_snapshots(root)
+    widget = temp / 'data/plasma/plasmoids/org.openpowermenu.start'
+    (widget / 'last-working').write_text('recover me')
+    (temp / 'tools/kpackagetool6').write_text('#!/bin/sh\nexit 1\n')
+    env['OPM_WIDGET_BACKUP_RETENTION'] = '1'
+    failed = subprocess.run(['bash', 'scripts/install-core.sh'], cwd=ROOT, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert failed.returncode != 0
+    assert all(path.exists() for path in old)
+    newest = sorted(root.iterdir())[-1]
+    assert (newest / 'last-working').read_text() == 'recover me'
+
+
+@pytest.mark.parametrize('operation', ['install', 'uninstall'])
+def test_legacy_snapshot_migration_preserves_manual_files_and_collisions(isolated_install, operation):
+    from openpowermenu.widget_snapshots import recovery_path
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    legacy = temp / 'data/open-power-menu/widget-backups'
+    old = seed_snapshots(legacy, 1)[0]
+    root = recovery_path(temp / 'data')
+    existing = seed_snapshots(root, 1)[0]
+    (existing / 'old.txt').write_text('new location')
+    (legacy / 'manual.txt').write_text('keep manual')
+    (legacy / 'manual-link').symlink_to(temp / 'missing')
+    run('bash', f'scripts/{operation}-core.sh', env=env)
+    assert (existing / 'old.txt').read_text() == 'new location'
+    assert list(root.glob('legacy-*/old.txt'))[0].read_text() == '0'
+    assert (root / 'manual.txt').read_text() == 'keep manual'
+    assert (root / 'manual-link').is_symlink()
+    assert not old.exists()
+
+
+def test_copy_failure_cleans_partial_snapshot_and_preserves_widget(tmp_path, monkeypatch):
+    from openpowermenu import widget_snapshots as snapshots
+    widget = tmp_path / 'plasma/plasmoids/org.openpowermenu.start'
+    widget.mkdir(parents=True)
+    (widget / 'keep').write_text('working')
+    def fail(*args, **kwargs):
+        raise OSError('disk full')
+    monkeypatch.setattr(snapshots.shutil, 'copytree', fail)
+    with pytest.raises(OSError, match='disk full'):
+        snapshots.snapshot(tmp_path)
+    assert (widget / 'keep').read_text() == 'working'
+    assert list(snapshots.recovery_path(tmp_path).iterdir()) == []
+
+
+@pytest.mark.parametrize('unsafe', ['widget-link', 'history-link', 'legacy-link', 'invalid-retention'])
+def test_prepare_failure_aborts_before_replacing_installed_files(isolated_install, unsafe):
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    backend = temp / 'data/open-power-menu/run.py'
+    backend.write_text('previous backend marker')
+    external = temp / 'outside'
+    external.mkdir()
+    (external / 'keep').write_text('untouched')
+    if unsafe == 'invalid-retention':
+        env['OPM_WIDGET_BACKUP_RETENTION'] = '0'
+    else:
+        target = {'widget-link': temp / 'data/plasma/plasmoids/org.openpowermenu.start',
+                  'history-link': temp / 'data/open-power-menu-recovery',
+                  'legacy-link': temp / 'data/open-power-menu/widget-backups'}[unsafe]
+        if target.exists():
+            target.rename(target.with_name('previous'))
+        target.symlink_to(external, target_is_directory=True)
+    result = subprocess.run(['bash', 'scripts/install-core.sh'], cwd=ROOT, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert backend.read_text() == 'previous backend marker'
+    assert (external / 'keep').read_text() == 'untouched'
+
+
+def test_uninstall_aborts_when_legacy_history_cannot_be_migrated(isolated_install):
+    temp, env = isolated_install
+    run('bash', 'scripts/install-core.sh', env=env)
+    legacy = temp / 'data/open-power-menu/widget-backups'
+    legacy.symlink_to(temp / 'unreadable-or-missing', target_is_directory=True)
+    result = subprocess.run(['bash', 'scripts/uninstall-core.sh'], cwd=ROOT, env=env,
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode != 0
+    assert (temp / 'bin/open-power-menu').exists() and legacy.is_symlink()

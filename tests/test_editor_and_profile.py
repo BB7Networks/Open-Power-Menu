@@ -131,7 +131,7 @@ class EditorIntegrationTests(unittest.TestCase):
             self.assertIn(label, source)
         for item in ('Move up', 'Move down', 'Remove', 'Restore default layout'):
             self.assertIn(item, source)
-        self.assertIn('save_config(self.cfg)', source)
+        self.assertIn('expected_revision=self.revision', source)
         self.assertIn('shlex.split', source)
 
 

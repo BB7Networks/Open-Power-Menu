@@ -1,7 +1,7 @@
 """0.4.12: two-tab Configure contract and minimal, verified adapter cleanup.
 
-Editor checks are source/AST checks: the CI environment lacks PySide6, and a
-live Plasma/Wayland compositor is required for end-to-end GUI acceptance.
+Portable source/AST contracts complement tests/test_qt_editor.py. A live
+Plasma/Wayland compositor is required for end-to-end desktop acceptance.
 """
 from __future__ import annotations
 
@@ -38,6 +38,7 @@ class ConfigureTabsTests(unittest.TestCase):
     def test_launchers_and_icons_are_general_not_layout(self):
         src = editor_method("__init__")
         general, layout = src.split('# LAYOUT:', 1)
+        layout = layout.split('tabs.addTab(layout_tab', 1)[0]
         for feature in ('self.launcher_target', 'self.hide_launcher',
                         'self.icon_mode', 'self.button_icon', 'self.appearance'):
             self.assertIn(feature, general)
@@ -49,7 +50,7 @@ class ConfigureTabsTests(unittest.TestCase):
     def test_layout_tab_contains_only_menu_builder(self):
         src = editor_method("__init__")
         layout = src.split('# LAYOUT:', 1)[1]
-        for feature in ('QTreeWidget(layout_tab)', 'self.add_button',
+        for feature in ('MenuTree(self, layout_tab)', 'self.add_button',
                         'self.show_missing', 'self.restore_defaults',
                         '"Built-in command"', '"Custom command"',
                         '"Submenu"', '"Separator"'):
@@ -64,8 +65,9 @@ class ConfigureTabsTests(unittest.TestCase):
         for unsafe in ('self.appearance.setCurrentIndex', 'self.hide_launcher.setChecked',
                        'self.icon_mode.setCurrentIndex', 'save_config('):
             self.assertNotIn(unsafe, src)
-        # Save still commits all fields together; Cancel has no write path.
-        self.assertIn('save_config(self.cfg)', editor_method('accept'))
+        # Save still commits both tabs together, with a content conflict check.
+        self.assertIn('config = self.configuration()', editor_method('accept'))
+        self.assertIn('expected_revision=self.revision', editor_method('accept'))
 
     def test_unmodified_visual_surfaces_match_known_good(self):
         # A source-only adapter refactor must not change visual menu layout,

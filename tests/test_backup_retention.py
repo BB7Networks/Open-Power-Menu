@@ -114,7 +114,7 @@ class BackupRetentionTests(unittest.TestCase):
     def test_editor_exposes_limit_under_general(self):
         editor = (ROOT / 'openpowermenu/editor.py').read_text()
         for needle in ('QSpinBox', 'backupRetentionSpin', 'Configuration backups',
-                       'self.cfg["backup_retention"] = self.backup_retention.value()'):
+                       "config['backup_retention'] = self.backup_retention.value()"):
             self.assertIn(needle, editor)
 
 

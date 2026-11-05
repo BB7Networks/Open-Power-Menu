@@ -144,6 +144,24 @@
 
 # Changelog
 
+## Unreleased - editor usability and recovery
+
+- Add validated drag-and-drop between submenus, independent Duplicate, Qt
+  Undo/Redo, keyboard movement, context actions and selection-aware controls.
+- Track unsaved General/Layout changes and offer Save / Discard / Cancel on close.
+- Detect externally changed, replaced or deleted configuration files; provide
+  reload or explicit overwrite with an independent recovery copy.
+- Add General → Manage backups with local timestamps, validity, non-executing
+  previews and atomic restore, including recovery from corrupt active JSON.
+- Preserve pre-restore/pre-overwrite copies even with automatic retention off;
+  reject symlink paths and preserve the restore source and manual backups.
+- Keep five widget snapshots by default, independently configurable through
+  `OPM_WIDGET_BACKUP_RETENTION`. Migrate old history to a separate recovery
+  directory, prune only after successful installation, and preserve it on uninstall.
+- Extend offscreen Qt, configuration safety and installer failure regression
+  coverage. Launcher QML, command selection and detached process behavior stay
+  unchanged; live Manjaro Plasma 6 Wayland acceptance remains required.
+
 ## 0.4.10
 
 - For the compiled in-process AppGrid 1.9.6 variant, call its native

@@ -91,8 +91,8 @@ class MutualExclusionAndIconTests(unittest.TestCase):
         editor = (ROOT/'openpowermenu/editor.py').read_text()
         for phrase in ('Use original launcher icon', 'Custom icon',
                        'QFileDialog.getOpenFileName(', 'self.icon_mode',
-                       'self.button_icon', 'self.cfg["button_icon_mode"]',
-                       'self.cfg["button_icon"]'):
+                       'self.button_icon', "config['button_icon_mode']",
+                       "config['button_icon']"):
             self.assertIn(phrase, editor)
         self.assertNotIn('sh -c',editor)
 
