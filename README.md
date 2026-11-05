@@ -87,18 +87,19 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 ## Make it yours
 
 For a quick rearrangement, right-click the Start button and select the **lock**
-icon. Drag an entry to reorder it; hover or click a submenu to open a real
-floating flyout beside its row, rather than widening the editor into two panes.
-To move an entry into a floating submenu, select it, hover the destination,
-then click **Move selected item here**. Dragging remains available for
-reordering within the main list; native cross-window dragging is disabled
-to prevent Wayland pointer grabs. Keyboard/context movement remains available. Drag over **Back** to
-move up a level. The list keeps your place as you
-rearrange entries, including wheel scrolling during a drag. Right-click or press
-Shift+F10 for movement actions; Alt+Arrow shortcuts remain available. All entries
-appear, including unavailable applications and empty submenus. **Save layout**
-checks for conflicts and preserves your command definitions; **Cancel** leaves
-the saved menu untouched. Closing the popup keeps the draft for your next visit.
+icon. Drag any entry to reorder it, or hold it over a submenu to open that
+submenu **in the same menu window**. You can keep holding and navigate through
+multiple levels without releasing your mouse button. Inside a submenu, the
+full-width **Go Back** strip at the top is both clickable and a drag-hover target:
+hold a dragged item there to return to its parent menu, then drop it where
+you want. There are no separate editing windows or cross-window drag grabs.
+
+The list retains your position while rearranging, including wheel scrolling
+during a drag. Right-click or press Shift+F10 for movement actions; Alt+Arrow
+shortcuts remain available. All entries appear, including unavailable applications
+and empty submenus. **Save layout** checks for conflicts and preserves command
+definitions; **Cancel** leaves the saved menu untouched. Closing the popup keeps
+the draft for your next visit.
 See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
 
 **Meta+X** is assigned automatically as the Start Button widget's native shortcut
@@ -107,7 +108,7 @@ of taking an occupied key from another application. Remove any older OPM
 application shortcut using Meta+X if necessary. You can change or disable the
 binding in the widget's native **Keyboard Shortcuts** settings; subsequent
 restarts will respect that preference. The standalone menu remains available
-for diagnostics. See [the shortcut and flyout guide](docs/NATIVE-SHORTCUT-CASCADE.md).
+for diagnostics. See [native shortcut and single-pane editor notes](docs/NATIVE-SHORTCUT-CASCADE.md).
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
