@@ -861,6 +861,13 @@ QQC2.Control {
             control.nativeDragHandled = false;
             const hit = control.rowUnderPointer(mouse.x, mouse.y);
             if (!hit) { mouse.accepted = false; return; }
+            // End the floating submenu's pointer ownership before starting a
+            // reorder in the parent. Qt.Popup.Window can otherwise keep the
+            // grab and prevent the parent list from receiving its drop.
+            if (mouse.button === Qt.LeftButton && control.flyoutVisible) {
+                control.flyoutId = "";
+                control.flyoutPointerInside = false;
+            }
             pressedId = hit.entry.id;
             pressedParent = hit.parentId;
             control.choose(pressedId);
