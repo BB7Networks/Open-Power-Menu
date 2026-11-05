@@ -10,6 +10,16 @@ owns shortcut conflicts. If an older application binding already uses Meta+X,
 remove that binding and assign the combination in the widget's Keyboard
 Shortcuts settings.
 
+KDE registers widget shortcuts under per-instance actions such as
+`activate widget 42`. Removing a widget normally starts an Undo grace period,
+so a shortcut can remain assigned temporarily even though the button is gone.
+OPM now listens for Plasma's explicit `destroyedChanged(true)` signal and
+clears **only that widget's** global shortcut immediately. Undo restores the
+prior key if it has not been reassigned. Ordinary Plasma exits, UI reloads,
+and reinstalling OPM do not invoke this cleanup. Existing orphaned actions
+from builds before the fix may still need manual removal in System Settings
+→ Keyboard → Shortcuts; OPM never edits or steals another widget's binding.
+
 The Plasma `activated()` signal routes through OPM's existing panel-attached
 menu and launcher handoff. The standalone `open-power-menu` command remains
 available for diagnostics. OPM does not edit KWin shortcut files.
