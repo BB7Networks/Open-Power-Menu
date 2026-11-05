@@ -88,12 +88,13 @@ class BackupRetentionTests(unittest.TestCase):
             self.assertTrue(historical.exists())
             self.assertEqual(json.loads(target.read_text())['backup_retention'], 10)
 
-    def test_command_resolution_unchanged_from_field_baseline(self):
+    def test_menu_normalization_unchanged_from_field_baseline(self):
         baseline = Path('/mnt/data/OpenPowerMenu-RightClick-v0.4.16/openpowermenu/core.py')
         if not baseline.exists():
             self.skipTest('Previous release source unavailable')
-        selected = {'COMMANDS', 'resolve_action', 'which_executable',
-                    'desktop_is_available', 'normalized_menu', 'validate_menu_definition'}
+        # Action additions and per-candidate checks are intentional. Keep the
+        # field-tested menu normalization and desktop filtering boundary intact.
+        selected = {'desktop_is_available', 'normalized_menu'}
 
         def snapshot(path):
             tree = ast.parse(path.read_text())

@@ -5,7 +5,8 @@ from copy import deepcopy
 import shlex
 from pathlib import Path
 
-from .core import COMMANDS, desktop_is_available, expand_part, resolve_action, which_executable
+from .core import (COMMANDS, candidate_argv, candidate_is_available,
+                   desktop_is_available, expand_part, resolve_action, which_executable)
 
 
 def display_argv(argv: list[str] | tuple[str, ...]) -> str:
@@ -26,15 +27,8 @@ def built_in_candidates(action_id: str) -> tuple[str, list[str]]:
             valid_spec = False
     details = []
     for index, candidate in enumerate(spec.get("commands", []), start=1):
-        if isinstance(candidate, dict):
-            raw = candidate.get("argv", [])
-            valid_desktop = desktop_is_available(candidate.get("desktops"))
-        else:
-            raw, valid_desktop = candidate, True
-        if not isinstance(raw, list) or not raw:
-            continue
-        argv = [expand_part(part) for part in raw]
-        available = valid_spec and valid_desktop and which_executable(argv[0])
+        argv = candidate_argv(candidate)
+        available = valid_spec and candidate_is_available(candidate)
         status = "installed" if available else "not available"
         details.append(f"{index}. {display_argv(argv)}  [{status}]")
     return effective, details

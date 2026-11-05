@@ -1,5 +1,20 @@
 # Open Power Menu changelog
 
+## Unreleased - default actions and development review
+
+- Prefer KSystemLog for System Logs; retain warning-priority journal output with
+  a live 1,000-line terminal fallback and per-candidate dependency checks.
+- Add Printers to new defaults and the built-in selector, preferring an installed
+  KDE Print Manager module before system-config-printer. Preserve saved layouts.
+- Reap exited backend children and detach launched applications' standard streams;
+  retain argv execution, detached sessions and normal user permissions.
+- Prevent automatic backup collisions from overwriting files or following symlinks.
+- Validate loaded menu trees; preserve literal picker arguments, improve localized
+  desktop-entry parsing and reject unsupported fallback launch semantics.
+- Add real offscreen Qt/D-Bus, lifecycle, isolated installer and archive checks.
+- Refresh the README, add a real screenshot capture plan, and document process
+  accounting findings, recovery, live acceptance and the separate Store roadmap.
+
 ## Unreleased - configurable configuration backup retention
 
 - Keep the latest 10 timestamped configuration backups by default.

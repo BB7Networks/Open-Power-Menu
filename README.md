@@ -1,103 +1,155 @@
 # Open Power Menu
 
-**One Start button, two menus — for KDE Plasma 6.**
+**One Start button. Two useful menus.**
 
-Open Power Menu is an optional unified Start button that works with an existing
-Plasma application launcher. **Left-click** opens your original app launcher;
-**right-click** opens a configurable Power User menu. You can hide the original
-launcher *button* without deleting or modifying the launcher, its favorites,
-or your panel configuration.
+The Windows right-click Start / Win+X menu is a good idea. Microsoft has made
+some questionable decisions over the years, but this is one worth keeping.
+Open Power Menu brings that workflow to **KDE Plasma 6**, alongside the
+application launcher you already like.
 
-> **Version 0.4.17 · Beta.** Tested on Manjaro / KDE Plasma 6. The AppGrid
-> Center 1.9.6 integration was tested on a live Wayland desktop. Not every
-> third-party launcher has been tested; fullscreen launchers may need an adapter.
+| Click the OPM Start button | What opens |
+| --- | --- |
+| **Left-click** | Your existing application launcher: Kickoff, Kicker, or a supported alternative |
+| **Right-click** | Your configurable Power User menu: system tools, settings, apps and shortcuts |
 
-## Features
+OPM started during a personal KDE desktop customization project: keep a useful,
+familiar workflow without recreating Windows wholesale. It is not another
+Windows-themed application launcher. Keep your launcher, favorites and panel;
+add quick access to the tools you use.
 
-- Launcher-independent by default: supports the Plasma applet interface,
-  including KDE Application Launcher (Kickoff) and Application Menu (Kicker).
-- AppGrid Center 1.9.6 adapter for its fullscreen Wayland input overlay.
-- Built-in commands, custom commands, nested submenus, and separators.
-- **Configure → General** for integration, icon and appearance; **Layout** for
-  menu entries, including an installed-application picker and command previews.
-- Per-user install and uninstall. Keeps custom menu settings on upgrade.
+> **Beta · v0.4.17 release baseline.** Changes under development are listed in
+> [Unreleased](CHANGELOG.md). Manjaro / Plasma 6 and AppGrid Center 1.9.6 have
+> been tested on a live Wayland desktop. New changes still need the
+> [desktop acceptance checks](docs/TESTING.md).
 
-## Install (recommended)
+Real screenshots are being collected. See the [capture guide](docs/images/README.md)
+for the Start button, both menus and Configure views. No mock screenshots are
+presented as the application.
 
-1. Download the **EZ installer ZIP** from Releases tab once the
-   GitHub repository is published, or use a ZIP of this repository.
-2. Extract it, open a terminal in the extracted folder, and run:
+## What you get
+
+- A configurable menu of built-in system tools, installed applications, custom
+  commands, nested submenus and separators.
+- Optional, reversible hiding of the original launcher's **button**, preserving
+  the launcher itself, its configuration and its favorites.
+- Native KDE launcher support and a dedicated AppGrid Center 1.9.6 adapter.
+- **Configure → General** for launcher selection, button icon, appearance and
+  backup retention; **Layout** for menu editing and command previews.
+- Per-user installation, upgrades that preserve your menu, and a recovery command.
+
+**System Logs** prefers KSystemLog. Without it, Konsole or XTerm follows the
+current boot's warning-and-higher journal entries, starting with up to 1,000
+lines. Both the terminal and `journalctl` must be installed. Journal access
+uses your normal permissions; OPM does not force root execution.
+
+**Printers** prefers KDE Print Manager when its configuration module is installed,
+then `system-config-printer`. New defaults include it beside Disk Management;
+your existing saved layout stays unchanged. Add it through the built-in selector
+if you already have a custom menu. OPM never installs these optional tools silently.
+
+## Install on KDE Plasma 6
+
+1. Get the complete **EZ installer ZIP** from [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases)
+   when available, or download/clone this repository. Extract the whole archive.
+2. Open a terminal **inside the extracted folder**, then run:
 
    ```bash
    bash Install.sh
    ```
 
-   Do **not** use `sudo` for the installer. It checks for Python 3,
-   `kpackagetool6`, and PySide6. On Manjaro it can offer to install PySide6
-   using the system package manager after asking permission.
-3. Right-click the Plasma panel → **Add Widgets** → search for **Open Power
-   Menu Start Button**, and add it beside your existing launcher.
-4. Right-click the new Start button → gear icon → **General**. Select your
-   launcher, test both clicks, then optionally hide the original button.
+   Run as your normal desktop user, without `sudo`. Setup checks for Python 3,
+   `kpackagetool6` and PySide6 (QtCore, QtDBus, QtWidgets). On Manjaro it can offer
+   to install the system `pyside6` package after asking permission.
+3. Right-click the Plasma panel → **Add Widgets** → add **Open Power Menu Start
+   Button** on the same panel as your existing launcher.
+4. Right-click the new button → gear icon → **General**. Choose your launcher,
+   test both mouse buttons, then optionally hide the original button.
 
-For updates, run the new `Install.sh` again. Menu settings are preserved.
+For updates, run the new package's `Install.sh` again. Existing `menu.json`
+contents are preserved. Previous OPM widgets are backed up under
+`~/.local/share/open-power-menu/widget-backups/`. No automatic Plasma restart
+is performed. Test a widget refresh locally rather than interrupting remote access.
 
-**Configuration backups:** Configure -> General -> Configuration backups controls
-how many prior versions of `menu.json` are kept (10 by default). The oldest
-automatic backups are pruned only after a successful save. Setting it to 0
-disables new backups without deleting existing backup files. Manual backups
-are not deleted.
+The `Install.sh` / `Uninstall.sh` wrappers use distinct core filenames under
+`scripts/`. The source and complete archives are safe to clone or extract on
+Windows; **running OPM still requires Linux and Plasma 6**.
 
-The setup wrappers use `scripts/install-core.sh` and `scripts/uninstall-core.sh`,
-so source archives work correctly on Windows as well as Linux.
+**KDE Store limitation:** a `.plasmoid` archive installs only the widget, not
+its Python/PySide6 backend. It is not a complete one-click installation.
+Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 
-**The current installation requires both the QML widget and a Python/PySide6
-backend.** Installing only `plasmoid/` through KDE Store / Get New Widgets
-*does not* install that backend. KDE Store one-click support is a planned
-packaging improvement, not a feature of this release. See
-[Store publishing notes](docs/KDE-STORE.md).
+## Make it yours
 
-## Usage
+Open **Configure → Layout → Add → Installed application**, search by name or
+description, and choose an app. Its name, icon and launch command are filled in
+for review. Save the entry, then Save the complete editor. On KDE, the picker
+prefers `kioclient6` so the desktop file controls activation, terminal handling,
+working directory and field-code expansion.
 
-In **Configure → Layout → Add**, choose an installed app (search by name), a
-built-in action, a custom command, a submenu or a separator. Built-in actions
-show the command they use and fallback order. Custom commands run as your own
-user without a shell; pipes and redirection are not interpreted.
+Choose **Built-in command** to see what runs on this workstation and the ordered
+fallbacks. **Customize this command** creates an independent custom entry; the
+original built-in keeps its automatic fallback behavior.
 
-The widget does not require modifying or uninstalling your original launcher.
-It can launch programs with your user account's permissions, so review commands
-and source before installing a release from an untrusted source.
+For custom commands, give the executable name or path and its arguments:
+`dolphin ~/Documents`, or `tool "two words"`. Arguments containing spaces need
+quotes. OPM passes argument arrays directly; pipes, `>`, `&&` and command
+substitution are not interpreted. Commands needing terminal output should open
+a terminal explicitly; detached applications do not inherit OPM's standard streams.
 
-## Recovery / uninstall
+**Configure → General → Configuration backups** keeps 10 previous automatic
+versions by default, with a limit of 0–1,000. Setting 0 stops new backups and
+preserves existing history. Pruning happens only after a successful save;
+manually named backups remain untouched. Cancel saves nothing.
 
-Restore your original launcher button:
+## Recovery and removal
+
+Restore the original launcher button:
 
 ```bash
 ~/.local/bin/open-power-menu --show-launcher-button
 ```
 
-To uninstall, remove **Open Power Menu Start Button** from the panel, then run
-`bash Uninstall.sh` from your extracted package. Your personal menu JSON is
-retained at `~/.config/open-power-menu/menu.json`.
+The widget applies this reversible preference on its next refresh. OPM never
+removes the original launcher or edits its favorites or panel configuration.
 
-## Development
+Remove **only the OPM Start button** from the panel, then run `bash Uninstall.sh`
+from the complete extracted package. Your menu remains at
+`~/.config/open-power-menu/menu.json`. Copy any widget snapshots you want to
+keep before uninstalling; the application directory containing them is removed.
+For configuration/widget rollback steps, see [testing and recovery](docs/TESTING.md).
+
+## Compatibility and roadmap
+
+Requires KDE Plasma 6, Python 3, PySide6 and a user D-Bus session. Native
+Kickoff/Kicker and AppGrid Center use separate adapters. Other third-party
+fullscreen launchers may need an adapter. Portable/offscreen tests cannot prove
+Wayland pointer delivery, popup alignment or focus handoff on a physical panel.
+
+Next priorities:
+
+- Complete the two-workstation acceptance matrix and publish real screenshots.
+- Test more panel positions, launcher variants and clean-account upgrades.
+- Provide a clear, user-driven backend installation route for KDE Store users.
+- Evaluate separate desktop application scopes only with real Plasma/systemd
+  evidence; process ancestry alone does not mean an app dies with OPM.
+
+See the [review findings](docs/REVIEW.md) and [process lifecycle report](docs/PROCESS-LIFECYCLE.md).
+
+## Development and support
 
 ```bash
-python3 -m pytest -q
+python3 -m pip install pytest
+python3 -m pytest -q -ra
 bash scripts/build-release.sh
 ```
 
-Python/Node are used for portable regression tests. See
-[development notes](docs/DEVELOPER-README.md), [adapter design](docs/ADAPTERS.md),
-and [release process](docs/PUBLISHING.md).
+Python and Node run the portable regression suite. Optional offscreen Qt/D-Bus
+checks have a separate CI job; setup is described in [Testing](docs/TESTING.md).
+The release builder produces local artifacts and does not publish a release.
 
-## Compatibility and support
+[Report a bug](https://github.com/BB7Networks/Open-Power-Menu/issues) with your
+Plasma version, distribution, launcher and reproduction steps. See
+[Contributing](docs/CONTRIBUTING.md), [adapter design](docs/ADAPTERS.md) and
+[release process](docs/PUBLISHING.md).
 
-- **Requires:** KDE Plasma 6, Python 3, Qt for Python (PySide6) and user D-Bus.
-- **Tested:** Manjaro KDE, Plasma 6, AppGrid Center 1.9.6; native Kickoff integration.
-- **Limitations:** Third-party full-screen launchers may require a dedicated adapter.
-- **Bugs/ideas:** Please open a GitHub issue after publishing this repository.
-
-This is an independent community project, **not affiliated with KDE**.
-
-**License:** MIT. See [LICENSE](LICENSE).
+Independent community project, not affiliated with KDE. **MIT license:** [LICENSE](LICENSE).
