@@ -54,8 +54,7 @@ class ArchitectureTests(unittest.TestCase):
     def test_menu_backend_and_visibility_are_unchanged_since_0412(self):
         if not PREVIOUS.is_dir():
             self.skipTest('previous release unavailable')
-        for rel in ('openpowermenu/core.py',
-                    'plasmoid/contents/ui/LauncherVisibility.js',
+        for rel in (                    'plasmoid/contents/ui/LauncherVisibility.js',
                     'plasmoid/contents/ui/SideFlyout.qml',
                     'plasmoid/contents/ui/configGeneral.qml'):
             self.assertEqual((ROOT/rel).read_bytes(), (PREVIOUS/rel).read_bytes(), rel)

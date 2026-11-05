@@ -42,6 +42,12 @@ or your panel configuration.
 
 For updates, run the new `Install.sh` again. Menu settings are preserved.
 
+**Configuration backups:** Configure -> General -> Configuration backups controls
+how many prior versions of `menu.json` are kept (10 by default). The oldest
+automatic backups are pruned only after a successful save. Setting it to 0
+disables new backups without deleting existing backup files. Manual backups
+are not deleted.
+
 The setup wrappers use `scripts/install-core.sh` and `scripts/uninstall-core.sh`,
 so source archives work correctly on Windows as well as Linux.
 

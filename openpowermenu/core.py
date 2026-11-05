@@ -8,6 +8,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import dataclass
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
@@ -16,6 +17,8 @@ from urllib.parse import urlsplit, unquote
 from typing import Any
 
 CONFIG_FILENAME = "menu.json"
+MAX_BACKUP_RETENTION = 1000
+_logger = logging.getLogger(__name__)
 
 
 def config_home() -> Path:
@@ -127,6 +130,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "appearance": "native",
     "anchor": "cursor",
     "show_unavailable": False,
+    "backup_retention": 10,  # Number of previous automatic menu.json versions to retain.
     # Opt-in, presentation-only Plasma panel integration; never writes panel config.
     "hide_original_launcher": False,
     # 0 = auto-detect a unique launcher on this panel, >0 = exact Plasma applet ID.
@@ -183,6 +187,7 @@ def load_config(path: Path | None = None) -> dict[str, Any]:
     if type(result["launcher_applet_id"]) is not int or not 0 <= result["launcher_applet_id"] <= 2147483647:
         raise ValueError("launcher_applet_id must be an integer from 0 to 2147483647")
     validate_button_icon(result["button_icon_mode"], result["button_icon"])
+    validate_backup_retention(result["backup_retention"])
     return result
 
 
@@ -359,6 +364,32 @@ def validate_button_icon(mode: str, icon: str) -> None:
         raise ValueError("Custom image must be a local PNG/SVG/JPEG/WebP/ICO file")
 
 
+def validate_backup_retention(value: Any) -> None:
+    if type(value) is not int or not 0 <= value <= MAX_BACKUP_RETENTION:
+        raise ValueError(f"backup_retention must be an integer from 0 to {MAX_BACKUP_RETENTION}")
+
+
+def prune_automatic_backups(target: Path, keep: int) -> None:
+    """Remove excess timestamped automatic backups; never delete manual files.
+
+    Keep zero disables *future* backup creation but leaves existing history
+    alone. Backups are pruned only after an atomic configuration save succeeds.
+    """
+    if keep == 0:
+        return
+    # Our automatic names: menu.json.bak-YYYYMMDDTHHMMSSffffffZ.
+    # Filter symlinks and unrelated names so user-maintained backups survive.
+    pattern = re.compile(re.escape(target.name) + r"\.bak-\d{8}T\d{12}Z")
+    backups = sorted((p for p in target.parent.iterdir()
+                      if p.is_file() and not p.is_symlink() and pattern.fullmatch(p.name)),
+                     key=lambda p: p.name, reverse=True)
+    for old in backups[keep:]:
+        try:
+            old.unlink()
+        except OSError as exc:
+            _logger.warning("Could not remove old Open Power Menu backup %s: %s", old, exc)
+
+
 def validate_configuration(config: dict[str, Any]) -> None:
     if not isinstance(config, dict) or not isinstance(config.get("menu"), list):
         raise ValueError("Configuration must contain a menu array")
@@ -373,6 +404,7 @@ def validate_configuration(config: dict[str, Any]) -> None:
         raise ValueError("launcher_applet_id must be an integer from 0 to 2147483647")
     validate_button_icon(config.get("button_icon_mode", "launcher"),
                          config.get("button_icon", ""))
+    validate_backup_retention(config.get("backup_retention", DEFAULT_CONFIG["backup_retention"]))
     validate_menu_definition(config["menu"])
 
 
@@ -385,6 +417,7 @@ def save_config(config: dict[str, Any], path: Path | None = None) -> Path:
     import tempfile
 
     validate_configuration(config)
+    retention = config.get("backup_retention", DEFAULT_CONFIG["backup_retention"])
     target = path or config_path()
     target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if target.is_symlink():
@@ -399,13 +432,20 @@ def save_config(config: dict[str, Any], path: Path | None = None) -> Path:
             temp.flush()
             os.fsync(temp.fileno())
         os.chmod(name, 0o600)
-        if target.is_file():
+        if target.is_file() and retention > 0:
             # Unique names even if two saves happen during the same second.
             stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
             backup = target.with_name(target.name + ".bak-" + stamp)
             shutil.copy2(target, backup, follow_symlinks=False)
             os.chmod(backup, 0o600)
         os.replace(name, target)
+        # A failed save must never prune the last known-good backups.
+        # A cleanup failure should not falsely report that a successful save failed.
+        if retention > 0:
+            try:
+                prune_automatic_backups(target, retention)
+            except OSError as exc:
+                _logger.warning("Could not inspect automatic backups for %s: %s", target, exc)
     finally:
         if name is not None and name.exists():
             name.unlink()

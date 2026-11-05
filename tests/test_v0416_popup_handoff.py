@@ -126,8 +126,7 @@ assert.equal(root.pendingLauncherEpoch,-1);
                'plasmoid/contents/ui/adapters/LauncherAdapters.js',
                'plasmoid/contents/ui/adapters/PlasmaLauncher.js',
                'plasmoid/contents/ui/LauncherVisibility.js',
-               'openpowermenu/core.py',
-)
+               )
         for name in paths:
             self.assertEqual((ROOT/name).read_bytes(),(previous/name).read_bytes(),name)
 

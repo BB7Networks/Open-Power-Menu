@@ -141,7 +141,7 @@ function make(status, deferred=false) {
                      'plasmoid/contents/ui/adapters/PlasmaLauncher.js',
                      'plasmoid/contents/ui/LauncherVisibility.js',
                      'plasmoid/contents/ui/SideFlyout.qml',
-                     'openpowermenu/core.py'):
+                     ):
             self.assertEqual((root/path).read_bytes(),(old/path).read_bytes(),path)
 
 
