@@ -45,7 +45,9 @@ PlasmoidItem {
     // <id>" action cannot hold Meta+X after the button is gone. If removal is
     // undone, restore the same key unless another binding has appeared.
     property string shortcutBeforeRemoval: ""
+    property bool widgetRemovalPending: false
     function onWidgetRemovalChanged(removed) {
+        widgetRemovalPending = removed;
         if (removed) {
             shortcutBeforeRemoval = String(Plasmoid.globalShortcut || "").trim();
             if (shortcutBeforeRemoval) Plasmoid.globalShortcut = "";
@@ -60,7 +62,7 @@ PlasmoidItem {
     // Set the native shortcut once per widget instance. Plasma/KDE handles
     // conflicts; subsequent user changes or removals must not be overwritten.
     function initializeDefaultShortcut() {
-        if (Plasmoid.configuration.opmDefaultShortcutTried) return;
+        if (widgetRemovalPending || Plasmoid.configuration.opmDefaultShortcutTried) return;
         const current = String(Plasmoid.globalShortcut || "").trim();
         Plasmoid.configuration.opmDefaultShortcutTried = true;
         if (!current) Plasmoid.globalShortcut = "Meta+X";
