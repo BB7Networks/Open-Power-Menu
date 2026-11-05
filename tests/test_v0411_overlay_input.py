@@ -121,7 +121,7 @@ assert.equal(c.applyAppGridPassThrough(),false);assert.equal(calls,0);
 
     def test_dismissal_has_explicit_delivery_trace_and_not_passively_killed(self):
         q=QML.read_text()
-        self.assertIn('right-click received by Start button', MAIN.read_text())
+        self.assertIn('right-click received by launcher button', MAIN.read_text())
         self.assertIn('AppGrid panel input pass-through applied:',q)
         self.assertIn('function onGridOpenChanged()',q)
         self.assertIn('appGridPassThroughRetry.restart()',q)
