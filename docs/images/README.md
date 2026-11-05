@@ -1,29 +1,55 @@
-# Real screenshot capture plan
+# Real Open Power Menu screenshots
 
-Capture on an actual Plasma 6 desktop after completing [acceptance](../TESTING.md).
-These are planned filenames, not existing screenshots. Add images and embed them
-in the repository README only after they have been captured and reviewed.
+The project uses **actual Plasma 6 captures**, never generated mockups or
+screens that suggest unimplemented features. Capture on a live desktop after
+[acceptance testing](../TESTING.md), and retain reproducible UI information.
 
-| Planned file | Capture |
+## Captured and ready for check-in
+
+The project owner supplied three real Manjaro / Plasma 6 screenshots for PR #6.
+The **image files are not in this branch yet**; the following names have been
+reserved for them. The README gallery is intentionally commented out until
+the actual files are committed, so visitors do not see broken images.
+
+| File to commit | What the capture shows |
 | --- | --- |
-| `start-button.png` | OPM beside the existing launcher; identify which button to click |
-| `power-user-menu.png` | Right-click menu with System Logs, Printers and one open flyout |
-| `application-launcher.png` | Left-click result using native Kickoff |
-| `appgrid-launcher.png` | Left-click result using AppGrid Center 1.9.6 |
-| `configure-general.png` | Launcher selector, separate Emergency Restore command, icon/appearance and Set up Meta+X |
-| `configure-layout.png` | Concise instructions, menu tree and right-aligned Undo/Redo toolbar |
-| `configure-backups.png` | Configuration retention, Manage / Restore Backups and automatically refreshed snapshot count |
-| `backup-delete.png` | Disposable selected backup and the permanent-deletion confirmation |
-| `in-menu-editing.png` | Full-row drag preview, submenu destination highlight and Save layout / Cancel |
-| `in-menu-conflict.png` | A retained draft and its safe external-change message |
-| `installed-application-picker.png` | Search results and the selected app details |
+| `power-user-menu.png` | Main Power User Menu, its top-right controls and the Manjaro Start button on the panel |
+| `submenu-flyout.png` | Normal-use **Shut down or sign out** submenu opening beside its parent row |
+| `configure-general.png` | **Configure → General**, including launcher selection, button hiding, emergency restore, icon and appearance |
 
-Use Spectacle or the desktop's screenshot tool. Capture real UI with an ordinary
-theme, readable scaling and modest crops. Record Plasma/Qt versions, display scale,
-launcher version, panel edge and hidden/visible original-button state in the image
-description. Test both click actions before capturing.
+To enable the README gallery after adding the files:
 
-Use a clean demo profile. Avoid personal favorites, hostnames, private commands,
-network shares, notification contents, other users' information and credentials.
-Keep screenshots faithful: no generated images, invented features or edits that
-suggest untested behavior. Describe an AppGrid screenshot as AppGrid, not Kickoff.
+```md
+![Power User Menu attached to the Manjaro panel](docs/images/power-user-menu.png)
+![Shut down or sign out submenu flyout](docs/images/submenu-flyout.png)
+![Configure General tab](docs/images/configure-general.png)
+```
+
+The General screenshot does **not** show Layout or Backups; describe those
+tabs with their own screenshots when available. A menu displayed normally
+does not demonstrate the separate, single-pane **editing** interaction.
+
+## Additional capture checklist
+
+| Suggested file | What to capture |
+| --- | --- |
+| `start-button.png` | Close-up of the OPM button and original launcher relationship |
+| `application-launcher.png` | Left-click result with native Kickoff/Kicker |
+| `appgrid-launcher.png` | Left-click result with AppGrid Center 1.9.6 |
+| `configure-layout.png` | Layout tree and responsive Undo/Redo toolbar |
+| `configure-backups.png` | Configuration backup limits, Restore and widget snapshots |
+| `backup-delete.png` | Safe backup deletion confirmation in a disposable profile |
+| `in-menu-editing.png` | **Go Back** strip, spring-loaded move, destination highlight and Save/Cancel |
+| `in-menu-conflict.png` | A retained draft and safe external-change message |
+| `installed-application-picker.png` | Search and selected-app details |
+
+Use Spectacle or another desktop screenshot utility with readable scaling
+and modest crops. Record distro, Plasma/Qt versions, session (Wayland/X11),
+launcher version, display scale, panel edge and whether the original button
+is hidden. Keep the original pixels and don't composite separate states into
+one implied screen. Use a clean demo profile: avoid private hostnames, network
+shares, credentials, notifications and other users' information.
+
+Screenshot assets belong under `docs/images/`. Update the README and
+`CHANGELOG.md` only after the image files are actually tracked in Git; do not
+present a capture plan as if a public screenshot already exists.
