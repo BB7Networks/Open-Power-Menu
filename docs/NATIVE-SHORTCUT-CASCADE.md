@@ -25,7 +25,8 @@ tests cannot validate KGlobalAccel or native popup placement.
 ## Floating layout-edit flyouts
 
 The unlocked editor stays a normal-width menu. Clicking or hovering over a
-submenu opens a **separate, row-anchored Qt Popup.Window** beside that item,
+submenu opens a **Plasma-native PopupPlasmaWindow** beside that item (the same
+native popup type used by the normal Power User Menu),
 instead of widening the parent into a fixed split-pane layout. The flyout
 adapts to available space on either side and matches normal-use placement:
 its **bottom edge aligns with the parent row's bottom edge**, except when
