@@ -1,5 +1,26 @@
 # Open Power Menu changelog
 
+## Unreleased - native widget shortcut and single-pane editor
+
+- Attempt **Meta+X once per new Plasma widget instance**, invoking the existing
+  panel-attached Power User Menu and guarded launcher handoff. Respect
+  conflicting, user-changed or deliberately cleared shortcuts on later loads.
+- Release **only the removed widget's** shortcut on Plasma's explicit removal
+  signal; restore the previous binding on Undo if still available. Guard
+  against first-run initialization racing with removal. Older orphaned actions
+  may still need one-time cleanup in KDE Shortcuts.
+- Restore single-popup spring-loaded layout editing after real
+  Wayland problems with experimental floating editor windows. A **full-width,
+  48px Go Back** strip now supports click navigation and dragging items back
+  to their parent level; the normal locked-menu flyouts remain unchanged.
+- Remove the obsolete manual Meta+X setup button and editing-flyout toggle,
+  while preserving standalone launch diagnostics as an optional fallback.
+- Refresh README and linked troubleshooting/acceptance docs. Three genuine
+  Manjaro Plasma screenshots are captured for the repository gallery;
+  image publication remains pending.
+- Keep version identifiers at **0.4.17** until review, live desktop acceptance,
+  merge and an explicitly approved release.
+
 ## Unreleased - configuration UX and in-menu layout editing
 
 - Preserve viewport anchors, selection and focus when rearranging long menus;
@@ -12,10 +33,11 @@
   corrupt history, with changed-file checks and protected-copy warnings.
 - Refresh widget snapshot counts read-only on Backups tab visits, and present
   Emergency Restore as a separate selectable monospace command with Copy.
-- Prefer KDE's installed Application entry for Meta+X and provide a real Test
-  menu launch with startup/exposure/focus diagnostics. Use a top-level standalone
-  menu on Wayland, explicitly parent submenus, and quote the desktop entry's Exec
-  path. Global bindings remain under user/KDE control; native dispatch is a live check.
+- Earlier PR #5 work provided a standalone KDE Application shortcut fallback
+  and a diagnostic Test menu launch with exposure/focus traces. Its Wayland
+  top-level menu, explicitly parented submenus and quoted desktop Exec path
+  remain useful for standalone diagnostics. **PR #6 supersedes that default
+  shortcut route** with native widget Meta+X.
 - Stop redundant AppGrid close animations and defer an AppGrid close triggered
   during its open signal until that call completes. Add sequenced state/callback/
   input-mask traces and a direct-versus-OPM acceptance procedure for desktop flashes.

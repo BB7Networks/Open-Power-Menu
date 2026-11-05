@@ -9,7 +9,7 @@ not replace those results. Optional PySide6 offscreen tests now run in CI; actua
 Plasma/Wayland acceptance remains separate.
 
 A launcher-independent Power User menu for KDE Plasma 6, with an optional unified
-Start-button widget. **Left-click** delegates to an existing launcher; **right-click**
+launcher-button widget. **Left-click** delegates to an existing launcher; **right-click**
 shows the Power User menu. The original launcher, its favorites, and its settings
 remain installed and untouched.
 
@@ -60,9 +60,12 @@ The **General** tab now contains:
 - **Start button icon:** adopt the selected launcher's icon (default) or use a
   custom theme icon/local image, with a preview.
 - **Appearance:** choose the standard native theme or Dark Aero for the menu.
-- **Keyboard shortcut:** Set up Meta+X tests the installed standalone menu and opens
-  KDE Shortcuts to assign the Application entry. KDE owns conflict handling; OPM
-  does not write bindings. General also separates the Emergency Restore command.
+- **Keyboard shortcut:** Meta+X is attempted once by each new OPM Start
+  Button widget through Plasma's native shortcut API (not the standalone
+  menu). Widget removal releases that instance's binding; Undo attempts to
+  restore it. KDE owns conflicts, and later user changes survive reinstall.
+  The older standalone launcher diagnostics remain available at the CLI.
+  General separately presents the Emergency Restore command.
 
 The **Backups** tab contains automatic configuration retention plus preview and
 restore through **Manage / Restore Backups…**. Explicit recovery copies are kept
@@ -99,7 +102,7 @@ the edge containing the panel. It also uses AppGrid's native in-process close
 method; it never patches AppGrid's files. The redundant 1.9.x standalone D-Bus probe was removed in 0.4.12. A
 separate-process `Hide` fallback remains for newer AppGrid center builds when
 the daemon is already running. **As of 0.4.13, these AppGrid exceptions live
-in separate adapter modules**, not the generic Start button logic.
+in separate adapter modules**, not the generic OPM panel-button logic.
 
 Other third-party full-screen or out-of-process launchers may need their own
 small adapters; this release does **not** claim universal popup dismissal for

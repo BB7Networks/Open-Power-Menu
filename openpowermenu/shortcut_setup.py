@@ -56,16 +56,14 @@ def create_shortcut_dialog(parent=None):
             self.saw_active = False
             layout = QVBoxLayout(self)
             explanation = QLabel(
-                '<b>Open the standalone Power User Menu with Meta+X</b>'
-                '<p>It uses your saved configuration and opens a separate menu, not the panel instance.</p>'
-                '<ol><li>Test the installed menu below. Press Esc to dismiss it.</li>'
-                '<li>Open KDE Shortcuts. Choose <b>Add New → Application… → Open Power Menu</b>.</li>'
-                '<li>Assign <b>Meta+X</b> and select <b>Apply</b>.</li></ol>'
-                '<p>If KDE reports a conflict, choose another shortcut or cancel. '
-                'For a stale Command or Script assignment, remove only that old OPM assignment, Apply, '
-                'then add the application entry and Apply again. Test Meta+X on your desktop.</p>'
-                '<p>If the launch test works but the key does nothing, check the assignment in KDE. '
-                'Starting this test does not verify the keyboard binding.</p>', self)
+                '<b>Meta+X — open the menu beside your Start button</b>'
+                '<ol><li>Remove an old Open Power Menu Meta+X application shortcut, if assigned.</li>'
+                '<li>Enter Plasma Panel Edit Mode and open this widget’s settings.</li>'
+                '<li>Under <b>Keyboard Shortcuts</b>, assign <b>Meta+X</b> and apply.</li></ol>'
+                '<p>KDE checks for shortcut conflicts; cancel if Meta+X is already in use. OPM never overrides another shortcut automatically.</p>'
+                '<b>Optional: standalone menu test</b>'
+                '<p>Use Test menu launch below to check the separate application. '
+                'It does not test Meta+X and may appear near the screen center.</p>', self)
             explanation.setTextFormat(Qt.RichText)
             explanation.setWordWrap(True)
             layout.addWidget(explanation)

@@ -607,3 +607,56 @@ def test_quick_controls_follow_light_dark_and_aero_palettes(quick, background, f
 
     bright, dark = sorted((luminance(background), luminance(foreground)), reverse=True)
     assert (bright + .05) / (dark + .05) >= 4.5
+
+ 
+def test_full_width_go_back_area_is_a_spring_loaded_drag_target(quick):
+    """The entire top strip, including its far right edge, navigates up."""
+    _, view, root = quick
+    nested_menu(view, root)
+    evaluate(root, "control.enter('g')")
+    QTest.qWait(20)
+    back = child(root, 'layoutBack')
+    assert back is not None
+    assert back.property('enabled')
+    assert back.height() >= 44
+    assert back.width() >= root.width() - 12
+    assert back.property('text').startswith('Go Back')
+    root.setProperty('submenuHoverDelay', 120)
+    back_right = back.mapToScene(
+        QPointF(back.width() - 12, back.height() / 2)).toPoint()
+    begin_drag(view, point(root, 'layoutRow-c'), back_right)
+    assert root.property('dragActive')
+    assert root.property('dropKind') == 'parent'
+    assert root.property('dropParent') == ''
+    QTest.qWait(145)
+    assert draft(root)['parentId'] == ''
+    assert root.property('dragActive')
+    end = point(root, 'layoutRow-b', y=32)
+    QTest.mouseMove(view, end, delay=10)
+    QTest.mouseRelease(view, Qt.LeftButton, pos=end)
+    QTest.qWait(20)
+    value = draft(root)
+    assert [e['id'] for e in value['entries']] == ['a', 'g', 'b', 'c', 's']
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id'] == 'g')['items']] == ['h']
+    assert not root.property('dragActive')
+    assert not back.property('enabled')  # Root has no parent level.
+
+
+def test_dedicated_go_back_click_and_original_editor_no_popup(quick):
+    """A click and drag share the same top strip; no floating editor is loaded."""
+    _, view, root = quick
+    evaluate(root, "control.enter('g')")
+    QTest.qWait(20)
+    back = child(root, 'layoutBack')
+    pos = back.mapToScene(QPointF(back.width() / 2, back.height() / 2)).toPoint()
+    QTest.mouseClick(view, Qt.LeftButton, pos=pos)
+    QTest.qWait(10)
+    assert draft(root)['parentId'] == ''
+    assert back.property('text') == 'Top level'
+    editor_qml = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
+    main_qml = (ROOT / 'plasmoid/contents/ui/main.qml').read_text()
+    assert 'Drag.dragType: Drag.Automatic' not in editor_qml
+    assert 'flyoutPane' not in editor_qml
+    assert 'preferPlasmaFlyout' not in main_qml
+    assert 'springOpen' in editor_qml
+    assert 'opmDefaultShortcutTried' in main_qml

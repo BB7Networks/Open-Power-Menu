@@ -171,6 +171,7 @@ QQC2.Control {
     }
     function updateDragTarget() {
         if (!dragActive || dragCanceled || !draft || restoringView) return;
+        // The entire top button is an active spring-loaded Go Back target.
         const backPoint = rowPointer.mapToItem(navigationBar, rowPointer.mouseX, rowPointer.mouseY);
         if (draft.parentId && backPoint.x >= 0 && backPoint.x < navigationBar.width
                 && backPoint.y >= 0 && backPoint.y < navigationBar.height) {
@@ -316,31 +317,30 @@ QQC2.Control {
 
     contentItem: ColumnLayout {
         spacing: 4
-        RowLayout {
+        // A full-width, dedicated parent-navigation drop target. It shares
+        // its geometry with the drag hit test so the same large area works for
+        // a normal click and spring-loaded navigation while holding an item.
+        QQC2.Button {
             id: navigationBar
+            objectName: "layoutBack"
             Layout.fillWidth: true
-            QQC2.ToolButton {
-                objectName: "layoutBack"
-                text: "Back"
-                icon.name: "go-previous"
-                icon.color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.buttonText
-                enabled: !!control.draft && !!control.draft.parentId && !control.busy
-                onClicked: control.back()
-                Accessible.name: "Back to parent menu"
-                QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: "Parent menu (Left)"
-            }
-            QQC2.Label {
-                Layout.fillWidth: true
-                text: control.draft && control.draft.parentId ? Draft.find(control.draft.entries, control.draft.parentId).entry.title : "Top level"
-                elide: Text.ElideMiddle
-                font.bold: true
-                color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.windowText
-            }
+            Layout.preferredHeight: 48
+            enabled: !!control.draft && !!control.draft.parentId && !control.busy
+            text: control.draft && control.draft.parentId
+                ? "Go Back · " + Draft.find(control.draft.entries, control.draft.parentId).entry.title
+                : "Top level"
+            font.bold: true
+            icon.name: enabled ? "go-previous" : "go-home"
+            highlighted: control.dragActive && control.dropKind === "parent"
+            onClicked: control.back()
+            Accessible.name: enabled ? "Go Back to parent menu" : "Top level"
+            Accessible.description: "Hold a dragged item here to navigate to its parent without dropping it."
+            QQC2.ToolTip.visible: hovered && enabled
+            QQC2.ToolTip.text: "Click to go back, or drag here and hold to move up one level"
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag to move; pause over a submenu or Back. Right-click or Shift+F10 for moves."
+            text: "Drag an item onto a submenu and hold to open it. Drag onto Go Back to move up."
             wrapMode: Text.WordWrap
         }
         ListView {

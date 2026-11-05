@@ -1,67 +1,79 @@
 # Shortcut and AppGrid live diagnostics
 
-PR #5 adds these checks after live Manjaro feedback at `b236efd`. The cloud has
-no Plasma, KWin or native display session. The fixes below have source evidence
-and automated regression coverage; the reported desktop symptoms need this
-local comparison before merge. Nothing here requires restarting Plasma.
+These checks originated in Manjaro Plasma 6 development testing. GitHub
+Actions provides portable and offscreen Qt coverage, but no full Plasma, KWin
+or native Wayland desktop session. Use these local comparisons for
+desktop-specific focus or shortcut behavior. Nothing requires restarting Plasma.
 
-## Meta+X: separate dispatch, startup and visibility
+## Meta+X: native panel shortcut versus standalone diagnostics
 
-1. Install the complete package using `bash install.sh`, then run:
+**Current behavior:** Meta+X belongs to the **Open Power Menu
+Start Button widget** using Plasma's native shortcut API. The former
+**Configure → General → Set up Meta+X…** wizard was removed. The installed
+standalone application remains available for diagnosis, but assigning it
+Meta+X *as well* can create a conflict with the widget.
+
+### Check the native widget shortcut first
+
+1. Add OPM to the desired panel and verify right-click opens its menu from
+   that button. On a newly created widget with a free binding, OPM attempts
+   to assign Meta+X once; a second press should close the panel-attached menu.
+2. Open **System Settings → Keyboard → Shortcuts** and search Meta+X.
+   KDE stores widget actions under instance-specific names such as
+   `plasmashell: activate widget 42`. If Meta+X opens at an old panel location,
+   check whether an old or removed widget still owns the key.
+3. Clear **only the obsolete OPM binding**, Apply, then assign the combination
+   to the current widget through its native Keyboard Shortcuts settings.
+   Do not edit `kglobalshortcutsrc` by hand or take over another app's binding.
+4. Test removal and re-add promptly. OPM clears the removed widget's own
+   shortcut as soon as its removal lifecycle signal arrives. Undo should
+   restore the previous assignment where available. Changing/disabling the
+   shortcut must survive ordinary Plasma reloads and reinstallations.
+5. Record distribution, Plasma/Qt/KWin versions, screen arrangement, panel
+   edge, AppGrid/Kickoff choice, active widget ID and the result of left-click,
+   right-click and Meta+X separately. Headless CI cannot verify delivery.
+
+See [native widget lifecycle and Go Back](NATIVE-SHORTCUT-CASCADE.md).
+
+### Check standalone menu startup separately
+
+1. Install the complete package using `bash install.sh`. If `XDG_BIN_HOME`
+   differs from the default, use your installed binary path instead of the
+   examples below:
 
    ```bash
    ~/.local/bin/open-power-menu --check
    ~/.local/bin/open-power-menu
-   ```
-
-   If you use `XDG_BIN_HOME`, use the resolved executable shown in **Configure →
-   General → Set up Meta+X…** instead. `--check` validates the configuration and
-   resolves entries without Qt. The normal command checks GUI startup. Press Esc
-   to dismiss without launching an entry. Both commands were exercised in an
-   isolated installed cloud profile; the cloud user's default path is not installed.
-
-2. Use **Test menu launch** in setup, or run:
-
-   ```bash
    ~/.local/bin/open-power-menu --diagnose-launch
    ```
 
-   The test invokes that installed executable as an argument array. It displays
-   failed startup, nonzero/crashed exits and bounded output. `OPM_LAUNCH` lines
-   contain a sequence, monotonic elapsed milliseconds, platform, visibility,
-   exposure and focus. They contain no menu titles or command arguments. Ordinary
-   configuration error output can contain a local path; review it before sharing.
-   Closing setup stops only its own test child.
+   `--check` validates configuration without starting Qt. The plain command
+   opens the standalone menu. `--diagnose-launch` records bounded startup,
+   exposure, visibility and focus information (`OPM_LAUNCH` records);
+   a started process alone does not prove a visible window.
+
+2. Use the diagnostic output to separate an executable/import failure from a
+   popup visibility/focus failure. Traces contain no menu titles or arguments,
+   but review output for local paths before sharing.
 
    | Observation | Next check |
    | --- | --- |
-   | Executable missing or FailedToStart | Reinstall; inspect the displayed executable path/permissions |
-   | `configuration-error` or --check fails | Recover the configuration before testing the shortcut |
-   | Process exits with a Qt/import/platform error | Fix the reported dependency/session issue; use the local desktop terminal |
-   | `cli-start`, but no exposed window | Read Qt errors; check platform, installed version and Wayland behavior |
-   | Exposed but no active/focused menu | Check compositor placement/activation; record what is actually visible |
-   | Test menu works, but Meta+X does nothing | Inspect KDE assignment, conflicts and the application entry |
+   | Executable missing / FailedToStart | Reinstall and inspect path and permissions |
+   | `configuration-error` or `--check` failure | Recover the configuration |
+   | Qt, import or platform error | Verify dependencies in the actual user session |
+   | `cli-start` but no exposed window | Check native Wayland/X11 popup and focus |
+   | Exposed but not active | Check compositor placement and activation |
+   | Standalone opens; Meta+X doesn't | Check the **widget's** shortcut owner, not the standalone launcher |
 
-   A started process is not proof of a visible menu. Qt exposure/focus reports
-   still need visual confirmation, and this launch test does not test keyboard dispatch.
+3. Only if deliberately testing a **separate Application shortcut**, use KDE's
+   `org.openpowermenu.desktop` entry with a *different unused combination*.
+   This path opens the standalone saved menu at a compositor-controlled
+   location, not the panel-attached widget or an unfinished layout draft.
+   Keep this fallback distinct from the native widget shortcut.
 
-3. In KDE Shortcuts choose **Add New → Application… → Open Power Menu**, assign
-   **Meta+X**, and **Apply**. The installed entry is `org.openpowermenu.desktop`;
-   setup shows its XDG-resolved location. Also try launching that application
-   from KDE's application menu to check desktop-entry execution separately.
-   The installer quotes Exec paths including spaces and literal percent signs.
-   This opens the **standalone saved menu**, not the panel instance or its draft.
-
-4. If an older Command or Script assignment is stale, remove only that OPM
-   assignment in KDE, Apply, then add the installed Application entry and Apply.
-   Close/reopen Shortcuts and verify the assignment persisted. Cancel a conflict
-   or choose another key; preserve unrelated bindings. Test Meta+X on the actual
-   desktop, then test changing and removing it. OPM does not write KDE/KWin
-   shortcut configuration or restart the shortcut daemon.
-
-5. On Wayland check visibility/focus, Esc, submenu arrows, command selection and
-   clicking another application. KWin controls top-level placement; exact cursor
-   or panel anchoring is not guaranteed. Repeat on X11 where practical.
+4. On Wayland check visibility, focus, Escape, submenu navigation, selection
+   and outside-click dismissal; repeat on X11 when available. Native panel
+   placement and standalone placement are different test cases.
 
 ### Findings and evidence
 
@@ -82,9 +94,11 @@ local comparison before merge. Nothing here requires restarting Plasma.
   a cache/new-assignment defect on the user's current KDE version. Bugzilla access
   was proxy-blocked; public source/history were inspected. Record Plasma/Frameworks/
   Qt versions and the three launch outcomes before attributing this to KDE caching.
-- Native panel activation remains deferred: KDE's default applet activation
-  changes expansion outside OPM's launcher-close handshake. This follow-up does
-  not add a competing activation path.
+- **Historical PR #5 finding:** native applet activation used to change
+  expansion outside OPM's launcher-close handshake. OPM now routes the
+  Plasma widget's activated() event through the guarded OPM handoff. Its
+  actual Wayland shortcut dispatch and instance-removal behavior still need
+  live verification.
 
 ## AppGrid desktop flash
 

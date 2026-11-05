@@ -11,5 +11,9 @@
       <label>Action on left click</label>
       <default>launcher</default>
     </entry>
+    <entry name="opmDefaultShortcutTried" type="Bool">
+      <label>Native shortcut initialization completed for this widget</label>
+      <default>false</default>
+    </entry>
   </group>
 </kcfg>

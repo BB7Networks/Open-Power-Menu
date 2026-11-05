@@ -553,13 +553,8 @@ def test_shortcut_setup_missing_services_and_failed_launch_are_clear(editor, app
     dialog.deleteLater()
 
 
-def test_general_shortcut_setup_is_discoverable_and_does_not_dirty_editor(editor, app):
-    button = editor.findChild(QPushButton, 'setupMenuShortcut')
-    assert editor.tabs.widget(0).isAncestorOf(button)
-    def inspect(dialog):
-        assert dialog.windowTitle().endswith('Set up Meta+X')
-        assert dialog.findChild(QPushButton, 'openKdeShortcuts')
-    modal(app, inspect, button.click)
+def test_general_does_not_require_shortcut_setup(editor, app):
+    assert editor.findChild(QPushButton, 'setupMenuShortcut') is None
     assert not editor.is_dirty()
 
 
