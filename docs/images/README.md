@@ -13,7 +13,7 @@ the actual files are committed, so visitors do not see broken images.
 
 | File to commit | What the capture shows |
 | --- | --- |
-| `power-user-menu.png` | Main Power User Menu, its top-right controls and the Manjaro Start button on the panel |
+| `power-user-menu.png` | Main Power User Menu, its top-right controls and the OPM launcher button on the panel |
 | `submenu-flyout.png` | Normal-use **Shut down or sign out** submenu opening beside its parent row |
 | `configure-general.png` | **Configure → General**, including launcher selection, button hiding, emergency restore, icon and appearance |
 
@@ -33,7 +33,7 @@ does not demonstrate the separate, single-pane **editing** interaction.
 
 | Suggested file | What to capture |
 | --- | --- |
-| `start-button.png` | Close-up of the OPM button and original launcher relationship |
+| `launcher-button.png` | Close-up of the OPM button and original launcher relationship |
 | `application-launcher.png` | Left-click result with native Kickoff/Kicker |
 | `appgrid-launcher.png` | Left-click result with AppGrid Center 1.9.6 |
 | `configure-layout.png` | Layout tree and responsive Undo/Redo toolbar |
