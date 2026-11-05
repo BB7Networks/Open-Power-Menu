@@ -14,6 +14,12 @@ QQC2.Control {
     // False preserves the proven narrow single-pane editor for fallback/tests.
     // The Plasma widget explicitly enables the adjacent flyout experience.
     property bool cascadingEnabled: false
+    // Use the same Plasma popup window/anchor implementation as normal-use
+    // flyouts when hosted by the widget. The Qt Popup.Window remains a fallback
+    // for headless tests and standalone editor embedding.
+    property bool preferPlasmaFlyout: false
+    property var plasmaFlyout: null
+    readonly property bool plasmaFlyoutActive: preferPlasmaFlyout && plasmaFlyout !== null
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
     // A real Qt popup is anchored to the hovered row, outside the 328px
@@ -32,6 +38,8 @@ QQC2.Control {
         !!Draft.find(draft.entries, flyoutId) &&
         Draft.find(draft.entries, flyoutId).parentId === draft.parentId
     readonly property var flyoutEntries: flyoutVisible ? (Draft.children(draft.entries, flyoutId) || []) : []
+    readonly property string flyoutTitle: flyoutVisible
+        ? Draft.find(draft.entries, flyoutId).entry.title : ""
     property string draggedId: ""
     property bool dragActive: false
     property bool dragCanceled: false
@@ -205,6 +213,18 @@ QQC2.Control {
         const index = rowIndex(id);
         const row = index >= 0 ? list.itemAtIndex(index) : null;
         if (!row) return;
+        if (plasmaFlyoutActive) {
+            // Exactly the SideFlyout.qml positioning path: position the
+            // one-pixel visualParent proxy before making the popup visible.
+            const screen = Qt.rect(Screen.virtualX, Screen.virtualY,
+                Screen.width, Screen.height);
+            plasmaFlyout.entries = Draft.children(draft.entries, id) || [];
+            plasmaFlyout.screenRect = screen;
+            plasmaFlyout.positionAtRow(row, plasmaFlyoutAnchor, screen);
+            plasmaFlyout.visualParent = plasmaFlyoutAnchor;
+            plasmaFlyout.popupDirection = plasmaFlyout.chooseSide(plasmaFlyoutAnchor);
+            return;
+        }
         const local = row.mapToItem(control, 0, 0);
         const global = row.mapToGlobal(0, 0);
         const screenLeft = Screen.virtualX;
@@ -226,6 +246,39 @@ QQC2.Control {
         const requestedTop = global.y + row.height - popupH;
         const targetTop = Math.max(screenTop + border, Math.min(requestedTop, topLimit));
         flyoutY = local.y + targetTop - global.y;
+    }
+    function setFlyoutPointer(inside) {
+        flyoutPointerInside = inside;
+        if (inside) flyoutDismiss.stop();
+        else if (flyoutVisible && !dragActive) flyoutDismiss.restart();
+    }
+    function canMoveSelectionIntoFlyout() {
+        if (!draft || !flyoutVisible || busy || expired || !draft.selectedId) return false;
+        return !Draft.moveError(draft, draft.selectedId, flyoutId, "");
+    }
+    function moveSelectedIntoFlyout() {
+        if (!canMoveSelectionIntoFlyout()) return;
+        const movingId = draft.selectedId;
+        move(movingId, flyoutId, "");
+    }
+    function createPlasmaFlyout() {
+        if (!preferPlasmaFlyout || plasmaFlyout) return;
+        const component = Qt.createComponent(Qt.resolvedUrl("LayoutPlasmaFlyout.qml"));
+        if (component.status !== Component.Ready) {
+            console.warn("Open Power Menu: Plasma editing flyout unavailable:",
+                component.errorString());
+            return;
+        }
+        const window = component.createObject(control, {
+            "editor": control,
+            "visualParent": plasmaFlyoutAnchor
+        });
+        if (!window) {
+            console.warn("Open Power Menu: Plasma editing flyout creation failed");
+            return;
+        }
+        plasmaFlyout = window;
+        if (flyoutVisible) positionFlyout(flyoutId);
     }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
@@ -430,7 +483,17 @@ QQC2.Control {
         if (!draft || (flyoutId && !Draft.find(draft.entries, flyoutId)))
             flyoutId = "";
     }
-    Component.onCompleted: { viewReady = true; syncView(); }
+    Component.onCompleted: {
+        viewReady = true;
+        syncView();
+        if (preferPlasmaFlyout) Qt.callLater(() => createPlasmaFlyout());
+    }
+    onPreferPlasmaFlyoutChanged: {
+        if (preferPlasmaFlyout && viewReady) Qt.callLater(() => createPlasmaFlyout());
+    }
+    Component.onDestruction: {
+        if (plasmaFlyout) { plasmaFlyout.visible = false; plasmaFlyout.destroy(); }
+    }
     onVisibleChanged: {
         if (!visible) {
             rememberView();
@@ -522,7 +585,7 @@ QQC2.Control {
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag between the menu and its flyout. Hover to open a submenu; Back moves up."
+            text: "Drag to reorder here. Select an item, hover a submenu, then use Move selected item here."
             wrapMode: Text.WordWrap
         }
         ListView {
@@ -616,12 +679,19 @@ QQC2.Control {
             }
         }
     }
+    // The popup below is a Qt-only fallback. Plasma uses LayoutPlasmaFlyout.qml
+    // loaded at runtime so the native KWin placement matches normal submenus.
+    Item {
+        id: plasmaFlyoutAnchor
+        width: 1
+        height: 1
+    }
     QQC2.Popup {
             id: flyoutPane
             objectName: "layoutCascadingPane"
             parent: control
             popupType: QQC2.Popup.Window
-            visible: control.flyoutVisible
+            visible: control.flyoutVisible && !control.plasmaFlyoutActive
             modal: false
             focus: false
             closePolicy: QQC2.Popup.NoAutoClose
@@ -645,11 +715,7 @@ QQC2.Control {
             contentItem: Item {
                 id: flyoutSurface
                 HoverHandler {
-                    onHoveredChanged: {
-                        control.flyoutPointerInside = hovered;
-                        if (hovered) flyoutDismiss.stop();
-                        else if (control.flyoutVisible && !control.dragActive) flyoutDismiss.restart();
-                    }
+                    onHoveredChanged: control.setFlyoutPointer(hovered)
                 }
                 ColumnLayout {
                     anchors.fill: parent
@@ -657,9 +723,15 @@ QQC2.Control {
                 QQC2.Label {
                     Layout.fillWidth: true
                     font.bold: true
-                    text: control.flyoutVisible ? Draft.find(control.draft.entries, control.flyoutId).entry.title : ""
+                    text: control.flyoutTitle
                     elide: Text.ElideMiddle
                     Accessible.name: "Open submenu"
+                }
+                QQC2.Button {
+                    Layout.fillWidth: true
+                    text: "Move selected item here"
+                    enabled: control.canMoveSelectionIntoFlyout()
+                    onClicked: control.moveSelectedIntoFlyout()
                 }
                 ListView {
                     id: flyoutList
@@ -717,7 +789,8 @@ QQC2.Control {
                             anchors.fill: parent
                             acceptedButtons: Qt.LeftButton
                             preventStealing: true
-                            drag.target: childDragHandle
+                            // No native cross-window drag grab. It can block
+                            // the entire Plasma popup on Wayland.
                             drag.smoothed: false
                             onPressed: {
                                 control.nativeDragHandled = false;
@@ -730,19 +803,7 @@ QQC2.Control {
                                 else control.navigate(control.flyoutId, childRow.entry.id);
                             }
                         }
-                        Item {
-                            id: childDragHandle
-                            width: 1
-                            height: 1
-                            Drag.active: childPointer.drag.active
-                            Drag.dragType: Drag.Automatic
-                            Drag.keys: ["opm-layout"]
-                            Drag.supportedActions: Qt.MoveAction
-                            Drag.mimeData: ({
-                                "application/x-opm-layout-entry": childRow.entry.id,
-                                "application/x-opm-layout-session": control.draft ? control.draft.token : ""
-                            })
-                        }
+
                     }
                     footer: Item {
                         width: flyoutList.width
@@ -852,20 +913,10 @@ QQC2.Control {
         onCanceled: { suppressClick = true; control.cancelDrag(); }
         onWheel: wheel => control.scrollDuringDrag(wheel)
     }
-    Item {
-        id: dragPosition
-        Drag.active: control.cascadingEnabled && control.flyoutVisible && rowPointer.drag.active
-        Drag.dragType: Drag.Automatic
-        Drag.keys: ["opm-layout"]
-        Drag.supportedActions: Qt.MoveAction
-        Drag.mimeData: ({
-            "application/x-opm-layout-entry": control.draggedId,
-            "application/x-opm-layout-session": control.draft ? control.draft.token : ""
-        })
-        Drag.onDragFinished: {
-            control.cancelDrag(false);
-        }
-    }
+    // Keep drag movement inside the existing MouseArea's nonblocking path.
+    // Drag.Automatic starts a nested native QDrag loop on Wayland, stealing
+    // mouse-release events from the parent menu when a flyout is visible.
+    Item { id: dragPosition }
     Rectangle {
         id: dragProxy
         objectName: "inMenuDragPreview"
