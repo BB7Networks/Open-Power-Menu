@@ -52,7 +52,7 @@ class AdaptivePlacementTests(unittest.TestCase):
         self.assertIn('floating: true', side)
         self.assertNotIn('floating: false\n', side)
         self.assertIn('const point = anchor.mapToGlobal(0, 0);', side)
-        self.assertIn('if (screenRect.width <= 0', side)
+        self.assertIn('if (availableScreen.width <= 0', side)
         self.assertIn('return Qt.RightEdge;', side)
         self.assertIn('popupDirection: Qt.RightEdge', side)
         self.assertIn('childPopup.screenRect = row.menuScreen;', side)

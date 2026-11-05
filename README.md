@@ -27,11 +27,19 @@ right-click tools without insisting on an entire desktop makeover.
 
 ## Screenshots
 
-Real Manjaro Plasma 6 captures of the Power User Menu, a normal-use submenu,
-and **Configure → General** have been prepared for the
-[repository screenshot gallery](docs/images/README.md). They will be embedded
-here once the image files are available in the repository. No generated mockups
-are presented as screenshots.
+**Power User Menu** — Quick access to system tools and applications.
+
+<img src="docs/images/power-user-menu.png" alt="Power User Menu above the launcher buttons" width="420">
+
+**Submenus** — Organized commands with adaptive flyouts.
+
+<img src="docs/images/submenu-flyout.png" alt="Shut down or sign out submenu beside the Power User Menu" width="760">
+
+**Your launcher** — Keep your familiar applications and favorites.
+
+<img src="docs/images/application-launcher.png" alt="Existing application launcher opened from the OPM button" width="760">
+
+[View the gallery](docs/images/README.md).
 
 ## Why use it?
 
@@ -42,7 +50,8 @@ are presented as screenshots.
   Kickoff/Kicker and AppGrid Center 1.9.6 have separate integration paths.
 - **A menu you can make your own.** Add built-in commands, installed apps,
   custom commands, nested submenus and separators. Normal-use submenus open
-  beside their parent rows as native Plasma flyouts.
+  beside their parent rows as native Plasma flyouts. Arrows follow the side
+  each flyout opens on, including nested submenus.
 - **Edit without window juggling.** Unlock the menu, drag entries in place,
   hold over a submenu to enter it, and use the large **Go Back** drop area
   to navigate out. **Save layout** or **Cancel**; commands stay inactive
@@ -161,6 +170,9 @@ See [shortcut lifecycle and testing](docs/NATIVE-SHORTCUT-CASCADE.md) or the
 original panel button, the OPM button icon, and the menu's appearance.
 You can follow the original launcher's icon or use a custom theme icon/image.
 Optional Aero styling is available; the normal desktop theme remains a choice.
+Uncheck **Show icons in Power User Menu** for compact text-only entries in the
+menu and all submenus. The launcher button and toolbar keep their icons, and
+turning the option back on restores your existing entry icons.
 
 **Layout** lets you add installed applications, built-ins, custom commands and
 submenus. Under **Add → Installed application**, search by name or description;
@@ -219,7 +231,7 @@ prove** physical Wayland pointer behavior, shortcut registration, popup
 placement or focus handling.
 
 Current priorities include live acceptance on more panel positions, launchers,
-display scales and clean-account upgrades; publishing the captured screenshots; and a
+display scales and clean-account upgrades, plus a
 user-consented backend installation path for KDE Store. Separate desktop
 application scopes will be evaluated only with real Plasma/systemd evidence—
 process ancestry alone doesn't establish an application lifetime.

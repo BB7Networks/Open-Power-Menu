@@ -263,7 +263,7 @@ def configuration_flow(temp):
     marker = temp / 'unexpected-launch'
     config = {'menu': [{'label': 'Must not execute', 'command': [sys.executable, '-c',
               'import pathlib,sys; pathlib.Path(sys.argv[1]).touch()', str(marker)]}],
-              'hide_original_launcher': True}
+              'hide_original_launcher': True, 'show_menu_icons': False}
     payload = json.dumps(config).encode('utf-8')
     backend = subprocess.Popen([sys.executable, str(ROOT / 'run.py'), '--service'], cwd=ROOT,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -279,6 +279,7 @@ def configuration_flow(temp):
             entries = json.loads(call('GetMenu'))
             assert not any('Invalid menu.json' in entry.get('title', '') for entry in entries)
             assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
+            assert json.loads(call('GetIntegration'))['show_menu_icons'] is True
             assert not target.exists()
         def assert_rejected():
             entries = json.loads(call('GetMenu'))
@@ -286,6 +287,7 @@ def configuration_flow(temp):
             assert 'Invalid menu.json' in entries[0]['title']
             assert call('Run', '0') is False
             assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
+            assert json.loads(call('GetIntegration'))['show_menu_icons'] is True
             assert not marker.exists()
             assert backend.poll() is None
 
@@ -295,6 +297,7 @@ def configuration_flow(temp):
         target.write_bytes(payload)
         assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
         assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
+        assert json.loads(call('GetIntegration'))['show_menu_icons'] is False
         for invalid in (payload + b' ' * MAX_CONFIG_BYTES, b'{broken'):
             target.write_bytes(invalid)
             assert_rejected()
@@ -320,6 +323,7 @@ def configuration_flow(temp):
             moved.rename(target.parent)
         assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
         assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
+        assert json.loads(call('GetIntegration'))['show_menu_icons'] is False
         assert not marker.exists() and target.read_bytes() == payload
     finally:
         backend.terminate()

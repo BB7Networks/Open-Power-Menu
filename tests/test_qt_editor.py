@@ -659,3 +659,55 @@ def test_nested_edit_save_reopen_round_trip(editor):
     finally:
         reopened.reject()
         reopened.deleteLater()
+
+
+def test_menu_icon_setting_dirty_save_and_reload(editor):
+    original = menu(editor)
+    assert editor.show_menu_icons.isChecked()
+    editor.show_menu_icons.setChecked(False)
+    assert editor.is_dirty()
+    assert editor.accept()
+    saved = decode_configuration(current_revision(editor.target).content)
+    assert saved['show_menu_icons'] is False
+    assert saved['menu'] == original
+    editor.load_state(saved, current_revision(editor.target))
+    assert not editor.show_menu_icons.isChecked() and not editor.is_dirty()
+    editor.show_menu_icons.setChecked(True)
+    assert editor.is_dirty()
+    assert editor.accept()
+    assert decode_configuration(current_revision(editor.target).content)['show_menu_icons'] is True
+
+
+@pytest.mark.parametrize('visible', [True, False, True])
+def test_standalone_icon_visibility_all_levels(app, monkeypatch, visible):
+    from PySide6.QtGui import QIcon, QPixmap
+    from PySide6.QtWidgets import QMenu
+    from openpowermenu.gui import launch_menu
+    pixmap = QPixmap(16, 16)
+    pixmap.fill(Qt.red)
+    monkeypatch.setattr(QIcon, 'fromTheme', lambda name: QIcon(pixmap))
+    config = deepcopy(DEFAULT_CONFIG)
+    config['show_menu_icons'] = visible
+    config['menu'] = [{'label': 'Root', 'command': ['true'], 'icon': 'test'},
+        {'submenu': 'Group', 'icon': 'test', 'items': [
+            {'submenu': 'Nested', 'icon': 'test', 'items': [
+                {'label': 'Leaf', 'command': ['true'], 'icon': 'test'}]}]}]
+    errors = []
+    def check():
+        menu = app.activePopupWidget()
+        try:
+            assert isinstance(menu, QMenu)
+            def walk(current):
+                for action in current.actions():
+                    assert action.icon().isNull() is not visible
+                    if action.menu():
+                        walk(action.menu())
+            walk(menu)
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            if menu:
+                menu.close()
+    QTimer.singleShot(50, check)
+    assert launch_menu(config) == 0
+    assert not errors, errors

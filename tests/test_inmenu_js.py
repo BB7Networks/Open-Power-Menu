@@ -159,3 +159,25 @@ flyout.activeIndex=1;key(sideKeys,'Return');assert.equal(launches.length,2);
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_icon_preference_transport_defaults_and_recovery():
+    if not shutil.which('node'):
+        pytest.skip('Node is required')
+    code = 'const assert=require("node:assert/strict");\n'
+    code += function((UI / 'main.qml').read_text(), 'fetchIntegration')
+    code += r'''
+let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true;
+let response={},ok=true;
+function send(service,path,iface,method,args,callback){callback(ok,JSON.stringify(response))}
+function synchronizeLauncherVisibility(){}
+function releaseMask(){}
+fetchIntegration(); assert.equal(showMenuIcons,true);
+response={show_menu_icons:false,button_icon:'custom',button_icon_mode:'custom'};
+fetchIntegration();assert.equal(showMenuIcons,false);assert.equal(customButtonIcon,'custom');
+ok=false;response={};fetchIntegration();assert.equal(showMenuIcons,false);
+ok=true;fetchIntegration();assert.equal(showMenuIcons,true);
+response={show_menu_icons:true};fetchIntegration();assert.equal(showMenuIcons,true);
+'''
+    result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr

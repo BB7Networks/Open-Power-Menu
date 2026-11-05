@@ -8,7 +8,7 @@ os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 import pytest
 
 pytest.importorskip('PySide6.QtQuick', reason='Qt Quick interactions run in the Qt CI job')
-from PySide6.QtCore import QPoint, QPointF, QUrl, Qt
+from PySide6.QtCore import QElapsedTimer, QPoint, QPointF, QUrl, Qt
 from PySide6.QtGui import QColor, QWheelEvent
 from PySide6.QtQml import QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickView
@@ -314,9 +314,27 @@ def test_dragging_a_whole_submenu_preserves_children_without_opening(quick):
 
 
 def point(root, name, x=120, y=18):
+    # A spring-navigation timer can update the draft before Qt's next polish
+    # creates ListView delegates (especially when returning to 200 entries).
+    # Wait for the actual target, with a bound, instead of assuming one frame.
+    deadline = QElapsedTimer()
+    deadline.start()
     item = child(root, name)
+    while item is None and deadline.elapsed() < 1000:
+        QTest.qWait(10)
+        item = child(root, name)
     assert item is not None, name
     return item.mapToScene(QPointF(x, y)).toPoint()
+
+
+def wait_parent(root, parent_id):
+    # Positive spring transitions depend on Qt's animation/event-loop cadence.
+    # Keep short-hover rejection checks timed, but bound waits for completion.
+    deadline = QElapsedTimer()
+    deadline.start()
+    while draft(root)['parentId'] != parent_id and deadline.elapsed() < 1000:
+        QTest.qWait(10)
+    assert draft(root)['parentId'] == parent_id
 
 
 def begin_drag(view, start, end):
@@ -343,10 +361,10 @@ def test_spring_navigation_moves_into_two_levels_without_losing_pointer(quick):
     assert root.property('dropKind') == 'inside' and root.property('dropValid')
     QTest.qWait(40)
     assert draft(root)['parentId'] == ''  # Passing over a group does not immediately open it.
-    QTest.qWait(100)
+    wait_parent(root, 'g')
     assert draft(root)['parentId'] == 'g' and root.property('dragActive')
     QTest.mouseMove(view, point(root, 'layoutRow-h'), delay=10)
-    QTest.qWait(140)
+    wait_parent(root, 'h')
     assert draft(root)['parentId'] == 'h' and root.property('dragActive')
     end = point(root, 'layoutRow-d', y=32)
     QTest.mouseMove(view, end, delay=10)
@@ -365,9 +383,9 @@ def test_spring_parent_navigation_moves_out_through_multiple_levels(quick):
     QTest.qWait(20)
     end = point(root, 'layoutBack', x=18, y=12)
     begin_drag(view, point(root, 'layoutRow-d'), end)
-    QTest.qWait(140)
+    wait_parent(root, 'g')
     assert draft(root)['parentId'] == 'g' and root.property('dragActive')
-    QTest.qWait(140)
+    wait_parent(root, '')
     assert draft(root)['parentId'] == '' and root.property('dragActive')
     end = point(root, 'layoutRow-b', y=32)
     QTest.mouseMove(view, end, delay=10)
@@ -434,7 +452,7 @@ def test_full_parent_can_be_traversed_to_reach_another_submenu(quick):
     end = point(root, 'layoutBack', x=18, y=12)
     begin_drag(view, point(root, 'layoutRow-c'), end)
     assert not root.property('dropValid')  # Cannot add a 201st sibling.
-    QTest.qWait(140)
+    wait_parent(root, '')
     assert draft(root)['parentId'] == ''
     end = point(root, 'layoutRow-e')
     QTest.mouseMove(view, end, delay=10)
@@ -450,8 +468,7 @@ def test_interrupted_spring_navigation_preserves_layout_and_returns_to_source(qu
     before = nested_menu(view, root)
     end = point(root, 'layoutRow-g')
     begin_drag(view, point(root, 'layoutRow-a'), end)
-    QTest.qWait(140)
-    assert draft(root)['parentId'] == 'g'
+    wait_parent(root, 'g')
     if interruption == 'escape':
         QTest.keyClick(view, Qt.Key_Escape)
     elif interruption == 'popup':
