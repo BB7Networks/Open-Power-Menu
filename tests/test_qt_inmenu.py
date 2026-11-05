@@ -789,6 +789,9 @@ def test_parent_row_drag_remains_nonblocking_while_edit_flyout_is_open(quick):
     QTest.mouseMove(view, start + (end-start)/2, delay=20)
     QTest.mouseMove(view, end, delay=20)
     assert root.property('dragActive')
+    assert root.property('dropValid'), (
+        root.property('dropKind'), root.property('dropParent'),
+        root.property('dropBefore'), root.property('dropReason'))
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)
     QTest.qWait(30)
     assert not root.property('dragActive')
