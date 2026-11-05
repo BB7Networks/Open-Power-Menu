@@ -60,9 +60,12 @@ The **General** tab now contains:
 - **Start button icon:** adopt the selected launcher's icon (default) or use a
   custom theme icon/local image, with a preview.
 - **Appearance:** choose the standard native theme or Dark Aero for the menu.
-- **Keyboard shortcut:** Set up Meta+X tests the installed standalone menu and opens
-  KDE Shortcuts to assign the Application entry. KDE owns conflict handling; OPM
-  does not write bindings. General also separates the Emergency Restore command.
+- **Keyboard shortcut:** Meta+X is attempted once by each new OPM Start
+  Button widget through Plasma's native shortcut API (not the standalone
+  menu). Widget removal releases that instance's binding; Undo attempts to
+  restore it. KDE owns conflicts, and later user changes survive reinstall.
+  The older standalone launcher diagnostics remain available at the CLI.
+  General separately presents the Emergency Restore command.
 
 The **Backups** tab contains automatic configuration retention plus preview and
 restore through **Manage / Restore Backups…**. Explicit recovery copies are kept
