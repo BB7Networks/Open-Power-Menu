@@ -1,7 +1,6 @@
 // Rearrangement only: no command payloads, launch signals or direct file access.
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Window
 import QtQuick.Controls as QQC2
 import "LayoutDraft.js" as Draft
 
@@ -11,35 +10,8 @@ QQC2.Control {
     property var draft: null
     property bool busy: false
     property bool expired: false
-    // False preserves the proven narrow single-pane editor for fallback/tests.
-    // The Plasma widget explicitly enables the adjacent flyout experience.
-    property bool cascadingEnabled: false
-    // Use the same Plasma popup window/anchor implementation as normal-use
-    // flyouts when hosted by the widget. The Qt Popup.Window remains a fallback
-    // for headless tests and standalone editor embedding.
-    property bool preferPlasmaFlyout: false
-    property var plasmaFlyout: null
-    readonly property bool plasmaFlyoutActive: preferPlasmaFlyout && plasmaFlyout !== null
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
-    // A real Qt popup is anchored to the hovered row, outside the 328px
-    // main menu. Native Qt drag/drop is used for cross-window moves.
-    property string flyoutId: ""
-    property bool flyoutPointerInside: false
-    property real flyoutX: width + 4
-    property real flyoutY: 0
-    property bool nativeDragHandled: false
-    readonly property string nativeDragFormat: "application/x-opm-layout-entry"
-    readonly property string nativeTokenFormat: "application/x-opm-layout-session"
-    property string pendingHoverFlyoutId: ""
-    property int hoverOpenDelay: 180
-    property int flyoutDismissDelay: 230
-    readonly property bool flyoutVisible: cascadingEnabled && !!draft && !!flyoutId &&
-        !!Draft.find(draft.entries, flyoutId) &&
-        Draft.find(draft.entries, flyoutId).parentId === draft.parentId
-    readonly property var flyoutEntries: flyoutVisible ? (Draft.children(draft.entries, flyoutId) || []) : []
-    readonly property string flyoutTitle: flyoutVisible
-        ? Draft.find(draft.entries, flyoutId).entry.title : ""
     property string draggedId: ""
     property bool dragActive: false
     property bool dragCanceled: false
@@ -138,10 +110,6 @@ QQC2.Control {
     }
     function navigate(parentId, selectedId) {
         rememberView();
-        hoverOpen.stop();
-        flyoutDismiss.stop();
-        pendingHoverFlyoutId = "";
-        flyoutId = "";
         edited(Draft.select(draft, parentId, Draft.selection(draft, parentId, selectedId)));
         if (visible) forceActiveFocus();
     }
@@ -153,10 +121,6 @@ QQC2.Control {
         if (busy || expired) return;
         try {
             const next = Draft.move(draft, id, parentId, beforeId);
-            // Keep both panes open when the drop crosses the visible boundary.
-            // Only data references are saved; this is purely visual navigation.
-            if (flyoutVisible && (parentId === flyoutId || parentId === draft.parentId))
-                next.parentId = draft.parentId;
             rememberView();
             revealSelection = true;
             edited(next);
@@ -176,116 +140,11 @@ QQC2.Control {
         const sibling = parent.container[parent.index + 1];
         move(draft.selectedId, parent.parentId, sibling ? sibling.id : "");
     }
-    function openFlyout(id) {
-        if (!draft) return;
-        if (!cascadingEnabled) { enter(id); return; }
-        hoverOpen.stop();
-        flyoutDismiss.stop();
-        pendingHoverFlyoutId = "";
-        const found = Draft.find(draft.entries, id);
-        if (!found || found.entry.kind !== "submenu") return;
-        if (found.parentId === draft.parentId) {
-            // Position before the native window becomes visible; otherwise
-            // Wayland can briefly show it at the popup's default y=0.
-            positionFlyout(id);
-            flyoutId = id;
-            Qt.callLater(() => positionFlyout(id));
-        } else if (flyoutVisible && found.parentId === flyoutId) {
-            // Advance the level without tearing down/reopening the native popup.
-            rememberView();
-            // Update the parent level before switching the child's ID so the
-            // flyoutVisible binding never compares the new child with the old
-            // draft parent during onDraftChanged.
-            edited(Draft.select(draft, found.parentId,
-                Draft.selection(draft, found.parentId, id)));
-            flyoutId = id;
-            if (visible) forceActiveFocus();
-            Qt.callLater(() => positionFlyout(id));
-        } else {
-            navigate(found.parentId, id);
-            flyoutId = id;
-            Qt.callLater(() => positionFlyout(id));
-        }
-    }
-
-    function positionFlyout(id) {
-        if (!draft || !id) return;
-        const index = rowIndex(id);
-        const row = index >= 0 ? list.itemAtIndex(index) : null;
-        if (!row) return;
-        if (plasmaFlyoutActive) {
-            // Exactly the SideFlyout.qml positioning path: position the
-            // one-pixel visualParent proxy before making the popup visible.
-            const screen = Qt.rect(Screen.virtualX, Screen.virtualY,
-                Screen.width, Screen.height);
-            plasmaFlyout.entries = Draft.children(draft.entries, id) || [];
-            plasmaFlyout.screenRect = screen;
-            plasmaFlyout.positionAtRow(row, plasmaFlyoutAnchor, screen);
-            plasmaFlyout.visualParent = plasmaFlyoutAnchor;
-            plasmaFlyout.popupDirection = plasmaFlyout.chooseSide(plasmaFlyoutAnchor);
-            return;
-        }
-        const local = row.mapToItem(control, 0, 0);
-        const global = row.mapToGlobal(0, 0);
-        const screenLeft = Screen.virtualX;
-        const screenTop = Screen.virtualY;
-        const screenWidth = Screen.desktopAvailableWidth > 0 ? Screen.desktopAvailableWidth : Screen.width;
-        const screenHeight = Screen.desktopAvailableHeight > 0 ? Screen.desktopAvailableHeight : Screen.height;
-        const rightFree = screenLeft + screenWidth - (global.x + row.width);
-        const leftFree = global.x - screenLeft;
-        const openRight = rightFree >= flyoutPane.width + 6 || rightFree >= leftFree;
-        flyoutX = openRight ? local.x + row.width + 3 : local.x - flyoutPane.width - 3;
-        const childCount = (Draft.children(draft.entries, id) || []).length;
-        const popupH = Math.max(72, Math.min(410, (childCount * 36) + 72));
-        const border = 4;
-        // Match the normal-use SideFlyout.positionAtRow() rule: the flyout's
-        // BOTTOM edge meets the hovered parent's BOTTOM edge. Only adjust
-        // vertically when the actual display boundary makes that impossible.
-        const screenBottom = screenTop + screenHeight - border;
-        const topLimit = Math.max(screenTop + border, screenBottom - popupH);
-        const requestedTop = global.y + row.height - popupH;
-        const targetTop = Math.max(screenTop + border, Math.min(requestedTop, topLimit));
-        flyoutY = local.y + targetTop - global.y;
-    }
-    function setFlyoutPointer(inside) {
-        flyoutPointerInside = inside;
-        if (inside) flyoutDismiss.stop();
-        else if (flyoutVisible && !dragActive) flyoutDismiss.restart();
-    }
-    function canMoveSelectionIntoFlyout() {
-        if (!draft || !flyoutVisible || busy || expired || !draft.selectedId) return false;
-        return !Draft.moveError(draft, draft.selectedId, flyoutId, "");
-    }
-    function moveSelectedIntoFlyout() {
-        if (!canMoveSelectionIntoFlyout()) return;
-        const movingId = draft.selectedId;
-        move(movingId, flyoutId, "");
-    }
-    function createPlasmaFlyout() {
-        if (!preferPlasmaFlyout || plasmaFlyout) return;
-        const component = Qt.createComponent(Qt.resolvedUrl("LayoutPlasmaFlyout.qml"));
-        if (component.status !== Component.Ready) {
-            console.warn("Open Power Menu: Plasma editing flyout unavailable:",
-                component.errorString());
-            return;
-        }
-        const window = component.createObject(control, {
-            "editor": control,
-            "visualParent": plasmaFlyoutAnchor
-        });
-        if (!window) {
-            console.warn("Open Power Menu: Plasma editing flyout creation failed");
-            return;
-        }
-        plasmaFlyout = window;
-        if (flyoutVisible) positionFlyout(flyoutId);
-    }
     function enter(id) {
         const children = Draft.children(draft.entries, id);
         if (children) navigate(id, children.length ? children[0].id : "");
     }
     function back() {
-        if (flyoutVisible) { flyoutId = ""; flyoutPointerInside = false; return; }
         if (!draft || !draft.parentId) return;
         const parent = Draft.find(draft.entries, draft.parentId);
         navigate(parent.parentId, parent.entry.id);
@@ -310,86 +169,9 @@ QQC2.Control {
             if (key) springOpen.restart(); else springOpen.stop();
         }
     }
-    // Accept only current-draft entry references. A drag cannot execute commands.
-    function nativeDrop(event, destination, view, entries) {
-        if (!draft || !cascadingEnabled || busy || expired) return false;
-        if (!event.formats.includes(nativeDragFormat) ||
-                !event.formats.includes(nativeTokenFormat)) return false;
-        const id = event.getDataAsString(nativeDragFormat);
-        if (event.getDataAsString(nativeTokenFormat) !== draft.token ||
-                !Draft.find(draft.entries, id)) return false;
-        const contentY = event.y + view.contentY;
-        const index = view.indexAt(Math.min(12, view.width / 2), contentY);
-        let parentId = destination, beforeId = "";
-        if (index >= 0 && index < entries.length) {
-            const entry = entries[index], row = view.itemAtIndex(index);
-            if (!row) return false;
-            const relativeY = contentY - row.y;
-            if (entry.kind === "submenu" && relativeY >= row.height * .25 &&
-                    relativeY < row.height * .75) parentId = entry.id;
-            else if (relativeY < row.height / 2) beforeId = entry.id;
-            else beforeId = entries[index + 1] ? entries[index + 1].id : "";
-        }
-        if (Draft.moveError(draft, id, parentId, beforeId)) return false;
-        nativeDragHandled = true;
-        move(id, parentId, beforeId);
-        cancelDrag(false);
-        return true;
-    }
-    function containsPointer(pane, x, y) {
-        if (!pane.visible) return false;
-        const point = rowPointer.mapToItem(pane, x, y);
-        return point.x >= 0 && point.y >= 0 &&
-               point.x < pane.width && point.y < pane.height;
-    }
-    function pointerPane(x, y) {
-        if (containsPointer(list, x, y)) {
-            const point = rowPointer.mapToItem(list, x, y);
-            if (point.x < list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0))
-                return {list: list, parentId: draft.parentId, entries: rows};
-        }
-        return null;
-    }
-    function rowUnderPointer(x, y) {
-        const pane = pointerPane(x, y);
-        if (!pane) return null;
-        const point = rowPointer.mapToItem(pane.list.contentItem, x, y);
-        const index = pane.list.indexAt(point.x, point.y);
-        return index >= 0 && index < pane.entries.length ?
-            {entry: pane.entries[index], parentId: pane.parentId} : null;
-    }
-    function updateFlyoutHover(x, y) {
-        if (!cascadingEnabled || !draft || busy || expired || dragActive) {
-            hoverOpen.stop();
-            flyoutDismiss.stop();
-            return;
-        }
-        const hit = rowPointer.containsMouse ? rowUnderPointer(x, y) : null;
-        if (hit && hit.entry.kind === "submenu" &&
-                (hit.parentId === draft.parentId ||
-                 (flyoutVisible && hit.parentId === flyoutId))) {
-            flyoutDismiss.stop();
-            if (hit.entry.id !== flyoutId) {
-                if (pendingHoverFlyoutId !== hit.entry.id || !hoverOpen.running) {
-                    pendingHoverFlyoutId = hit.entry.id;
-                    hoverOpen.restart();
-                }
-            } else {
-                hoverOpen.stop();
-                pendingHoverFlyoutId = "";
-            }
-            return;
-        }
-        hoverOpen.stop();
-        pendingHoverFlyoutId = "";
-        if (flyoutVisible && flyoutPointerInside) {
-            flyoutDismiss.stop();
-            return;
-        }
-        if (flyoutVisible && !flyoutDismiss.running) flyoutDismiss.start();
-    }
     function updateDragTarget() {
         if (!dragActive || dragCanceled || !draft || restoringView) return;
+        // The entire top button is an active spring-loaded Go Back target.
         const backPoint = rowPointer.mapToItem(navigationBar, rowPointer.mouseX, rowPointer.mouseY);
         if (draft.parentId && backPoint.x >= 0 && backPoint.x < navigationBar.width
                 && backPoint.y >= 0 && backPoint.y < navigationBar.height) {
@@ -398,21 +180,22 @@ QQC2.Control {
             target("parent:" + draft.parentId, "parent", parent.parentId, next ? next.id : "", true);
             return;
         }
-        const pane = pointerPane(rowPointer.mouseX, rowPointer.mouseY);
-        if (!pane) { clearTarget(); return; }
-        const point = rowPointer.mapToItem(pane.list.contentItem, rowPointer.mouseX, rowPointer.mouseY);
-        const index = pane.list.indexAt(point.x, point.y);
-        if (index < 0) { target("end:" + pane.parentId, "end", pane.parentId, "", false); return; }
-        const row = pane.list.itemAtIndex(index);
+        const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
+        if (point.x < 0 || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)
+                || point.y < 0 || point.y >= list.height) { clearTarget(); return; }
+        const content = rowPointer.mapToItem(list.contentItem, rowPointer.mouseX, rowPointer.mouseY);
+        const index = list.indexAt(content.x, content.y);
+        if (index < 0) { target("end", "end", draft.parentId, "", false); return; }
+        const row = list.itemAtIndex(index);
         if (!row) { clearTarget(); return; }
-        const entry = pane.entries[index];
-        const y = point.y - row.y;
+        const entry = rows[index];
+        const y = content.y - row.y;
         if (entry.kind === "submenu" && y >= row.height * .25 && y < row.height * .75) {
             target(entry.id, "inside", entry.id, "", true);
         } else {
             dropBelow = y >= row.height / 2;
-            const next = pane.entries[index + 1];
-            target(entry.id, dropBelow ? "after" : "before", pane.parentId,
+            const next = rows[index + 1];
+            target(entry.id, dropBelow ? "after" : "before", draft.parentId,
                    dropBelow ? (next ? next.id : "") : entry.id, false);
         }
     }
@@ -432,11 +215,9 @@ QQC2.Control {
         // three 36px rows. Consume even at bounds so the outer popup stays put.
         const delta = wheel.pixelDelta.y || wheel.angleDelta.y / 120 * 108;
         if (Number.isFinite(delta) && delta !== 0) {
-            const pane = pointerPane(rowPointer.mouseX, rowPointer.mouseY);
-            const view = pane ? pane.list : list;
-            view.contentY = Math.max(view.originY, Math.min(view.contentY - delta,
-                view.originY + Math.max(0, view.contentHeight - view.height)));
-            view.forceLayout();
+            list.contentY = Math.max(list.originY, Math.min(list.contentY - delta,
+                list.originY + Math.max(0, list.contentHeight - list.height)));
+            list.forceLayout();
             updateDragTarget();
         }
         wheel.accepted = true;
@@ -476,36 +257,11 @@ QQC2.Control {
         event.accepted = true;
     }
     Keys.onPressed: event => handleKey(event)
-    onDraftChanged: {
-        syncView();
-        // A nested popup can temporarily be hidden while its parent changes.
-        // Validate the entry's existence, not the transient visibility binding.
-        if (!draft || (flyoutId && !Draft.find(draft.entries, flyoutId)))
-            flyoutId = "";
-    }
-    Component.onCompleted: {
-        viewReady = true;
-        syncView();
-        if (preferPlasmaFlyout) Qt.callLater(() => createPlasmaFlyout());
-    }
-    onPreferPlasmaFlyoutChanged: {
-        if (preferPlasmaFlyout && viewReady) Qt.callLater(() => createPlasmaFlyout());
-    }
-    Component.onDestruction: {
-        if (plasmaFlyout) { plasmaFlyout.visible = false; plasmaFlyout.destroy(); }
-    }
+    onDraftChanged: syncView()
+    Component.onCompleted: { viewReady = true; syncView(); }
     onVisibleChanged: {
-        if (!visible) {
-            rememberView();
-            hoverOpen.stop();
-            flyoutDismiss.stop();
-            pendingHoverFlyoutId = "";
-            cancelDrag();
-            flyoutId = "";
-            flyoutPointerInside = false;
-            movesMenu.close();
-            destinationMenu.close();
-        } else if (viewReady && draft) Qt.callLater(() => restoreView(false));
+        if (!visible) { rememberView(); cancelDrag(); movesMenu.close(); destinationMenu.close(); }
+        else if (viewReady && draft) Qt.callLater(() => restoreView(false));
     }
 
     QQC2.Menu {
@@ -561,31 +317,30 @@ QQC2.Control {
 
     contentItem: ColumnLayout {
         spacing: 4
-        RowLayout {
+        // A full-width, dedicated parent-navigation drop target. It shares
+        // its geometry with the drag hit test so the same large area works for
+        // a normal click and spring-loaded navigation while holding an item.
+        QQC2.Button {
             id: navigationBar
+            objectName: "layoutBack"
             Layout.fillWidth: true
-            QQC2.ToolButton {
-                objectName: "layoutBack"
-                text: "Back"
-                icon.name: "go-previous"
-                icon.color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.buttonText
-                enabled: !!control.draft && !!control.draft.parentId && !control.busy
-                onClicked: control.back()
-                Accessible.name: "Back to parent menu"
-                QQC2.ToolTip.visible: hovered
-                QQC2.ToolTip.text: "Parent menu (Left)"
-            }
-            QQC2.Label {
-                Layout.fillWidth: true
-                text: control.draft && control.draft.parentId ? Draft.find(control.draft.entries, control.draft.parentId).entry.title : "Top level"
-                elide: Text.ElideMiddle
-                font.bold: true
-                color: control.dragActive && control.dropKind === "parent" ? control.palette.highlight : control.palette.windowText
-            }
+            Layout.preferredHeight: 48
+            enabled: !!control.draft && !!control.draft.parentId && !control.busy
+            text: control.draft && control.draft.parentId
+                ? "Go Back · " + Draft.find(control.draft.entries, control.draft.parentId).entry.title
+                : "Top level"
+            font.bold: true
+            icon.name: enabled ? "go-previous" : "go-home"
+            highlighted: control.dragActive && control.dropKind === "parent"
+            onClicked: control.back()
+            Accessible.name: enabled ? "Go Back to parent menu" : "Top level"
+            Accessible.description: "Hold a dragged item here to navigate to its parent without dropping it."
+            QQC2.ToolTip.visible: hovered && enabled
+            QQC2.ToolTip.text: "Click to go back, or drag here and hold to move up one level"
         }
         QQC2.Label {
             Layout.fillWidth: true
-            text: "Drag to reorder here. Select an item, hover a submenu, then use Move selected item here."
+            text: "Drag an item onto a submenu and hold to open it. Drag onto Go Back to move up."
             wrapMode: Text.WordWrap
         }
         ListView {
@@ -648,17 +403,7 @@ QQC2.Control {
                     width: parent.width
                     height: 2
                     color: control.dropValid ? control.palette.highlight : "#da4453"
-                    visible: control.dragActive && control.dropKind === "end" &&
-                             control.dropParent === control.draft.parentId
-                }
-            }
-            DropArea {
-                anchors.fill: parent
-                keys: ["opm-layout"]
-                onDropped: event => {
-                    if (control.nativeDrop(event, control.draft.parentId, list, control.rows))
-                        event.accept(Qt.MoveAction);
-                    else event.accepted = false;
+                    visible: control.dragActive && control.dropKind === "end"
                 }
             }
         }
@@ -679,161 +424,6 @@ QQC2.Control {
             }
         }
     }
-    // The popup below is a Qt-only fallback. Plasma uses LayoutPlasmaFlyout.qml
-    // loaded at runtime so the native KWin placement matches normal submenus.
-    Item {
-        id: plasmaFlyoutAnchor
-        width: 1
-        height: 1
-    }
-    QQC2.Popup {
-            id: flyoutPane
-            objectName: "layoutCascadingPane"
-            parent: control
-            popupType: QQC2.Popup.Window
-            visible: control.flyoutVisible && !control.plasmaFlyoutActive
-            modal: false
-            focus: false
-            closePolicy: QQC2.Popup.NoAutoClose
-            onAboutToShow: control.positionFlyout(control.flyoutId)
-            onClosed: {
-                // The editor owns visibility through flyoutId. A late native
-                // close notification must not erase a newly selected nested
-                // submenu that was opened during the same event loop.
-                control.flyoutPointerInside = false;
-            }
-            x: control.flyoutX
-            y: control.flyoutY
-            width: 280
-            height: Math.max(72, Math.min(410, (control.flyoutEntries.length * 36) + 72))
-            padding: 5
-            background: Rectangle {
-                color: control.palette.window
-                border.color: control.palette.mid
-                radius: 4
-            }
-            contentItem: Item {
-                id: flyoutSurface
-                HoverHandler {
-                    onHoveredChanged: control.setFlyoutPointer(hovered)
-                }
-                ColumnLayout {
-                    anchors.fill: parent
-                    spacing: 4
-                QQC2.Label {
-                    Layout.fillWidth: true
-                    font.bold: true
-                    text: control.flyoutTitle
-                    elide: Text.ElideMiddle
-                    Accessible.name: "Open submenu"
-                }
-                QQC2.Button {
-                    Layout.fillWidth: true
-                    text: "Move selected item here"
-                    enabled: control.canMoveSelectionIntoFlyout()
-                    onClicked: control.moveSelectedIntoFlyout()
-                }
-                ListView {
-                    id: flyoutList
-                    objectName: "layoutFlyoutRows"
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    model: control.flyoutEntries
-                    interactive: !control.dragActive
-                    boundsBehavior: Flickable.StopAtBounds
-                    QQC2.ScrollBar.vertical: QQC2.ScrollBar { id: flyoutScrollBar }
-                    onModelChanged: Qt.callLater(() => {
-                        if (!control.flyoutVisible) return;
-                        const saved = Draft.view(control.draft, control.flyoutId);
-                        if (saved) contentY = Math.max(originY, Math.min(originY + saved.position,
-                            originY + Math.max(0, contentHeight - height)));
-                    })
-                    onContentYChanged: {
-                        if (!control.flyoutVisible || !control.draft || control.restoringView) return;
-                        const saved = Draft.view(control.draft, control.flyoutId) || {};
-                        Draft.rememberView(control.draft, control.flyoutId, {
-                            anchorId: saved.anchorId || "",
-                            offset: 0, position: contentY - originY,
-                            selectedId: saved.selectedId || ""
-                        });
-                    }
-                    delegate: QQC2.ItemDelegate {
-                        id: childRow
-                        required property var modelData
-                        required property int index
-                        property var entry: modelData
-                        objectName: "layoutFlyoutRow-" + entry.id
-                        width: flyoutList.width
-                        height: 36
-                        text: entry.title
-                        highlighted: control.draft && entry.id === control.draft.selectedId
-                        enabled: !control.busy
-                        Accessible.name: entry.title + (entry.kind === "submenu" ? ", submenu" : ", rearrange only")
-                        QQC2.Label {
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.rightMargin: 9
-                            text: childRow.entry.kind === "submenu" ? "›" : ""
-                        }
-                        Rectangle {
-                            width: parent.width
-                            height: control.dropKind === "inside" ? parent.height : 2
-                            y: control.dropKind !== "inside" && control.dropBelow ? parent.height - height : 0
-                            color: control.dropValid ? control.palette.highlight : "#da4453"
-                            opacity: control.dropKind === "inside" ? .25 : 1
-                            visible: control.dragActive && control.dropRow === childRow.entry.id
-                        }
-                        MouseArea {
-                            id: childPointer
-                            anchors.fill: parent
-                            acceptedButtons: Qt.LeftButton
-                            preventStealing: true
-                            // No native cross-window drag grab. It can block
-                            // the entire Plasma popup on Wayland.
-                            drag.smoothed: false
-                            onPressed: {
-                                control.nativeDragHandled = false;
-                                control.flyoutPointerInside = true;
-                                flyoutDismiss.stop();
-                            }
-                            onClicked: {
-                                if (childRow.entry.kind === "submenu")
-                                    control.openFlyout(childRow.entry.id);
-                                else control.navigate(control.flyoutId, childRow.entry.id);
-                            }
-                        }
-
-                    }
-                    footer: Item {
-                        width: flyoutList.width
-                        height: flyoutList.count ? 24 : Math.max(32, flyoutList.height)
-                        QQC2.Label {
-                            anchors.centerIn: parent
-                            text: control.dragActive ? "Drop at end" : flyoutList.count ? "" : "Empty submenu"
-                        }
-                        Rectangle {
-                            width: parent.width
-                            height: 2
-                            color: control.dropValid ? control.palette.highlight : "#da4453"
-                            visible: control.dragActive && control.dropKind === "end" &&
-                                     control.dropParent === control.flyoutId
-                        }
-                    }
-                    DropArea {
-                        anchors.fill: parent
-                        keys: ["opm-layout"]
-                        onDropped: event => {
-                            if (control.nativeDrop(event, control.flyoutId, flyoutList, control.flyoutEntries))
-                                event.accept(Qt.MoveAction);
-                            else event.accepted = false;
-                        }
-                    }
-                }
-            }
-                }
-    }
-
     // One stable pointer owner survives row moves and submenu navigation. Qt's
     // native drag threshold distinguishes a click from movement; no hold delay.
     MouseArea {
@@ -842,94 +432,60 @@ QQC2.Control {
         z: 50
         enabled: !control.busy && !control.expired
         property string pressedId: ""
-        property string pressedParent: ""
         property bool suppressClick: false
         preventStealing: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        hoverEnabled: control.cascadingEnabled
-        onEntered: control.updateFlyoutHover(mouseX, mouseY)
-        onExited: {
-            hoverOpen.stop();
-            pendingHoverFlyoutId = "";
-            if (control.flyoutVisible && !control.dragActive) flyoutDismiss.restart();
-        }
         drag.target: (pressedButtons & Qt.LeftButton) ? dragPosition : null
         drag.smoothed: false
         onPressed: mouse => {
-            hoverOpen.stop();
-            flyoutDismiss.stop();
-            control.nativeDragHandled = false;
-            const hit = control.rowUnderPointer(mouse.x, mouse.y);
-            if (!hit) { mouse.accepted = false; return; }
-            // A detached Qt popup may own the pointer while it is visible.
-            // Release that ownership immediately on a parent-row press;
-            // waiting for the drag threshold can leave drop targets unreachable.
-            if (mouse.button === Qt.LeftButton && control.flyoutVisible) {
-                control.flyoutId = "";
-                control.flyoutPointerInside = false;
+            const point = mapToItem(list, mouse.x, mouse.y);
+            const content = mapToItem(list.contentItem, mouse.x, mouse.y);
+            const index = list.indexAt(content.x, content.y);
+            if (point.x < 0 || point.y < 0 || point.y >= list.height || index < 0
+                    || point.x >= list.width - (layoutScrollBar.visible ? layoutScrollBar.width : 0)) {
+                mouse.accepted = false; return;
             }
-            pressedId = hit.entry.id;
-            pressedParent = hit.parentId;
+            pressedId = rowModel.get(index).itemId;
             control.choose(pressedId);
             control.forceActiveFocus();
             if (mouse.button === Qt.RightButton) return;
             suppressClick = false;
             control.dragCanceled = false;
             control.draggedId = pressedId;
-            control.dragOriginParent = pressedParent;
+            control.dragOriginParent = control.draft.parentId;
             dragPosition.x = mouse.x - 8;
             dragPosition.y = mouse.y - 18;
         }
         onPositionChanged: {
             if (drag.active && !control.dragCanceled) {
-                hoverOpen.stop();
-                flyoutDismiss.stop();
                 control.dragActive = true;
                 control.updateDragTarget();
-            } else if (!rowPointer.pressed) {
-                control.updateFlyoutHover(mouseX, mouseY);
             }
         }
         onReleased: mouse => {
             if (mouse.button === Qt.RightButton) return;
-            if (control.nativeDragHandled) {
-                suppressClick = true;
-                control.nativeDragHandled = false;
-                control.cancelDrag(false);
-                return;
-            }
             suppressClick = control.dragActive || control.dragCanceled;
             control.updateDragTarget();
             const accepted = control.dragActive && !control.dragCanceled && control.dropValid;
             if (accepted) control.move(control.draggedId, control.dropParent, control.dropBefore);
             control.cancelDrag(!accepted);
-            control.updateFlyoutHover(mouse.x, mouse.y);
         }
         onClicked: mouse => {
-            if (mouse.button === Qt.RightButton) {
-                if (pressedParent !== control.draft.parentId)
-                    control.navigate(pressedParent, pressedId);
-                control.showMoves(mouse.x, mouse.y); return;
-            }
+            if (mouse.button === Qt.RightButton) { control.showMoves(mouse.x, mouse.y); return; }
             if (suppressClick || !control.draft) return;
             const entry = Draft.find(control.draft.entries, pressedId);
-            if (entry && entry.entry.kind === "submenu") control.openFlyout(pressedId);
-            else if (pressedParent !== control.draft.parentId)
-                control.navigate(pressedParent, pressedId);
+            if (entry && entry.entry.kind === "submenu") control.enter(pressedId);
         }
         onCanceled: { suppressClick = true; control.cancelDrag(); }
         onWheel: wheel => control.scrollDuringDrag(wheel)
     }
-    // Keep drag movement inside the existing MouseArea's nonblocking path.
-    // Drag.Automatic starts a nested native QDrag loop on Wayland, stealing
-    // mouse-release events from the parent menu when a flyout is visible.
     Item { id: dragPosition }
     Rectangle {
         id: dragProxy
         objectName: "inMenuDragPreview"
         x: Math.max(0, Math.min(dragPosition.x, control.width - width))
         y: dragPosition.y
-        width: Math.min(292, control.width - 30)
+        width: control.width - 30
         height: 36
         z: 100
         visible: control.dragActive
@@ -945,44 +501,13 @@ QQC2.Control {
         }
     }
     Timer {
-        id: hoverOpen
-        interval: control.hoverOpenDelay
-        onTriggered: {
-            if (control.dragActive || !rowPointer.containsMouse || !control.draft) return;
-            const hit = control.rowUnderPointer(rowPointer.mouseX, rowPointer.mouseY);
-            if (hit && hit.entry.kind === "submenu" && hit.entry.id === control.pendingHoverFlyoutId &&
-                    (hit.parentId === control.draft.parentId ||
-                     (control.flyoutVisible && hit.parentId === control.flyoutId)))
-                control.openFlyout(hit.entry.id);
-        }
-    }
-    Timer {
-        id: flyoutDismiss
-        interval: control.flyoutDismissDelay
-        onTriggered: {
-            if (control.dragActive || !control.flyoutVisible) return;
-            if (rowPointer.containsMouse) {
-                const hit = control.rowUnderPointer(rowPointer.mouseX, rowPointer.mouseY);
-                if (hit && hit.parentId === control.draft.parentId && hit.entry.id === control.flyoutId)
-                    return;
-                if (control.flyoutPointerInside) return;
-            }
-            control.flyoutId = "";
-        }
-    }
-    Timer {
         id: springOpen
         interval: control.submenuHoverDelay
         onTriggered: {
             if (!control.dragActive || !control.hoverKey) return;
             const parentId = control.hoverParent;
-            const kind = control.dropKind; // Preserve before clearTarget resets it.
             control.clearTarget();
-            if (kind === "parent" || !control.cascadingEnabled) {
-                control.navigate(parentId, "");
-            } else {
-                control.openFlyout(parentId);
-            }
+            control.navigate(parentId, "");
         }
     }
     Timer {
@@ -990,13 +515,11 @@ QQC2.Control {
         repeat: true
         running: control.dragActive
         onTriggered: {
-            const pane = control.pointerPane(rowPointer.mouseX, rowPointer.mouseY);
-            if (!pane) return;
-            const view = pane.list;
-            const point = rowPointer.mapToItem(view, rowPointer.mouseX, rowPointer.mouseY);
-            if (point.y < 24) view.contentY = Math.max(view.originY, view.contentY - 12);
-            else if (point.y > view.height - 24)
-                view.contentY = Math.min(view.originY + Math.max(0, view.contentHeight - view.height), view.contentY + 12);
+            const point = rowPointer.mapToItem(list, rowPointer.mouseX, rowPointer.mouseY);
+            if (point.x < 0 || point.x > list.width || point.y < 0 || point.y > list.height) return;
+            if (point.y < 24) list.contentY = Math.max(list.originY, list.contentY - 12);
+            else if (point.y > list.height - 24)
+                list.contentY = Math.min(list.originY + Math.max(0, list.contentHeight - list.height), list.contentY + 12);
             control.updateDragTarget();
         }
     }
