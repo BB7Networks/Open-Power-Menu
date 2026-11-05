@@ -4,12 +4,12 @@ The project uses **actual Plasma 6 captures**, never generated mockups or
 screens that suggest unimplemented features. Capture on a live desktop after
 [acceptance testing](../TESTING.md), and retain reproducible UI information.
 
-## Captured and ready for check-in
+## Captured screenshots
 
-The project owner supplied three real Manjaro / Plasma 6 screenshots for PR #6.
-The **image files are not in this branch yet**; the following names have been
-reserved for them. The README gallery is intentionally commented out until
-the actual files are committed, so visitors do not see broken images.
+Three genuine Manjaro / Plasma 6 screenshots have been prepared. Their image
+binaries are awaiting repository upload; the names below are reserved for the
+gallery. The README links to this guide instead of embedding images until the
+assets are available, avoiding broken screenshots.
 
 | File to commit | What the capture shows |
 | --- | --- |
@@ -17,7 +17,7 @@ the actual files are committed, so visitors do not see broken images.
 | `submenu-flyout.png` | Normal-use **Shut down or sign out** submenu opening beside its parent row |
 | `configure-general.png` | **Configure → General**, including launcher selection, button hiding, emergency restore, icon and appearance |
 
-To enable the README gallery after adding the files:
+When image files have been uploaded, embed the gallery in the README:
 
 ```md
 ![Power User Menu attached to the Manjaro panel](docs/images/power-user-menu.png)
