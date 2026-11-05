@@ -203,12 +203,14 @@ the source evidence and repeated-activation capture procedure.
 
 ## Verification
 
-The latest baseline at `b236efd` passed **370 tests, 8 historical-source skips,
-and 18 subtests** in 25.12 seconds. The full follow-up suite passes **393 tests,
-8 historical-source skips, and 18 subtests** in 28.20 seconds (Python 3.12.14, PySide6 6.10.2,
-Node 24; CI uses Node 22). The missing historical release trees remain explicit.
-[PR #5 checks](https://github.com/BB7Networks/Open-Power-Menu/pull/5/checks) record
-CI results for each pushed head.
+On main with PRs #1–#6 included and the test helper correction, the local suite passes **399 tests,
+8 historical-source skips and 18 subtests** in 72.23 seconds (Python 3.12,
+PySide6 6.10.2, Node 24; CI uses Node 22). A test helper now waits for the row
+delegate after spring navigation instead of assuming it exists before the next
+Qt polish. The missing historical release trees remain explicit. See the
+[consolidation review](CONSOLIDATION-REVIEW.md) for main's separate CI results;
+[PR #5 checks](https://github.com/BB7Networks/Open-Power-Menu/pull/5/checks) retain
+the earlier development results.
 
 Coverage includes actual Qt Widgets/Quick input, mouse and touchpad wheel events,
 keyboard/context movement menus, installed-process launch outcomes, standalone
@@ -219,14 +221,15 @@ original-button visibility and retained draft, with rapid clicks and stale
 callbacks. These models establish event ordering, not visual compositor behavior.
 Python compilation, all seven Bash syntax checks and all changed QML parsing pass.
 
-Cloud limitations: no Plasma shell, KDE settings tools or real Wayland/X11 session.
-Installed commands are exercised in isolated XDG profiles with a stub KPackage
-command. Qt exposure/focus tests run offscreen, including a forced Wayland code
-branch. The source-confirmed parentless-popup defect and redundant AppGrid closes
-are addressed, but the user's Meta+X failure and intermittent desktop flash cannot
-be declared resolved without live checks. Full-row/hover dragging was separately
-confirmed by the user; new wheel/context interactions still need desktop acceptance.
-Real desktop screenshots and native screen-reader/theme behavior remain live work.
+Automated tests exercise installed commands in isolated XDG profiles with a stub
+KPackage command. Qt exposure/focus tests run offscreen, including a forced
+Wayland code branch. Separate [actual Plasma 6 captures](images/README.md) now
+show the menu, flyout, Configure and Go Back editor in an isolated X11 desktop.
+That capture session verifies display, click navigation, Cancel and Kickoff
+handoff; it does not certify physical Wayland input or AppGrid behavior.
+Full-row/hover dragging was separately confirmed by the user. Native Meta+X
+lifecycle, the intermittent AppGrid desktop flash, wheel/context interactions
+and screen-reader behavior remain part of the desktop acceptance matrix.
 
 ## Live Manjaro Plasma 6 Wayland acceptance
 

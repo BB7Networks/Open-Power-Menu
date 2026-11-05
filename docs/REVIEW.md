@@ -1,5 +1,9 @@
 # Review: default actions, lifecycle and release readiness
 
+> Historical record of PR #3's development review. PRs #1–#6 are now merged;
+> the branch status, test counts and UI descriptions below refer to that earlier
+> point in development. See the [current consolidation review](CONSOLIDATION-REVIEW.md).
+
 ## Base and scope
 
 The fetched `main` at `ed5c9aa` is the initial 0.4.17 beta. On this review,

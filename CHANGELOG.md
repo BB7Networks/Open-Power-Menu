@@ -1,5 +1,15 @@
 # Open Power Menu changelog
 
+## Unreleased - consolidation review and screenshot gallery
+
+- Verify that PRs #1–#6 and every retained feature/fix branch are fully included
+  in main; record the merge order, current behavior and validation evidence.
+- Embed actual Power User Menu, submenu and Configure screenshots in the README.
+  Add seven captures with source revision and Debian 13 / Plasma 6.3.6 / X11
+  provenance, including single-pane editing and the existing Kickoff launcher.
+- Make Qt drag-test coordinates wait for a row delegate after spring navigation,
+  with a one-second bound. Application behavior and version identifiers are unchanged.
+
 ## Unreleased - native widget shortcut and single-pane editor
 
 - Attempt **Meta+X once per new Plasma widget instance**, invoking the existing
@@ -15,11 +25,10 @@
   to their parent level; the normal locked-menu flyouts remain unchanged.
 - Remove the obsolete manual Meta+X setup button and editing-flyout toggle,
   while preserving standalone launch diagnostics as an optional fallback.
-- Refresh README and linked troubleshooting/acceptance docs. Three genuine
-  Manjaro Plasma screenshots are captured for the repository gallery;
-  image publication remains pending.
+- Refresh README and linked troubleshooting/acceptance docs. The original
+  gallery placeholders are superseded by the committed captures above.
 - Keep version identifiers at **0.4.17** until review, live desktop acceptance,
-  merge and an explicitly approved release.
+  and an explicitly approved release.
 
 ## Unreleased - configuration UX and in-menu layout editing
 

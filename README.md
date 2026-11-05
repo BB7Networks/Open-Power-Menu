@@ -27,11 +27,19 @@ right-click tools without insisting on an entire desktop makeover.
 
 ## Screenshots
 
-Real Manjaro Plasma 6 captures of the Power User Menu, a normal-use submenu,
-and **Configure → General** have been prepared for the
-[repository screenshot gallery](docs/images/README.md). They will be embedded
-here once the image files are available in the repository. No generated mockups
-are presented as screenshots.
+Captured from the running application on **Debian 13, KDE Plasma 6.3.6 and
+Qt 6.8.2**, using an isolated X11 desktop with Breeze Light at 100% scale.
+
+**Right-click the OPM button for the Power User Menu:**
+
+![Power User Menu attached to the bottom panel, with the OPM button visible](docs/images/power-user-menu.png)
+
+**Hover a submenu to open its flyout:**
+
+![Shut down or sign out flyout opening to the left of the Power User Menu](docs/images/submenu-flyout.png)
+
+See the [full gallery and capture details](docs/images/README.md) for Configure,
+in-menu editing and the existing Kickoff launcher opened through OPM.
 
 ## Why use it?
 
@@ -142,7 +150,7 @@ not the standalone diagnostic window. Press it again to close the menu.
   or reinstalling OPM **do not reassign it**.
 - When you remove an OPM widget, the new cleanup path releases **that
   instance's** shortcut; choosing Plasma's **Undo** attempts to restore it.
-  Live remove/re-add testing is still part of PR #6's acceptance work.
+  Live remove/re-add testing remains part of release acceptance.
 - An orphaned binding left by an **older** OPM instance may need to be
   cleared once in **System Settings → Keyboard → Shortcuts**.
 - You can change or disable the current instance's binding in its native
@@ -161,6 +169,8 @@ See [shortcut lifecycle and testing](docs/NATIVE-SHORTCUT-CASCADE.md) or the
 original panel button, the OPM button icon, and the menu's appearance.
 You can follow the original launcher's icon or use a custom theme icon/image.
 Optional Aero styling is available; the normal desktop theme remains a choice.
+
+![Configure General tab with launcher, icon and appearance controls](docs/images/configure-general.png)
 
 **Layout** lets you add installed applications, built-ins, custom commands and
 submenus. Under **Add → Installed application**, search by name or description;
@@ -219,8 +229,8 @@ prove** physical Wayland pointer behavior, shortcut registration, popup
 placement or focus handling.
 
 Current priorities include live acceptance on more panel positions, launchers,
-display scales and clean-account upgrades; publishing the captured screenshots; and a
-user-consented backend installation path for KDE Store. Separate desktop
+display scales and clean-account upgrades, plus a user-consented backend
+installation path for KDE Store. Separate desktop
 application scopes will be evaluated only with real Plasma/systemd evidence—
 process ancestry alone doesn't establish an application lifetime.
 
@@ -237,7 +247,8 @@ Qt/D-Bus checks. Release scripts build local artifacts and **do not publish**
 a tag or release. See [testing](docs/TESTING.md),
 [contributing](docs/CONTRIBUTING.md),
 [adapter design](docs/ADAPTERS.md),
-[review findings](docs/REVIEW.md),
+[main/branch/PR consolidation review](docs/CONSOLIDATION-REVIEW.md),
+[earlier development review](docs/REVIEW.md),
 [process lifecycle](docs/PROCESS-LIFECYCLE.md) and
 [release preparation](docs/PUBLISHING.md).
 
