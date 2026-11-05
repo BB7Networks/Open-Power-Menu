@@ -8,7 +8,7 @@ os.environ.setdefault('QT_QUICK_BACKEND', 'software')
 import pytest
 
 pytest.importorskip('PySide6.QtQuick', reason='Qt Quick interactions run in the Qt CI job')
-from PySide6.QtCore import QPoint, QPointF, QUrl, Qt
+from PySide6.QtCore import QElapsedTimer, QPoint, QPointF, QUrl, Qt
 from PySide6.QtGui import QColor, QWheelEvent
 from PySide6.QtQml import QQmlEngine, QQmlExpression
 from PySide6.QtQuick import QQuickView
@@ -314,7 +314,15 @@ def test_dragging_a_whole_submenu_preserves_children_without_opening(quick):
 
 
 def point(root, name, x=120, y=18):
+    # A spring-navigation timer can update the draft before Qt's next polish
+    # creates ListView delegates (especially when returning to 200 entries).
+    # Wait for the actual target, with a bound, instead of assuming one frame.
+    deadline = QElapsedTimer()
+    deadline.start()
     item = child(root, name)
+    while item is None and deadline.elapsed() < 1000:
+        QTest.qWait(10)
+        item = child(root, name)
     assert item is not None, name
     return item.mapToScene(QPointF(x, y)).toPoint()
 
