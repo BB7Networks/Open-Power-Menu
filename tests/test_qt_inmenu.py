@@ -637,7 +637,7 @@ def test_full_width_go_back_area_is_a_spring_loaded_drag_target(quick):
     QTest.qWait(20)
     value = draft(root)
     assert [e['id'] for e in value['entries']] == ['a', 'g', 'b', 'c', 's']
-    assert next(e for e in value['entries'] if e['id'] == 'g')['items'] == []
+    assert [e['id'] for e in next(e for e in value['entries'] if e['id'] == 'g')['items']] == ['h']
     assert not root.property('dragActive')
     assert not back.property('enabled')  # Root has no parent level.
 
