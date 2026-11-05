@@ -1,5 +1,40 @@
 # Open Power Menu changelog
 
+## Unreleased - configuration UX and in-menu layout editing
+
+- Preserve viewport anchors, selection and focus when rearranging long menus;
+  restore each visited submenu's view and retain it with unfinished drafts.
+- Support full-row dragging and delayed submenu/parent navigation inside one
+  popup, including bounded wheel/touchpad scrolling during a drag. Following
+  confirmed live Wayland drag/hover checks, replace movement button rows with
+  Alt+Arrow and right-click/Shift+F10 movement menus.
+- Add confirmed, confined deletion of selected configuration backups, including
+  corrupt history, with changed-file checks and protected-copy warnings.
+- Refresh widget snapshot counts read-only on Backups tab visits, and present
+  Emergency Restore as a separate selectable monospace command with Copy.
+- Prefer KDE's installed Application entry for Meta+X and provide a real Test
+  menu launch with startup/exposure/focus diagnostics. Use a top-level standalone
+  menu on Wayland, explicitly parent submenus, and quote the desktop entry's Exec
+  path. Global bindings remain under user/KDE control; native dispatch is a live check.
+- Stop redundant AppGrid close animations and defer an AppGrid close triggered
+  during its open signal until that call completes. Add sequenced state/callback/
+  input-mask traces and a direct-versus-OPM acceptance procedure for desktop flashes.
+- Standardize the root wrappers as `install.sh` and `uninstall.sh`; rebuild
+  complete archives without stale members and retain the distinct core scripts.
+- Give Configure concise instructions, a responsive toolbar with Undo/Redo on
+  the right, and a dedicated Backups tab with Manage / Restore Backups and
+  separate widget snapshot information. Block restoration while edits are unsaved.
+- Add a locked-by-default menu layout control with full-row dragging, submenu
+  navigation, Move into/out, and explicit Save layout / Cancel. Keep drafts
+  across popup closure and prevent command activation while editing.
+- Commit complete, reference-only layouts through the backend's existing
+  revision checks, validation, backups and atomic writer. Preserve hidden items,
+  command definitions, metadata and General settings; reject stale or invalid edits.
+- Add menu/flyout keyboard navigation and visible launch/backend errors; follow
+  native theme colors while retaining optional Aero styling and flyout geometry.
+- Extend Node, offscreen Qt Quick and real D-Bus checks. Live Wayland acceptance
+  and real Plasma screenshots remain required; version identifiers stay unchanged.
+
 ## Unreleased - default actions and development review
 
 - Prefer KSystemLog for System Logs; retain warning-priority journal output with
@@ -280,5 +315,5 @@
 ### Packaging correction (Windows Git checkout)
 
 - Moved lower-case installation scripts into `scripts/*-core.sh` to prevent
-  Windows case-insensitive filename collisions with `Install.sh` and `Uninstall.sh`.
+  Windows case-insensitive filename collisions with `install.sh` and `uninstall.sh`.
   No widget or application-runtime behavior changed.

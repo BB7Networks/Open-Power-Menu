@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# User-friendly setup wrapper; the existing v0.4.17 installer lives in app/.
+# User-friendly setup wrapper for the user-local core installer.
 set -euo pipefail
 here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 app_dir="$here"
@@ -11,8 +11,8 @@ printf ' OPEN POWER MENU 0.4.17 - EASY SETUP\n'
 printf ' KDE Plasma 6 / Manjaro\n'
 printf '================================================\n\n'
 
-[[ $EUID -ne 0 ]] || fail "Run this as your normal desktop user, WITHOUT sudo. Example: bash Install.sh"
-[[ -f "$app_dir/scripts/install-core.sh" && -f "$app_dir/run.py" ]] || fail 'This package is incomplete. Extract the whole ZIP, not just Install.sh.'
+[[ $EUID -ne 0 ]] || fail "Run this as your normal desktop user, WITHOUT sudo. Example: bash install.sh"
+[[ -f "$app_dir/scripts/install-core.sh" && -f "$app_dir/run.py" ]] || fail 'This package is incomplete. Extract the whole ZIP, not just install.sh.'
 command -v python3 >/dev/null 2>&1 || fail 'Python 3 is required. Install python3 from your distribution.'
 command -v kpackagetool6 >/dev/null 2>&1 || fail 'KDE Plasma 6 is required (kpackagetool6 not found). Please run this on a Plasma 6 desktop.'
 
@@ -26,7 +26,7 @@ if ! python3 -c 'from PySide6 import QtCore, QtDBus, QtWidgets' >/dev/null 2>&1;
         if [[ "$reply" =~ ^[yY]([eE][sS])?$ ]]; then
             sudo pacman -S --needed pyside6 || fail 'PySide6 installation failed. Update Manjaro if necessary and retry.'
         else
-            fail 'PySide6 is required. Install it when ready (sudo pacman -S --needed pyside6), then rerun bash Install.sh.'
+            fail 'PySide6 is required. Install it when ready (sudo pacman -S --needed pyside6), then rerun bash install.sh.'
         fi
     else
         fail 'PySide6 is required. Install the PySide6 QtCore, QtDBus and QtWidgets modules with your distribution package manager and rerun.'

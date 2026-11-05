@@ -33,9 +33,10 @@ presented as the application.
 - Optional, reversible hiding of the original launcher's **button**, preserving
   the launcher itself, its configuration and its favorites.
 - Native KDE launcher support and a dedicated AppGrid Center 1.9.6 adapter.
-- **Configure → General** for launcher selection, button icon, appearance and
-  backup preview and restore; **Layout** for drag-and-drop editing, Duplicate,
-  Undo/Redo and command previews.
+- **Configure → General** for launcher selection, button icon and appearance;
+  **Layout** for editing with Duplicate and Undo/Redo; **Backups** for recovery.
+- Unlock the menu to rearrange entries, then **Save layout** or **Cancel**.
+  Commands stay inactive while editing.
 - Per-user installation, upgrades that preserve your menu, and a recovery command.
 
 **System Logs** prefers KSystemLog. Without it, Konsole or XTerm follows the
@@ -55,7 +56,7 @@ if you already have a custom menu. OPM never installs these optional tools silen
 2. Open a terminal **inside the extracted folder**, then run:
 
    ```bash
-   bash Install.sh
+   bash install.sh
    ```
 
    Run as your normal desktop user, without `sudo`. Setup checks for Python 3,
@@ -66,16 +67,16 @@ if you already have a custom menu. OPM never installs these optional tools silen
 4. Right-click the new button → gear icon → **General**. Choose your launcher,
    test both mouse buttons, then optionally hide the original button.
 
-For updates, run the new package's `Install.sh` again. Existing `menu.json`
+For updates, run the new package's `install.sh` again. Existing `menu.json`
 contents are preserved. Previous OPM widgets are backed up under
 `~/.local/share/open-power-menu-recovery/widget-backups/`. The newest five
 snapshots are kept; existing snapshots are migrated automatically and survive
 uninstall. To choose a different limit, run
-`OPM_WIDGET_BACKUP_RETENTION=10 bash Install.sh` (1–1,000).
+`OPM_WIDGET_BACKUP_RETENTION=10 bash install.sh` (1–1,000).
 No automatic Plasma restart is performed. Test a widget refresh locally rather
 than interrupting remote access.
 
-The `Install.sh` / `Uninstall.sh` wrappers use distinct core filenames under
+The `install.sh` / `uninstall.sh` wrappers use distinct core filenames under
 `scripts/`. The source and complete archives are safe to clone or extract on
 Windows; **running OPM still requires Linux and Plasma 6**.
 
@@ -84,6 +85,22 @@ its Python/PySide6 backend. It is not a complete one-click installation.
 Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 
 ## Make it yours
+
+For a quick rearrangement, right-click the Start button and select the **lock**
+icon. Drag any part of an entry to move it. Pause over a submenu to open it while
+dragging, or over **Back** to move up a level. The list keeps your place as you
+rearrange entries, including wheel scrolling during a drag. Right-click or press
+Shift+F10 for movement actions; Alt+Arrow shortcuts remain available. All entries
+appear, including unavailable applications and empty submenus. **Save layout**
+checks for conflicts and preserves your command definitions; **Cancel** leaves
+the saved menu untouched. Closing the popup keeps the draft for your next visit.
+See [in-menu editing and keyboard shortcuts](docs/IN-MENU-EDITING.md).
+
+For **Meta+X**, open **Configure → General → Keyboard shortcut → Set up Meta+X…**.
+Use **Test menu launch**, then choose **Add New → Application… → Open Power Menu**
+in KDE Shortcuts and assign/apply the key. This opens the standalone menu.
+KDE handles conflicts and lets you change or remove the assignment. See the
+[shortcut and AppGrid diagnostic guide](docs/SHORTCUT-APPGRID-DIAGNOSTICS.md) if nothing appears.
 
 Open **Configure → Layout → Add → Installed application**, search by name or
 description, and choose an app. Its name, icon and launch command are filled in
@@ -107,16 +124,22 @@ entry. Use **Ctrl+Z** to undo and **Ctrl+Shift+Z** or **Ctrl+Y** to redo layout
 changes. Right-click an entry to see editing and keyboard movement shortcuts;
 Move Up/Down buttons remain available.
 
-Changes stay in memory until **Save**. Closing with unsaved General or Layout
+Changes stay in memory until **Save**. Closing with unsaved Configure
 changes offers **Save / Discard / Cancel**. If another editor changes the file,
 choose to keep editing, reload it, or explicitly overwrite with a recovery copy.
 
-**Configure → General → Configuration backups** keeps 10 previous automatic
+**Configure → Backups → Configuration backups** keeps 10 previous automatic
 versions by default, with a limit of 0–1,000. Setting 0 stops new backups and
 preserves existing history. Pruning happens only after a successful save;
-manually named backups remain untouched. Select **Manage backups…** to preview
+manually named backups remain untouched. Select **Manage / Restore Backups…** to preview
 entries and settings, then restore a valid backup. Restore preserves the current
-file as a separate recovery copy even with automatic backups disabled.
+file as a separate recovery copy even with automatic backups disabled. Save or
+discard pending editor changes and reopen Configure before restoring. The Backups
+tab also shows the separate widget recovery directory and generated snapshot count.
+The count refreshes when you open or return to Backups. The separate configuration
+backup browser retains its **Refresh** button. In that browser,
+**Delete selected backup…** permanently removes one confirmed backup; the active
+configuration is protected, and recovery copies receive an additional warning.
 
 ## Recovery and removal
 
@@ -129,7 +152,7 @@ Restore the original launcher button:
 The widget applies this reversible preference on its next refresh. OPM never
 removes the original launcher or edits its favorites or panel configuration.
 
-Remove **only the OPM Start button** from the panel, then run `bash Uninstall.sh`
+Remove **only the OPM Start button** from the panel, then run `bash uninstall.sh`
 from the complete extracted package. Your menu remains at
 `~/.config/open-power-menu/menu.json`, together with its backups. Widget snapshots
 remain in the separate recovery directory above; legacy snapshots are moved there
@@ -152,6 +175,8 @@ Next priorities:
   evidence; process ancestry alone does not mean an app dies with OPM.
 
 See the [review findings](docs/REVIEW.md) and [process lifecycle report](docs/PROCESS-LIFECYCLE.md).
+The [in-menu editing guide](docs/IN-MENU-EDITING.md#deferred-work) records further
+setup, native panel shortcuts, search and packaging work deferred from this change.
 
 ## Development and support
 

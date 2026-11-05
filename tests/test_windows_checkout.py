@@ -7,12 +7,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class WindowsCheckoutTests(unittest.TestCase):
     def test_installers_have_distinct_paths(self):
-        paths = ["Install.sh", "Uninstall.sh", "scripts/install-core.sh", "scripts/uninstall-core.sh"]
+        paths = ["install.sh", "uninstall.sh", "scripts/install-core.sh", "scripts/uninstall-core.sh"]
         for path in paths:
             self.assertTrue((ROOT / path).is_file(), path)
+        for wrapper in ('install.sh', 'uninstall.sh'):
+            self.assertFalse((ROOT / wrapper.capitalize()).exists())
         self.assertEqual(len(set(path.casefold() for path in paths)), len(paths))
-        self.assertIn("scripts/install-core.sh", (ROOT / "Install.sh").read_text())
-        self.assertIn("scripts/uninstall-core.sh", (ROOT / "Uninstall.sh").read_text())
+        self.assertIn("scripts/install-core.sh", (ROOT / "install.sh").read_text())
+        self.assertIn("scripts/uninstall-core.sh", (ROOT / "uninstall.sh").read_text())
         release = (ROOT / "scripts/build-release.sh").read_text()
         self.assertIn('cp -a "$root/scripts/install-core.sh"', release)
         self.assertIn('"$root/scripts/uninstall-core.sh"', release)

@@ -3,7 +3,8 @@
 For the current branch's action/lifecycle changes, automated checks and remaining
 desktop acceptance, read [REVIEW.md](REVIEW.md), [TESTING.md](TESTING.md) and
 [PROCESS-LIFECYCLE.md](PROCESS-LIFECYCLE.md). For the subsequent editor changes,
-read [EDITOR-RECOVERY.md](EDITOR-RECOVERY.md). The release-history notes below do
+read [EDITOR-RECOVERY.md](EDITOR-RECOVERY.md), and for the new widget controls read
+[IN-MENU-EDITING.md](IN-MENU-EDITING.md). The release-history notes below do
 not replace those results. Optional PySide6 offscreen tests now run in CI; actual
 Plasma/Wayland acceptance remains separate.
 
@@ -59,8 +60,17 @@ The **General** tab now contains:
 - **Start button icon:** adopt the selected launcher's icon (default) or use a
   custom theme icon/local image, with a preview.
 - **Appearance:** choose the standard native theme or Dark Aero for the menu.
-- **Configuration backups:** automatic retention plus preview/restore through
-  Manage backups. Explicit recovery copies are kept even with retention zero.
+- **Keyboard shortcut:** Set up Meta+X tests the installed standalone menu and opens
+  KDE Shortcuts to assign the Application entry. KDE owns conflict handling; OPM
+  does not write bindings. General also separates the Emergency Restore command.
+
+The **Backups** tab contains automatic configuration retention plus preview and
+restore through **Manage / Restore Backups…**. Explicit recovery copies are kept
+even with retention zero. A separate section shows widget snapshot information;
+its retention remains controlled by the installer.
+The browser can permanently delete one confirmed configuration backup, with
+conflict checks and extra warnings for protected copies. Returning to Backups updates
+the separate widget count without touching files or unsaved editor settings.
 
 The **Layout** tab contains the Power User menu entries. Add built-in actions,
 custom argv commands, nested submenus and separators; edit/remove/reorder them.
@@ -70,7 +80,8 @@ layout** changes only the unsaved Layout tab; it will not reset General settings
 **Save** and **Cancel** apply to the complete editor. No files are edited until
 Save or an explicitly confirmed backup restore. Closing dirty state offers
 Save / Discard / Cancel; external modifications require reload or explicit
-overwrite with a recovery copy. Layout now supports nested drag-and-drop,
+overwrite with a recovery copy. Restore is blocked while any tab has unsaved edits.
+Layout now supports nested drag-and-drop,
 Duplicate and Qt Undo/Redo. Your personal shortcuts and submenu structure remain
 intact on upgrade. See the [editor guide](EDITOR-RECOVERY.md) for shortcuts.
 
@@ -131,7 +142,7 @@ Plasma/Wayland. Portable tests cannot reproduce compositor focus transitions.
 ```bash
 tar -xzf OpenPowerMenu-EZ-v0.4.17.tar.gz
 cd OpenPowerMenu-v0.4.17
-bash Install.sh
+bash install.sh
 ```
 
 The installer changes only Open Power Menu files. It backs up the previously

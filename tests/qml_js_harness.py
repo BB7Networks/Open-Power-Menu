@@ -23,17 +23,17 @@ def bundle_adapter_js() -> str:
              "originalIsVisiblyOpen", "closeOriginal", "activate", "describeState", "chooseIcon"]),
         ("AppGrid", "AppGridLauncher.js", ["matches", "hasLegacyWindow", "originalIsOpen",
              "originalIsVisiblyOpen", "hideOwnedAppGridWindow", "closeOriginal",
-             "supportsPanelPassThrough", "describeState", "requestStandaloneHide"]),
+             "supportsPanelPassThrough", "describeState", "requestStandaloneHide", "trace"]),
         ("LauncherAdapters", "LauncherAdapters.js", ["kind", "closeOriginal", "originalIsOpen",
              "originalIsVisiblyOpen", "activate", "chooseIcon", "describeState",
-             "trace", "traceDismissal", "requestAsyncClose"]),
+             "trace", "traceDismissal", "traceRequest", "deferSignalClose", "requestAsyncClose"]),
     ]:
         result.append(f"var {var} = (function () {{\n{_body(filename)}\n"
                       f"return {{{', '.join(f+' : '+f for f in functions)}}};\n}})();")
     # Existing JS tests can continue calling the public contract as globals,
     # while integration tests exercise the dispatcher namespace directly.
     for name in ("closeOriginal", "originalIsOpen", "originalIsVisiblyOpen",
-                 "activate", "chooseIcon", "describeState", "trace", "traceDismissal", "requestAsyncClose"):
+                 "activate", "chooseIcon", "describeState", "trace", "traceDismissal", "traceRequest", "deferSignalClose", "requestAsyncClose"):
         result.append(f"function {name}(...args) {{ return LauncherAdapters.{name}(...args); }}")
     result.append("function requestStandaloneHide(...args) { return AppGrid.requestStandaloneHide(...args); }")
     result.append("function closeExpanded(item) { return Plasma.closeExpanded(item); }")

@@ -7,9 +7,9 @@ from .core import normalized_menu
 from .launching import launch_detached
 
 
-def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) -> int:
+def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None, *, diagnostic=None) -> int:
     try:
-        from PySide6.QtCore import QPoint, Qt
+        from PySide6.QtCore import QEvent, QObject, QPoint, Qt, QTimer
         from PySide6.QtGui import QCursor, QIcon
         from PySide6.QtWidgets import QApplication, QMenu, QMessageBox
     except ImportError:
@@ -25,6 +25,48 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) 
     menu.setWindowTitle("Open Power Menu")
     menu.setToolTipsVisible(True)
     menu.setMinimumWidth(292)
+    # xdg-shell cannot create a grabbing popup in a fresh process: there is
+    # neither a transient parent nor an input serial. Use a real toplevel on
+    # Wayland, with QMenu's normal actions, keyboard navigation and submenus.
+    # The compositor chooses placement and grants activation (including KDE's
+    # launch token); we never force focus or try to fabricate an input serial.
+    standalone_window = app.platformName().startswith('wayland')
+    if standalone_window:
+        menu.setWindowFlags(Qt.Window | Qt.FramelessWindowHint)
+
+    def report(event):
+        if diagnostic:
+            win = menu.windowHandle()
+            diagnostic(event, platform=app.platformName(), toplevel=standalone_window,
+                       visible=menu.isVisible(), exposed=bool(win and win.isExposed()),
+                       active=menu.isActiveWindow())
+
+    class VisibilityProbe(QObject):
+        def eventFilter(self, watched, event):
+            if event.type() in (QEvent.Expose, QEvent.WindowActivate, QEvent.WindowDeactivate, QEvent.Hide):
+                report(event.type().name)
+            return False
+
+    probe = VisibilityProbe(menu)
+    was_active = False
+    def application_state(state):
+        nonlocal was_active
+        if state == Qt.ApplicationActive:
+            was_active = True
+        elif was_active and standalone_window:
+            # Changing to one of our submenus keeps the application active.
+            # Clicking another application dismisses the standalone toplevel.
+            menu.close()
+
+    def shown():
+        win = menu.windowHandle()
+        if win:
+            if diagnostic:
+                win.installEventFilter(probe)
+            if standalone_window:
+                win.requestActivate()
+        report('show-requested')
+
     if (theme or cfg["appearance"]) == "aero":
         menu.setStyleSheet("""
             QMenu#OpenPowerMenu, QMenu {
@@ -42,13 +84,19 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) 
     def icon_for(name: str):
         return QIcon.fromTheme(name) if name else QIcon()
 
+    # Explicitly parent submenus and retain their wrappers. The PySide 6.10
+    # addMenu(icon, title) overload can leave an invalid submenu wrapper.
+    submenus = []
     def populate(target_menu, entries):
         for entry in entries:
             kind = entry["kind"]
             if kind == "separator":
                 target_menu.addSeparator()
             elif kind == "submenu":
-                submenu = target_menu.addMenu(icon_for(entry["icon"]), entry["title"])
+                submenu = QMenu(entry["title"], target_menu)
+                submenu.setIcon(icon_for(entry["icon"]))
+                target_menu.addMenu(submenu)
+                submenus.append(submenu)
                 populate(submenu, entry["items"])
             else:
                 item_action = target_menu.addAction(icon_for(entry["icon"]), entry["title"])
@@ -63,6 +111,8 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) 
         QMessageBox.information(None, "Open Power Menu", "No configured commands are available on this system.")
         return 1
     populate(menu, entries)
+    app.applicationStateChanged.connect(application_state)
+    application_state(app.applicationState())
 
     placement = anchor or cfg["anchor"]
     cursor_pos = QCursor.pos()
@@ -75,9 +125,20 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None) 
                      available.y() + available.height() - menu.sizeHint().height() - 8)
     else:
         pos = cursor_pos
-    # Qt/QMenu handles keyboard navigation, submenus, dismissal and the final selection.
-    # On Wayland the compositor may adjust the requested popup coordinates.
-    selected = menu.exec(pos)
+    # Timers belong to the menu: an early dismissal cannot leave callbacks
+    # referring to a deleted window or a later launch.
+    for delay in (0, 250, 1500):
+        timer = QTimer(menu)
+        timer.setSingleShot(True)
+        timer.timeout.connect(shown if delay == 0 else lambda: report('visibility-sample'))
+        timer.start(delay)
+    try:
+        selected = menu.exec(pos)
+    finally:
+        app.applicationStateChanged.disconnect(application_state)
+        for timer in menu.findChildren(QTimer):
+            timer.stop()
+        report('dismissed')
     if selected is None:
         return 0
     argv = selected.data()

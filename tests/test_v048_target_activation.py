@@ -70,7 +70,7 @@ let global=0,old=0;
 const root={menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:59,
   selectedLauncherPlan:{applet:{id:72,activated(){old++}}},
   launcherSwitchError:'',send(){global++}};
-const env={root,console,Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('not found')}},
+const env={root,console,LauncherAdapters:{traceRequest(){}},Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('not found')}},
  selectedLauncherPlan:root.selectedLauncherPlan};
 for(const key of ['menuSwitchEpoch','requestedMenu','launcherSwitchError','selectedLauncherPlan'])
  Object.defineProperty(env,key,{get(){return root[key]},set(v){root[key]=v}});
@@ -87,7 +87,7 @@ const sent=[];
 const root={menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:0,
   selectedLauncherPlan:null,launcherSwitchError:'',
   send(...args){sent.push(args);args[5](true,null)}};
-const env={root,console,Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('no unique launcher')}},
+const env={root,console,LauncherAdapters:{traceRequest(){}},Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('no unique launcher')}},
  selectedLauncherPlan:null};
 for(const key of ['menuSwitchEpoch','requestedMenu','launcherSwitchError','selectedLauncherPlan'])
  Object.defineProperty(env,key,{get(){return root[key]},set(v){root[key]=v}});

@@ -97,7 +97,9 @@ class EditorIntegrationTests(unittest.TestCase):
         qml = (ROOT/'plasmoid/contents/ui/main.qml').read_text()
         self.assertIn('id: refreshButton', qml)
         self.assertIn('id: configureButton', qml)
-        self.assertEqual(qml.count('display: QQC2.AbstractButton.IconOnly'), 2)
+        self.assertEqual(qml.count('display: QQC2.AbstractButton.IconOnly'), 3)
+        self.assertIn('id: lockButton', qml)
+        self.assertIn('property var layoutDraft: null', qml)
         self.assertIn('root.fetchMenu(); root.fetchIntegration();', qml)
         self.assertIn('onClicked: root.openEditor()', qml)
         # Both are before the scrollable menu, not footer buttons.

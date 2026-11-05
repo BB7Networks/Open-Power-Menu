@@ -103,7 +103,7 @@ class MutualExclusionAndIconTests(unittest.TestCase):
         self.assertIn('LauncherAdapters.closeOriginal(plan.item, plan.applet,', q)
         self.assertIn('function onGridOpenChanged()', (ROOT/'plasmoid/contents/ui/adapters/AppGridPanelBridge.qml').read_text())
         self.assertIn('function onExpandedChanged()', q)
-        self.assertIn('root.closeLauncherPopup(); // Right-click was the latest request.', q)
+        self.assertIn('epoch === root.menuSwitchEpoch && root.requestedMenu === "power" && root.expanded', q)
         self.assertIn('LauncherAdapters.originalIsVisiblyOpen(',q)
         self.assertIn('function finishOpeningPower(epoch)',q)
         self.assertIn('if (requestEpoch !== root.menuSwitchEpoch) return;',q)
@@ -151,7 +151,7 @@ assert.equal(c.closeOriginal(oldCenter,{pluginName:'dev.xarbit.appgrid'},hide).o
 assert.equal(oldCenter.gridOpen,false);assert.equal(oldCenter.closed,1);
 assert.equal(hideRequests,0);
 assert.equal(c.closeOriginal(oldCenter,{pluginName:'dev.xarbit.appgrid'},hide).ok,true);
-assert.equal(oldCenter.closed,2);assert.equal(hideRequests,0); // Idempotent local close; no irrelevant bus probe.
+assert.equal(oldCenter.closed,1);assert.equal(hideRequests,0); // No redundant exit animation or bus probe.
 // External standalone AppGrid: no native popup or gridOpen, so use idempotent Hide.
 const newCenter={expanded:false};
 assert.equal(c.closeOriginal(newCenter,{pluginName:'dev.xarbit.appgrid'},hide).ok,true);
@@ -187,6 +187,7 @@ const item={expanded:false,gridOpen:true,closed:0,closeWindow(){this.gridOpen=fa
 const applet={pluginName:'dev.xarbit.appgrid'};
 const plan={item,applet};
 const sends=[];
+const callbacks=[];
 const timer={running:true};
 const root={selectedLauncherPlan:plan,selectedLauncherItem:item,expanded:true,
   menuSwitchEpoch:2,requestedMenu:'power',
@@ -196,7 +197,7 @@ const c={root,selectedLauncherPlan:plan,selectedLauncherItem:item,
   launcherCloseFollowup:timer,
   Plasmoid:{containment:null,id:1},
   LauncherVisibility:{prepare(){throw Error('unexpected')}},
-  console,LauncherAdapters:{}};
+  console,LauncherAdapters:{},Qt:{callLater(f){callbacks.push(f)}}};
 Object.defineProperty(c,'selectedLauncherPlan',{get(){return root.selectedLauncherPlan},set(v){root.selectedLauncherPlan=v}});
 vm.createContext(c);
 const helpers={}; vm.createContext(helpers);
@@ -210,6 +211,8 @@ assert.equal(sends.length,0); // Older AppGrid has no daemon to call.
 // AppGrid opens via Meta while Power menu is visible, during guard.
 item.gridOpen=true;
 c.onOriginalLauncherOpened();
+assert.equal(item.closed,1); // Do not close reentrantly during AppGrid.openWindow.
+callbacks.shift()();
 assert.equal(item.closed,2);
 assert.equal(root.expanded,true); // Latest right click wins.
 // A later Meta key action outside guard wins and closes Power.
@@ -266,7 +269,7 @@ Object.assign(root,{
   fetchMenu(){events.push('fetch-menu')},
   activateSelectedLauncher(epoch){if(epoch===this.menuSwitchEpoch && this.requestedMenu==='launcher') events.push('activate-selected')}
 });
-const c={root,Qt:{callLater(fn){callbacks.push(fn)}},launcherCloseFollowup:follow,
+const c={root,LauncherAdapters:{traceRequest(){}},Qt:{callLater(fn){callbacks.push(fn)}},launcherCloseFollowup:follow,
   launcherClosePoll:timer,launcherActivationSettle:settle,
   fetchIntegration(){events.push('fetch-integration')},
   fetchMenu(){root.fetchMenu()},closeLauncherPopup(){return root.closeLauncherPopup()}};

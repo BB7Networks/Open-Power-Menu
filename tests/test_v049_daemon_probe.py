@@ -55,7 +55,7 @@ Object.defineProperty(c,'selectedLauncherPlan',{get(){return root.selectedLaunch
 vm.createContext(c);vm.runInContext(process.env.QML,c);
 const result=c.closeLauncherPopup();
 assert.equal(result.mode,'appgrid-local-closed');
-assert.equal(localCloses,1);
+assert.equal(localCloses,0); // Already closed: do not restart AppGrid's exit animation.
 assert.equal(root.awaitingAsyncClose,false);
 assert.equal(calls.length,0); // v0.4.9's redundant D-Bus probe is removed.
 ''')

@@ -24,12 +24,12 @@ from .plasma_panels import list_panel_applets
 def create_editor(path: Path | None = None):
     try:
         from PySide6.QtCore import Qt, QUrl
-        from PySide6.QtGui import QIcon, QAction, QKeySequence, QUndoStack
+        from PySide6.QtGui import QIcon, QAction, QFontDatabase, QKeySequence, QUndoStack
         from PySide6.QtWidgets import (
             QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
             QFileDialog, QFormLayout, QFrame, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMenu,
             QMessageBox, QPushButton, QScrollArea, QSpinBox, QTabWidget, QTreeWidget, QTreeWidgetItem, QToolButton, QHeaderView,
-            QListWidget, QListWidgetItem, QPlainTextEdit, QVBoxLayout, QWidget
+            QListWidget, QListWidgetItem, QPlainTextEdit, QSizePolicy, QVBoxLayout, QWidget
         )
     except ImportError:
         print("The menu editor requires PySide6. On Manjaro: sudo pacman -S --needed pyside6",
@@ -37,6 +37,7 @@ def create_editor(path: Path | None = None):
         raise
 
     from .editor_tree import LayoutChange, MenuTree
+    from .editor_toolbar import EditorToolbar
     target = path or config_path()
     revision = current_revision(target)
     config = decode_configuration(revision.content)
@@ -80,8 +81,7 @@ def create_editor(path: Path | None = None):
             self.selected_application = None
             layout = QVBoxLayout(self)
             help_text = QLabel(
-                "Choose an installed application. Its name, icon and KDE launch "
-                "command will be filled in automatically. You can edit them next.", self)
+                "Search for an application, then review its name, icon and launch command.", self)
             help_text.setWordWrap(True)
             layout.addWidget(help_text)
             self.search = QLineEdit(self)
@@ -217,10 +217,9 @@ def create_editor(path: Path | None = None):
                 controls.addWidget(choose_binary)
                 form.addRow("", controls)
                 note = QLabel(
-                    "Examples: 'dolphin ~/Documents' opens a folder; 'konsole --hold' "
-                    "opens a terminal. Arguments containing spaces need quotes. "
-                    "Commands are run directly, not through a shell; pipes, > and && "
-                    "are not interpreted. Use the application picker for GUI apps.", self)
+                    "Quote arguments containing spaces. Commands run directly; "
+                    "shell operators such as pipes, > and && are not interpreted.", self)
+                note.setToolTip("Examples: dolphin ~/Documents; konsole --hold. Use the application picker for GUI apps.")
                 note.setWordWrap(True)
                 form.addRow("", note)
                 if self.picked_desktop_file:
@@ -359,8 +358,8 @@ def create_editor(path: Path | None = None):
             general_layout = QVBoxLayout(general)
             general_layout.setSpacing(12)
             general_help = QLabel(
-                "Choose the original launcher and how the replacement Start button looks. "
-                "These settings do not change the launcher's favorites or configuration.", general)
+                "Choose your launcher, Start button icon and menu style. "
+                "Your launcher and favorites stay intact.", general)
             general_help.setWordWrap(True)
             general_layout.addWidget(general_help)
 
@@ -397,11 +396,30 @@ def create_editor(path: Path | None = None):
                 "Plasma status when this option is disabled.")
             launcher_layout.addWidget(self.hide_launcher)
             launcher_help = QLabel(
-                "Left-click uses the selected launcher; right-click uses Power User Menu. "
-                "Hiding is reversible, and the launcher remains installed. "
-                "Emergency restore: open-power-menu --show-launcher-button", launcher_group)
+                "Left-click opens your launcher; right-click opens Power User Menu. "
+                "Hiding the original button is reversible.", launcher_group)
             launcher_help.setWordWrap(True)
             launcher_layout.addWidget(launcher_help)
+            restore_row = QHBoxLayout()
+            restore_row.addWidget(QLabel("Emergency restore", launcher_group))
+            restore_row.addStretch(1)
+            restore_command = "open-power-menu --show-launcher-button"
+            restore_copy = QPushButton("Copy", launcher_group)
+            restore_copy.setObjectName("copyEmergencyRestore")
+            restore_copy.setAccessibleName("Copy emergency restore command")
+            restore_copy.clicked.connect(lambda: QApplication.clipboard().setText(restore_command))
+            restore_row.addWidget(restore_copy)
+            launcher_layout.addLayout(restore_row)
+            restore_text = QLabel(restore_command, launcher_group)
+            restore_text.setObjectName("emergencyRestoreCommand")
+            restore_text.setTextFormat(Qt.PlainText)
+            restore_text.setWordWrap(True)
+            restore_text.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+            restore_text.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+            restore_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+            restore_font.setPointSizeF(self.font().pointSizeF())
+            restore_text.setFont(restore_font)
+            launcher_layout.addWidget(restore_text)
             general_layout.addWidget(launcher_group)
 
             icon_group = QGroupBox("Start button icon", general)
@@ -476,28 +494,17 @@ def create_editor(path: Path | None = None):
             style_form.addRow("Menu style:", self.appearance)
             general_layout.addWidget(style_group)
 
-            backups_group = QGroupBox("Configuration backups", general)
-            backups_form = QFormLayout(backups_group)
-            self.backup_retention = QSpinBox(backups_group)
-            self.backup_retention.setObjectName("backupRetentionSpin")
-            self.backup_retention.setRange(0, 1000)
-            self.backup_retention.setValue(cfg.get("backup_retention", DEFAULT_CONFIG["backup_retention"]))
-            self.backup_retention.setSpecialValueText("Off (no new backups)")
-            self.backup_retention.setToolTip(
-                "Number of previous menu.json versions to keep. Default: 10. "
-                "Setting 0 stops creating automatic backups without deleting existing ones.")
-            backups_form.addRow("Previous versions to keep:", self.backup_retention)
-            backups_help = QLabel(
-                "When enabled, each save keeps the previous configuration for recovery. "
-                "After a successful save, older automatic backups beyond this limit are removed. "
-                "Manual backups are left alone.", backups_group)
-            backups_help.setWordWrap(True)
-            backups_form.addRow(backups_help)
-            manage = QPushButton("Manage backups…", backups_group)
-            manage.setObjectName("manageBackupsButton")
-            manage.clicked.connect(self.manage_backups)
-            backups_form.addRow(manage)
-            general_layout.addWidget(backups_group)
+            shortcut_group = QGroupBox("Keyboard shortcut", general)
+            shortcut_layout = QVBoxLayout(shortcut_group)
+            shortcut_help = QLabel("Use KDE Shortcuts to open the standalone Power User Menu with Meta+X.", shortcut_group)
+            shortcut_help.setWordWrap(True)
+            shortcut_layout.addWidget(shortcut_help)
+            shortcut_button = QPushButton("Set up Meta+X…", shortcut_group)
+            shortcut_button.setObjectName("setupMenuShortcut")
+            shortcut_button.clicked.connect(self.setup_shortcut)
+            shortcut_layout.addWidget(shortcut_button, 0, Qt.AlignLeft)
+            general_layout.addWidget(shortcut_group)
+
             general_layout.addStretch(1)
             general_scroll = QScrollArea(tabs)
             general_scroll.setWidgetResizable(True)
@@ -510,11 +517,15 @@ def create_editor(path: Path | None = None):
             layout_tab.setObjectName("layoutTab")
             layout_root = QVBoxLayout(layout_tab)
             layout_help = QLabel(
-                "Add an installed app with a search, choose a built-in system action, "
-                "or enter an advanced command. The Runs column shows what each item launches. "
-                "Select a submenu before Add to insert inside it. Drag entries between or into submenus; "
-                "the drop indicator shows their destination. Right-click for keyboard shortcuts.",
-                layout_tab)
+                "<b>Organize your Power User Menu</b>"
+                "<ul style='margin-top:4px; margin-bottom:0px'>"
+                "<li><b>Add</b> an application, built-in action or custom command.</li>"
+                "<li><b>Drag</b> entries to reorder or move them into submenus.</li>"
+                "<li><b>Edit, duplicate or remove</b> the selected entry.</li>"
+                "<li><b>Save</b> when finished.</li></ul>", layout_tab)
+            layout_help.setObjectName("layoutInstructions")
+            layout_help.setTextFormat(Qt.RichText)
+            layout_help.setAccessibleName("Organize your Power User Menu. Add an entry. Drag to reorder or move into a submenu. Edit, duplicate or remove the selected entry. Save when finished.")
             layout_help.setWordWrap(True)
             layout_root.addWidget(layout_help)
             self.tree = MenuTree(self, layout_tab)
@@ -531,7 +542,7 @@ def create_editor(path: Path | None = None):
             self.tree.setSelectionMode(QTreeWidget.SingleSelection)
             self.tree.itemDoubleClicked.connect(lambda item, column: self.edit_selected())
             layout_root.addWidget(self.tree, 1)
-            line = QHBoxLayout()
+            editing_buttons = []
             self.add_button = QToolButton(layout_tab)
             self.add_button.setText("Add …")
             self.add_button.setPopupMode(QToolButton.InstantPopup)
@@ -543,18 +554,16 @@ def create_editor(path: Path | None = None):
             popup.addAction("Submenu", lambda: self.add_entry({"submenu": "New submenu", "icon": "folder", "items": []}, edit=True))
             popup.addAction("Separator", lambda: self.add_entry({"separator": True}, edit=False))
             self.add_button.setMenu(popup)
-            line.addWidget(self.add_button)
+            editing_buttons.append(self.add_button)
             self.edit_buttons = {}
             for label, callback in (("Edit", self.edit_selected), ("Remove", self.remove_selected), ("Duplicate", self.duplicate_selected),
                                     ("Move up", lambda: self.move_selected(-1)),
                                     ("Move down", lambda: self.move_selected(1))):
                 b = QPushButton(label, layout_tab)
                 b.clicked.connect(callback)
-                line.addWidget(b)
+                editing_buttons.append(b)
                 self.edit_buttons[label] = b
-            line.addStretch(1)
-            layout_root.addLayout(line)
-            history = QHBoxLayout()
+            history_buttons = []
             self.undo_action = self.undo_stack.createUndoAction(self, "Undo")
             self.undo_action.setShortcuts(QKeySequence.Undo)
             self.redo_action = self.undo_stack.createRedoAction(self, "Redo")
@@ -565,9 +574,12 @@ def create_editor(path: Path | None = None):
                 self.addAction(action)
                 button = QToolButton(layout_tab)
                 button.setDefaultAction(action)
-                history.addWidget(button)
-            history.addStretch(1)
-            layout_root.addLayout(history)
+                button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+                history_buttons.append(button)
+            self.undo_action.setIcon(QIcon.fromTheme("edit-undo"))
+            self.redo_action.setIcon(QIcon.fromTheme("edit-redo"))
+            self.toolbar = EditorToolbar(editing_buttons, history_buttons, layout_tab)
+            layout_root.addWidget(self.toolbar)
             self.context_actions = {}
             for label, callback, shortcut in (("Edit", self.edit_selected, "F2"),
                     ("Duplicate", self.duplicate_selected, "Ctrl+D"),
@@ -598,12 +610,64 @@ def create_editor(path: Path | None = None):
             bottom_row.addWidget(reset)
             layout_root.addLayout(bottom_row)
             layout_note = QLabel(
-                "These are the Power User Menu entries, not your original launcher's "
-                "applications or favorites. Nothing is written until you select Save.",
+                "Nothing is written until you select Save. Right-click an entry for keyboard shortcuts.",
                 layout_tab)
             layout_note.setWordWrap(True)
             layout_root.addWidget(layout_note)
             tabs.addTab(layout_tab, "Layout")
+
+            # BACKUPS: configuration history and separate installation snapshots.
+            backups_tab = QWidget(tabs)
+            backups_tab.setObjectName("backupsTab")
+            backups_layout = QVBoxLayout(backups_tab)
+            backups_group = QGroupBox("Configuration backups", backups_tab)
+            backups_form = QFormLayout(backups_group)
+            self.backup_retention = QSpinBox(backups_group)
+            self.backup_retention.setObjectName("backupRetentionSpin")
+            self.backup_retention.setRange(0, 1000)
+            self.backup_retention.setValue(cfg.get("backup_retention", DEFAULT_CONFIG["backup_retention"]))
+            self.backup_retention.setSpecialValueText("Off (no new backups)")
+            self.backup_retention.setToolTip(
+                "Number of previous menu.json versions to keep. Default: 10. "
+                "Setting 0 stops creating automatic backups without deleting existing ones.")
+            backups_form.addRow("Previous versions to keep:", self.backup_retention)
+            backups_help = QLabel(
+                "Restore an earlier configuration when you need it. "
+                "Default: 10 backups. Set 0 to stop new automatic backups; existing copies remain.", backups_group)
+            backups_help.setWordWrap(True)
+            backups_form.addRow(backups_help)
+            manage = QPushButton("Manage / Restore Backups…", backups_group)
+            manage.setObjectName("manageBackupsButton")
+            manage.clicked.connect(self.manage_backups)
+            backups_form.addRow(manage)
+            backups_layout.addWidget(backups_group)
+
+            snapshot_group = QGroupBox("Widget upgrade snapshots", backups_tab)
+            snapshot_layout = QVBoxLayout(snapshot_group)
+            snapshot_help = QLabel("Previous widget files are kept separately during upgrades. "
+                                   "Default: 5 snapshots. Uninstall preserves them.", snapshot_group)
+            snapshot_help.setWordWrap(True)
+            snapshot_layout.addWidget(snapshot_help)
+            self.snapshot_location = QLabel(snapshot_group)
+            self.snapshot_location.setObjectName("widgetSnapshotLocation")
+            self.snapshot_location.setTextFormat(Qt.PlainText)
+            self.snapshot_location.setWordWrap(True)
+            self.snapshot_location.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
+            snapshot_layout.addWidget(self.snapshot_location)
+            self.refresh_snapshots()
+            snapshot_setting = QLabel("Choose the limit when installing: OPM_WIDGET_BACKUP_RETENTION=5 bash install.sh", snapshot_group)
+            snapshot_setting.setWordWrap(True)
+            snapshot_setting.setToolTip("Installer setting: 1–1,000. It is separate from configuration backup retention. See the recovery guide to restore a widget and its matching backend.")
+            snapshot_layout.addWidget(snapshot_setting)
+            backups_layout.addWidget(snapshot_group)
+            backups_layout.addStretch(1)
+            backups_scroll = QScrollArea(tabs)
+            backups_scroll.setWidgetResizable(True)
+            backups_scroll.setFrameShape(QFrame.NoFrame)
+            backups_scroll.setWidget(backups_tab)
+            tabs.addTab(backups_scroll, "Backups")
+            tabs.currentChanged.connect(lambda index: self.refresh_snapshots()
+                                        if tabs.widget(index) is backups_scroll else None)
 
             buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel, self)
             buttons.accepted.connect(self.accept)
@@ -623,6 +687,21 @@ def create_editor(path: Path | None = None):
             self.show_missing.toggled.connect(self.unavailable_changed)
             self.update_dirty()
             self.update_actions()
+
+        def refresh_snapshots(self):
+            import os
+            from .widget_snapshots import recovery_path, snapshot_count
+            data_home = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+            try:
+                count = snapshot_count(data_home)
+                status = f"{count} generated snapshots available." if count else "No widget snapshots yet."
+            except OSError:
+                status = "Snapshot directory is unavailable."
+            self.snapshot_location.setText(f"{recovery_path(data_home)}\n{status}")
+
+        def setup_shortcut(self):
+            from .shortcut_setup import create_shortcut_dialog
+            create_shortcut_dialog(self).exec()
 
         def _make_item(self, entry: dict):
             # Build unattached: QTreeWidgetItem cannot be inserted into a
@@ -1039,7 +1118,13 @@ def create_editor(path: Path | None = None):
 
         def manage_backups(self):
             from .backup_dialog import BackupDialog
-            dialog = BackupDialog(self.target, self, before_restore=lambda: self.confirm_discard('Restore backup'))
+            def ready_to_restore():
+                if not self.is_dirty():
+                    return True
+                QMessageBox.warning(self, 'Unsaved changes',
+                    'Save or discard your editor changes and reopen Configure before restoring a backup. You can still preview backups now.')
+                return False
+            dialog = BackupDialog(self.target, self, before_restore=ready_to_restore)
             dialog.exec()
             if dialog.restored:
                 try:

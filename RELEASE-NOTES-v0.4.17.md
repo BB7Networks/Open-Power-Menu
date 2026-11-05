@@ -19,7 +19,7 @@ tested distribution. Third-party launchers may need additional adapters.
 
 ### Install
 
-Extract `OpenPowerMenu-EZ-v0.4.17.zip` and run `bash Install.sh`
+Extract `OpenPowerMenu-EZ-v0.4.17.zip` and run `bash install.sh`
 without sudo. Add **Open Power Menu Start Button** from Plasma's widget
 chooser; in Configure → General, select your original launcher.
 

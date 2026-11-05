@@ -3,6 +3,22 @@
 // Only the center AppGrid plugin needs this adapter. AppGrid Panel and every
 // other launcher use the generic Plasma adapter automatically.
 const PLUGIN_ID = "dev.xarbit.appgrid";
+var traceSequence = 0;
+
+// Shared by the host and bridge. Event order is independent of wall-clock
+// changes; journalctl supplies monotonic timing. No titles, commands or paths.
+function trace(event, item, applet, context) {
+    if (!matches(applet)) return;
+    const state = {seq: ++traceSequence, event: event};
+    try {
+        state.gridOpen = item ? item.gridOpen : null;
+        state.visible = item && item.gridWindow ? item.gridWindow.visible : null;
+        state.windowActive = item && item.gridWindow ? item.gridWindow.active : null;
+        state.expanded = item ? item.expanded : null;
+        state.status = applet.status;
+    } catch (e) { state.unavailable = true; }
+    console.info("Open Power Menu: AppGrid trace " + JSON.stringify(Object.assign(state, context || {})));
+}
 
 function matches(applet) {
     try { return !!applet && String(applet.pluginName || "") === PLUGIN_ID; }
@@ -57,10 +73,9 @@ function closeOriginal(item, applet, hideStandalone) {
             const open = item.gridOpen === true ||
                 (typeof item.gridOpen !== "boolean" && item.gridWindow && item.gridWindow.visible === true);
             if (!open) {
-                // This is in-process AppGrid: don't probe a nonexistent daemon.
-                if (typeof item.closeWindow === "function") {
-                    try { item.closeWindow(); } catch (e) {}
-                }
+                // closeWindow() is NOT idempotent in 1.9.6: even when closed it
+                // starts a new close animation, whose completion hides a later
+                // reopened window. Only finish hiding an already closing window.
                 const forceHidden = hideOwnedAppGridWindow(item);
                 return {ok:true, mode:"appgrid-local-closed", forceHidden:forceHidden};
             }
