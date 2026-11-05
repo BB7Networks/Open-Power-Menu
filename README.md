@@ -89,8 +89,10 @@ Use the full installer; see [Store readiness](docs/KDE-STORE.md).
 For a quick rearrangement, right-click the Start button and select the **lock**
 icon. Drag an entry to reorder it; hover or click a submenu to open a real
 floating flyout beside its row, rather than widening the editor into two panes.
-For cross-window moves, open the destination submenu first before dragging,
-or use the keyboard/context Move into submenu action. Drag over **Back** to
+To move an entry into a floating submenu, select it, hover the destination,
+then click **Move selected item here**. Dragging remains available for
+reordering within the main list; native cross-window dragging is disabled
+to prevent Wayland pointer grabs. Keyboard/context movement remains available. Drag over **Back** to
 move up a level. The list keeps your place as you
 rearrange entries, including wheel scrolling during a drag. Right-click or press
 Shift+F10 for movement actions; Alt+Arrow shortcuts remain available. All entries
