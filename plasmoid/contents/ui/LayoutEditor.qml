@@ -861,6 +861,13 @@ QQC2.Control {
             control.nativeDragHandled = false;
             const hit = control.rowUnderPointer(mouse.x, mouse.y);
             if (!hit) { mouse.accepted = false; return; }
+            // A detached Qt popup may own the pointer while it is visible.
+            // Release that ownership immediately on a parent-row press;
+            // waiting for the drag threshold can leave drop targets unreachable.
+            if (mouse.button === Qt.LeftButton && control.flyoutVisible) {
+                control.flyoutId = "";
+                control.flyoutPointerInside = false;
+            }
             pressedId = hit.entry.id;
             pressedParent = hit.parentId;
             control.choose(pressedId);
@@ -875,13 +882,6 @@ QQC2.Control {
         }
         onPositionChanged: {
             if (drag.active && !control.dragCanceled) {
-                // Close the detached submenu only after an actual drag starts.
-                // A normal click on its parent should not flicker the popup,
-                // but an active row drag must reclaim its pointer events.
-                if (!control.dragActive && control.flyoutVisible) {
-                    control.flyoutId = "";
-                    control.flyoutPointerInside = false;
-                }
                 hoverOpen.stop();
                 flyoutDismiss.stop();
                 control.dragActive = true;
