@@ -1,13 +1,13 @@
 # Shortcut and AppGrid live diagnostics
 
-PR #5 adds these checks after live Manjaro feedback at `b236efd`. The cloud has
-no Plasma, KWin or native display session. The fixes below have source evidence
-and automated regression coverage; the reported desktop symptoms need this
-local comparison before merge. Nothing here requires restarting Plasma.
+These checks originated in Manjaro Plasma 6 development testing. GitHub
+Actions provides portable and offscreen Qt coverage, but no full Plasma, KWin
+or native Wayland desktop session. Use these local comparisons for
+desktop-specific focus or shortcut behavior. Nothing requires restarting Plasma.
 
 ## Meta+X: native panel shortcut versus standalone diagnostics
 
-**PR #6 changes the default.** Meta+X now belongs to the **Open Power Menu
+**Current behavior:** Meta+X belongs to the **Open Power Menu
 Start Button widget** using Plasma's native shortcut API. The former
 **Configure → General → Set up Meta+X…** wizard was removed. The installed
 standalone application remains available for diagnosis, but assigning it
@@ -25,7 +25,7 @@ Meta+X *as well* can create a conflict with the widget.
 3. Clear **only the obsolete OPM binding**, Apply, then assign the combination
    to the current widget through its native Keyboard Shortcuts settings.
    Do not edit `kglobalshortcutsrc` by hand or take over another app's binding.
-4. Test removal and re-add promptly. PR #6 clears the removed widget's own
+4. Test removal and re-add promptly. OPM clears the removed widget's own
    shortcut as soon as its removal lifecycle signal arrives. Undo should
    restore the previous assignment where available. Changing/disabling the
    shortcut must survive ordinary Plasma reloads and reinstallations.
@@ -95,7 +95,7 @@ See [native widget lifecycle and Go Back](NATIVE-SHORTCUT-CASCADE.md).
   was proxy-blocked; public source/history were inspected. Record Plasma/Frameworks/
   Qt versions and the three launch outcomes before attributing this to KDE caching.
 - **Historical PR #5 finding:** native applet activation used to change
-  expansion outside OPM's launcher-close handshake. PR #6 now routes the
+  expansion outside OPM's launcher-close handshake. OPM now routes the
   Plasma widget's activated() event through the guarded OPM handoff. Its
   actual Wayland shortcut dispatch and instance-removal behavior still need
   live verification.
