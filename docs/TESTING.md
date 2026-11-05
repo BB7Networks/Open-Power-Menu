@@ -16,9 +16,9 @@ python -m compileall -q openpowermenu tests run.py
 bash scripts/build-release.sh
 bash scripts/build-widget-only.sh
 (cd dist && sha256sum -c SHA256SUMS)
-unzip -t dist/OpenPowerMenu-EZ-v0.4.17.zip
-unzip -t dist/org.openpowermenu.start-0.4.17.plasmoid
-tar -tzf dist/OpenPowerMenu-EZ-v0.4.17.tar.gz
+unzip -t dist/OpenPowerMenu-EZ-v1.0.1.zip
+unzip -t dist/org.openpowermenu.start-1.0.1.plasmoid
+tar -tzf dist/OpenPowerMenu-EZ-v1.0.1.tar.gz
 ```
 
 Optional Qt runtime checks require PySide6 QtCore/QtDBus/QtWidgets/QtTest/QtQuick/QtQml and
@@ -44,7 +44,7 @@ execute real core/wrapper scripts, preserve custom configuration, simulate prior
 0.4.16/0.4.17 widget metadata, check widget backups and uninstall preservation,
 and inspect actual ZIP/TAR archives. They do not prove KPackage works on a live
 Plasma session or reproduce every byte of the unavailable old installer releases.
-Version identifiers remain at 0.4.17; building archives does not tag or publish.
+Version identifiers are 1.0.1; building archives does not tag or publish.
 The wrapper tests run from a source path containing spaces. Archive checks reject
 obsolete capitalized wrapper names, stale ZIP members and case-insensitive collisions.
 
@@ -140,3 +140,8 @@ after upgrading from PR #4.
 
 Do not mark this matrix complete based on offscreen tests. Attach real
 [screenshots](images/README.md) only after live acceptance.
+
+## 1.0.1 release candidate
+
+See [release verification](RELEASE-1.0.1.md) for Desktop, optional pointer-leave
+dismissal, EZ installation/rollback and the final Manjaro Wayland checklist.
