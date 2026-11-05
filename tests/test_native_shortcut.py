@@ -25,6 +25,10 @@ def test_widget_activation_handler_and_native_configuration():
     assert 'Plasmoid.globalShortcut = "Meta+X"' in qml
     assert 'opmDefaultShortcutTried' in (ROOT / 'plasmoid/contents/config/main.xml').read_text()
     assert 'setupMenuShortcut' not in (ROOT / 'openpowermenu/editor.py').read_text()
+    assert 'function onDestroyedChanged(destroyed) { root.onWidgetRemovalChanged(destroyed); }' in qml
+    assert 'Component.onDestruction:' not in qml or (
+        'globalShortcut' not in qml.split('Component.onDestruction:', 1)[1].split('}', 1)[0])
+
 
 
 @pytest.mark.skipif(not shutil.which('node'), reason='Node required for native shortcut JS test')
@@ -80,5 +84,52 @@ assert.equal(c.Plasmoid.globalShortcut,'');
 """
     result = subprocess.run(['node','-e',js],
         env={**os.environ,'QML_FUNCTION':function(qml,'initializeDefaultShortcut')},
+        text=True,capture_output=True,timeout=12)
+    assert result.returncode == 0, result.stderr + result.stdout
+
+
+@pytest.mark.skipif(not shutil.which('node'), reason='Node required for native shortcut lifecycle test')
+def test_shortcut_cleared_only_on_widget_removal_and_restored_on_undo():
+    qml = MAIN.read_text(encoding='utf-8')
+    js = r"""
+const assert=require('node:assert/strict'), vm=require('node:vm');
+const source=process.env.QML_FUNCTION;
+function make(shortcut) {
+  const Plasmoid={globalShortcut:shortcut};
+  const ctx={Plasmoid,shortcutBeforeRemoval:''};
+  vm.createContext(ctx);
+  vm.runInContext(source,ctx);
+  return {ctx,Plasmoid};
+}
+// Normal reload does not invoke the removal signal or change the shortcut.
+let a=make('Meta+X');
+assert.equal(a.Plasmoid.globalShortcut,'Meta+X');
+a.ctx.onWidgetRemovalChanged(true);
+assert.equal(a.Plasmoid.globalShortcut,'');
+assert.equal(a.ctx.shortcutBeforeRemoval,'Meta+X');
+// Undo restores the same instance's former shortcut.
+a.ctx.onWidgetRemovalChanged(false);
+assert.equal(a.Plasmoid.globalShortcut,'Meta+X');
+assert.equal(a.ctx.shortcutBeforeRemoval,'');
+// A custom shortcut is likewise preserved on Undo.
+let custom=make('Ctrl+Alt+X');
+custom.ctx.onWidgetRemovalChanged(true);
+assert.equal(custom.Plasmoid.globalShortcut,'');
+custom.ctx.onWidgetRemovalChanged(false);
+assert.equal(custom.Plasmoid.globalShortcut,'Ctrl+Alt+X');
+// If an overlapping widget now owns a different assignment, don't steal it.
+let conflict=make('Meta+X');
+conflict.ctx.onWidgetRemovalChanged(true);
+conflict.Plasmoid.globalShortcut='Meta+Shift+X';
+conflict.ctx.onWidgetRemovalChanged(false);
+assert.equal(conflict.Plasmoid.globalShortcut,'Meta+Shift+X');
+// No shortcut assigned (possibly user disabled it) creates no new binding.
+let disabled=make('');
+disabled.ctx.onWidgetRemovalChanged(true);
+disabled.ctx.onWidgetRemovalChanged(false);
+assert.equal(disabled.Plasmoid.globalShortcut,'');
+"""
+    result=subprocess.run(['node','-e',js],
+        env={**os.environ,'QML_FUNCTION':function(qml,'onWidgetRemovalChanged')},
         text=True,capture_output=True,timeout=12)
     assert result.returncode == 0, result.stderr + result.stdout
