@@ -33,10 +33,11 @@
   corrupt history, with changed-file checks and protected-copy warnings.
 - Refresh widget snapshot counts read-only on Backups tab visits, and present
   Emergency Restore as a separate selectable monospace command with Copy.
-- Prefer KDE's installed Application entry for Meta+X and provide a real Test
-  menu launch with startup/exposure/focus diagnostics. Use a top-level standalone
-  menu on Wayland, explicitly parent submenus, and quote the desktop entry's Exec
-  path. Global bindings remain under user/KDE control; native dispatch is a live check.
+- Earlier PR #5 work provided a standalone KDE Application shortcut fallback
+  and a diagnostic Test menu launch with exposure/focus traces. Its Wayland
+  top-level menu, explicitly parented submenus and quoted desktop Exec path
+  remain useful for standalone diagnostics. **PR #6 supersedes that default
+  shortcut route** with native widget Meta+X.
 - Stop redundant AppGrid close animations and defer an AppGrid close triggered
   during its open signal until that call completes. Add sequenced state/callback/
   input-mask traces and a direct-versus-OPM acceptance procedure for desktop flashes.
