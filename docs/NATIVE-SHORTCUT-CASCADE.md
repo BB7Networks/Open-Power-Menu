@@ -40,12 +40,13 @@ and dismisses after a short grace interval when it leaves both the parent
 row and flyout. Closing the main popup also closes its editing flyout,
 without discarding the unsaved draft.
 
-Cross-window reordering uses Qt's native drag/drop with opaque, current-
-session item IDs and validation through the existing layout move rules.
-If a native Wayland drag between popup windows does not work on the user's
-compositor, the editor's Move into submenu command and single-pane
-fallback remain available. For cross-window moves, open the submenu
-before beginning the drag. No menu commands execute during editing.
+Dragging within the parent list uses the original, nonblocking MouseArea
+reordering behavior. Native cross-window Drag.Automatic has been disabled:
+on Wayland it can monopolize the pointer, making items impossible to release.
+For moves into the flyout, select the item, hover over the destination submenu,
+then click **Move selected item here**. Existing keyboard/context movement
+actions and the single-pane fallback remain available. All moves are checked
+by the same draft validation and do not execute menu commands.
 
 **Physical acceptance remains required:** actual KWin/Wayland popup placement,
 hover persistence, focus, close/reopen, multi-monitor and fractional scaling,
