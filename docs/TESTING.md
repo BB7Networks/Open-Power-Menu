@@ -100,7 +100,7 @@ Qt, Wayland, launcher versions, panel position and display scale for every run.
 | Editor | Search/pick/save/launch an app; spaces, localization, terminal/DBus apps; custom quoting and nested entries |
 | Configure presentation | Three tabs; concise instructions; Undo/Redo right-aligned and wrapping at narrow widths; unsaved changes survive attempted restore |
 | In-menu editing | Locked default; full hidden-entry hierarchy; reorder/reparent; Save/Cancel; interrupted drags; popup close/reopen; no command launches |
-| Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; drag and hold anywhere on the 48px-wide-strip **Go Back** target through multiple levels; return viewport/selection; long press; edge scrolling |
+| Scroll/drag follow-up | Repeated bottom-of-list moves; full-row drag; 450 ms submenu hover; drag and hold anywhere on the full-width, 48px-high **Go Back** strip through multiple levels; return viewport/selection; long press; edge scrolling |
 | In-menu recovery | External edit conflict; backend unavailable/restarted; retained draft and clear recovery instructions |
 | Keyboard/theme | Up/Down, Enter, Right/Left, Escape; Alt+Arrow and right-click/Shift+F10 movement menus; wheel/touchpad during drag; visible focus; native light/dark and Aero |
 | Native Meta+X | Fresh OPM widget on a free binding; press twice to open/close at **current** button; occupied binding; customize/disable; restart/reinstall preserves preferences; remove and promptly re-add; Undo restores prior key; no orphaned per-instance shortcut |
