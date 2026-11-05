@@ -608,229 +608,55 @@ def test_quick_controls_follow_light_dark_and_aero_palettes(quick, background, f
     bright, dark = sorted((luminance(background), luminance(foreground)), reverse=True)
     assert (bright + .05) / (dark + .05) >= 4.5
 
-
-def test_editor_flyout_is_a_separate_row_anchored_popup_with_safe_moves(quick):
-    """Popup.Window preserves the narrow parent; a drop references opaque IDs only."""
+ 
+def test_full_width_go_back_area_is_a_spring_loaded_drag_target(quick):
+    """The entire top strip, including its far right edge, navigates up."""
     _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-
-    click(view, root, 'layoutRow-g')
-    QTest.qWait(40)
-    assert root.property('flyoutVisible')
-    assert root.property('flyoutId') == 'g'
-    assert draft(root)['parentId'] == ''
-    left = child(root, 'layoutRows')
-    right = evaluate(root, 'flyoutList')
-    assert left is not None and right is not None
-    assert evaluate(root, 'flyoutPane.popupType === 1')  # QQC2.Popup.Window (Qt 6.8+)
-    assert root.implicitWidth() == 304
-    assert left.width() < 330  # The parent is no longer stretched to 650px.
-    # Flyout sits beyond either edge of the parent, not in a split RowLayout.
-    pos = evaluate(root, 'flyoutPane.x')
-    assert pos >= root.width() or pos < 0
-    assert child(root, 'layoutFlyoutRows') is None  # Separate popup window.
-
-    token = draft(root)['token']
-    def drop_command(item_id, target, row_y):
-        script = """
-            control.nativeDrop({
-                formats: [control.nativeDragFormat, control.nativeTokenFormat],
-                getDataAsString: function(fmt) {
-                    return fmt === control.nativeDragFormat ? %s : %s;
-                },
-                y: %s
-            }, %s, %s, %s)
-        """ % (json.dumps(item_id), json.dumps(token), row_y, target[0], target[1], target[2])
-        return evaluate(root, script)
-
-    assert drop_command('b', ('control.flyoutId','flyoutList','control.flyoutEntries'), 5)
-    value = draft(root)
-    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['b','c']
-    assert value['parentId'] == ''
-    assert root.property('flyoutVisible')
-
-    assert drop_command('b', ("control.draft.parentId","list","control.rows"), 5)
-    value = draft(root)
-    assert [e['id'] for e in value['entries']][:2] == ['b','a']
-    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['c']
-
-
-def test_editor_flyout_bottom_aligns_with_parent_row_on_first_open(quick):
-    """Match normal-use flyouts, not a popup at the editor window's top."""
-    _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-    parent = child(root, 'layoutRow-g')
-    assert parent is not None
-    parent_bottom = parent.mapToItem(root, QPointF(0, parent.height())).y()
-    click(view, root, 'layoutRow-g')
-    # Position must already be correct from the first opening, without
-    # waiting for a callLater correction that briefly flashes at y=0.
-    assert root.property('flyoutVisible')
-    popup_top = evaluate(root, 'flyoutPane.y')
-    popup_height = evaluate(root, 'flyoutPane.height')
-    assert abs(popup_top + popup_height - parent_bottom) <= 1.5
-    assert popup_top != 0
-
-
-def test_editor_flyout_uses_screen_clamp_when_bottom_alignment_overflows(quick):
-    """Tall flyouts use the same screen-boundary rules as SideFlyout."""
-    _, view, root = quick
-    long_menu(view, root)
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-    # Long group's 40 children produce a 410-pixel flyout. Its desired
-    # bottom-aligned top is above the virtual screen and must be clamped.
-    evaluate(root, "control.choose('x47')")
-    click(view, root, 'layoutRow-x47')
-    assert root.property('flyoutVisible')
-    expected = evaluate(root, """
-        (function () {
-            const row = list.itemAtIndex(control.rowIndex('x47'));
-            const p = row.mapToItem(control, 0, 0);
-            const global = row.mapToGlobal(0, 0);
-            const screenTop = Screen.virtualY;
-            const screenHeight = Screen.desktopAvailableHeight > 0
-                ? Screen.desktopAvailableHeight : Screen.height;
-            const h = flyoutPane.height, border = 4;
-            const limit = Math.max(screenTop + border,
-                screenTop + screenHeight - border - h);
-            const desired = global.y + row.height - h;
-            return p.y + Math.max(screenTop + border,
-                Math.min(desired, limit)) - global.y;
-        })()
-    """)
-    assert abs(evaluate(root, 'flyoutPane.y') - expected) <= 1.5
-
-
-def test_native_flyout_hover_state_prevents_premature_dismissal(quick):
-    """When the separate popup gains hover, the parent's timer cannot dismiss it."""
-    _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-    initial = draft(root)['entries']
-    parent = child(root, 'layoutRow-g')
-    QTest.mouseMove(view, parent.mapToScene(QPointF(70,18)).toPoint())
-    QTest.qWait(280)
-    assert root.property('flyoutVisible')
-    popup_window = evaluate(root, 'flyoutSurface.Window.window')
-    nested = evaluate(root, 'flyoutList.itemAtIndex(0)')
-    assert popup_window is not None and nested is not None
-    # Send pointer events to the *other window*, not to the parent QQuickView.
-    QTest.mouseMove(popup_window, nested.mapToScene(QPointF(45, 18)).toPoint())
-    QTest.qWait(310)
-    assert root.property('flyoutVisible')
-    outside = child(root,'layoutRow-a')
-    QTest.mouseMove(view, outside.mapToScene(QPointF(70,18)).toPoint())
-    QTest.qWait(320)
-    assert not root.property('flyoutVisible')
-    assert draft(root)['entries'] == initial
-
-
-def test_cascading_flyout_closes_when_popup_hides(quick):
-    _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(650, 430)
+    nested_menu(view, root)
+    evaluate(root, "control.enter('g')")
     QTest.qWait(20)
-    click(view, root, 'layoutRow-g')
-    assert root.property('flyoutVisible')
-    initial = draft(root)
-    root.setVisible(False)
-    QTest.qWait(20)
-    assert not root.property('flyoutVisible')
-    root.setVisible(True)
-    assert draft(root) == initial
-
-
-def test_native_flyout_switches_to_nested_level_without_widening(quick):
-    _, view, root = quick
-    value = draft(root)
-    value['entries'][1]['items'].append({
-        'id': 'h', 'kind': 'submenu', 'title': 'Nested',
-        'items': [{'id': 'z', 'kind': 'command', 'title': 'Inside'}]
-    })
-    root.setProperty('draft', view.engine().evaluate('(' + json.dumps(value) + ')'))
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-
-    click(view, root, 'layoutRow-g')
-    assert root.property('flyoutId') == 'g'
-    evaluate(root, "control.openFlyout('h')")
-    QTest.qWait(60)
-    assert draft(root)['parentId'] == 'g'
-    assert root.property('flyoutVisible')
-    assert root.property('flyoutId') == 'h'
-    assert root.implicitWidth() == 304
-    assert [e['id'] for e in draft(root)['entries'][1]['items']] == ['c', 'h']
-    evaluate(root, 'control.back()')
-    assert not root.property('flyoutVisible')
-    assert draft(root)['parentId'] == 'g'
-
-
-def test_parent_row_drag_remains_nonblocking_while_edit_flyout_is_open(quick):
-    """Native Wayland QDrag must not steal mouse release from parent reordering."""
-    _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-    click(view, root, 'layoutRow-g')
-    assert root.property('flyoutVisible')
-    first = child(root, 'layoutRow-a')
-    last = child(root, 'layoutRow-b')
-    start = first.mapToScene(QPointF(110, 18)).toPoint()
-    end = last.mapToScene(QPointF(110, 32)).toPoint()
-    QTest.mousePress(view, Qt.LeftButton, pos=start)
-    QTest.mouseMove(view, start + (end-start)/2, delay=20)
-    QTest.mouseMove(view, end, delay=20)
+    back = child(root, 'layoutBack')
+    assert back is not None
+    assert back.property('enabled')
+    assert back.height() >= 44
+    assert back.width() >= root.width() - 12
+    assert back.property('text').startswith('Go Back')
+    root.setProperty('submenuHoverDelay', 120)
+    back_right = back.mapToScene(
+        QPointF(back.width() - 12, back.height() / 2)).toPoint()
+    begin_drag(view, point(root, 'layoutRow-c'), back_right)
     assert root.property('dragActive')
-    assert root.property('dropValid'), (
-        root.property('dropKind'), root.property('dropParent'),
-        root.property('dropBefore'), root.property('dropReason'))
+    assert root.property('dropKind') == 'parent'
+    assert root.property('dropParent') == ''
+    QTest.qWait(145)
+    assert draft(root)['parentId'] == ''
+    assert root.property('dragActive')
+    end = point(root, 'layoutRow-b', y=32)
+    QTest.mouseMove(view, end, delay=10)
     QTest.mouseRelease(view, Qt.LeftButton, pos=end)
-    QTest.qWait(30)
-    assert not root.property('dragActive')
-    assert [entry['id'] for entry in draft(root)['entries']] == ['g', 'b', 'a', 's']
-    source = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
-    assert 'Drag.dragType: Drag.Automatic' not in source
-    assert 'Item { id: dragPosition }' in source
-
-
-def test_hover_flyout_move_selected_here_without_native_cross_window_drag(quick):
-    _, view, root = quick
-    root.setProperty('cascadingEnabled', True)
-    view.resize(328, 430)
-    QTest.qWait(30)
-    click(view, root, 'layoutRow-b')
-    assert draft(root)['selectedId'] == 'b'
-    evaluate(root, "control.openFlyout('g')")
-    assert root.property('flyoutVisible')
-    assert evaluate(root, 'control.canMoveSelectionIntoFlyout()')
-    evaluate(root, 'control.moveSelectedIntoFlyout()')
+    QTest.qWait(20)
     value = draft(root)
-    assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['c','b']
-    assert value['parentId'] == ''
+    assert [e['id'] for e in value['entries']] == ['a', 'g', 'b', 'c', 's']
+    assert next(e for e in value['entries'] if e['id'] == 'g')['items'] == []
     assert not root.property('dragActive')
+    assert not back.property('enabled')  # Root has no parent level.
 
 
-def test_plasma_native_flyout_is_only_loaded_by_widget():
-    editor = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
-    widget = (ROOT / 'plasmoid/contents/ui/main.qml').read_text()
-    plasma = (ROOT / 'plasmoid/contents/ui/LayoutPlasmaFlyout.qml').read_text()
-    normal = (ROOT / 'plasmoid/contents/ui/SideFlyout.qml').read_text()
-    assert 'preferPlasmaFlyout: true' in widget
-    assert 'property bool preferPlasmaFlyout: false' in editor
-    assert 'Qt.createComponent(Qt.resolvedUrl("LayoutPlasmaFlyout.qml"))' in editor
-    assert 'PlasmaCore.PopupPlasmaWindow {' in plasma
-    assert 'visualParent' in editor and 'plasmaFlyoutAnchor' in editor
-    # Both popup implementations use the stable one-pixel proxy and the
-    # same bottom-to-bottom preferred placement, never top-of-window y=0.
-    for src in (plasma, normal):
-        assert 'const requestedTop = rowGlobal.y + row.height - popupH;' in src
-        assert 'proxy.y = rowLocal.y + targetTop + popupH / 2 - rowGlobal.y - 0.5;' in src
-    assert 'Drag.dragType: Drag.Automatic' not in editor
+def test_dedicated_go_back_click_and_original_editor_no_popup(quick):
+    """A click and drag share the same top strip; no floating editor is loaded."""
+    _, view, root = quick
+    evaluate(root, "control.enter('g')")
+    QTest.qWait(20)
+    back = child(root, 'layoutBack')
+    pos = back.mapToScene(QPointF(back.width() / 2, back.height() / 2)).toPoint()
+    QTest.mouseClick(view, Qt.LeftButton, pos=pos)
+    QTest.qWait(10)
+    assert draft(root)['parentId'] == ''
+    assert back.property('text') == 'Top level'
+    editor_qml = (ROOT / 'plasmoid/contents/ui/LayoutEditor.qml').read_text()
+    main_qml = (ROOT / 'plasmoid/contents/ui/main.qml').read_text()
+    assert 'Drag.dragType: Drag.Automatic' not in editor_qml
+    assert 'flyoutPane' not in editor_qml
+    assert 'preferPlasmaFlyout' not in main_qml
+    assert 'springOpen' in editor_qml
+    assert 'opmDefaultShortcutTried' in main_qml
