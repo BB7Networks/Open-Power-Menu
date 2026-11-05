@@ -48,9 +48,9 @@ is unchanged.
 - A suspended or dismissed popup retains the draft; layout changes are saved
   only when the user explicitly selects Save layout.
 
-The optional floating edit flyout widget, configuration toggle and temporary
-cross-window drag code were removed from PR #6. The default Meta+X changes
-remain separate and intact.
+Experimental split-pane and floating editing flyouts were retired after live
+Wayland feedback. Normal-use flyouts are unaffected; layout editing remains a
+single in-window drag operation, and native Meta+X is configured separately.
 
 ## Acceptance checks
 
