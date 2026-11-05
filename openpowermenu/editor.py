@@ -492,6 +492,9 @@ def create_editor(path: Path | None = None):
             self.appearance.setCurrentIndex(max(0, self.appearance.findData(
                 cfg.get("appearance", "native"))))
             style_form.addRow("Menu style:", self.appearance)
+            self.show_menu_icons = QCheckBox("Show icons in Power User Menu", style_group)
+            self.show_menu_icons.setChecked(cfg.get("show_menu_icons", True))
+            style_form.addRow(self.show_menu_icons)
             general_layout.addWidget(style_group)
 
             general_layout.addStretch(1)
@@ -671,6 +674,7 @@ def create_editor(path: Path | None = None):
             for control in (self.appearance, self.launcher_target, self.icon_mode):
                 control.currentIndexChanged.connect(self.update_dirty)
             self.hide_launcher.toggled.connect(self.update_dirty)
+            self.show_menu_icons.toggled.connect(self.update_dirty)
             self.button_icon.textChanged.connect(self.update_dirty)
             self.backup_retention.valueChanged.connect(self.update_dirty)
             self.show_missing.toggled.connect(self.unavailable_changed)
@@ -983,6 +987,7 @@ def create_editor(path: Path | None = None):
             config['menu'] = self._walk(self.tree.invisibleRootItem())
             config['show_unavailable'] = self.show_missing.isChecked()
             config['appearance'] = self.appearance.currentData()
+            config['show_menu_icons'] = self.show_menu_icons.isChecked()
             config['hide_original_launcher'] = self.hide_launcher.isChecked()
             config['launcher_applet_id'] = int(self.launcher_target.currentData())
             config['button_icon_mode'] = self.icon_mode.currentData()
@@ -1009,6 +1014,7 @@ def create_editor(path: Path | None = None):
                 self.fill(config['menu'])
                 self.show_missing.setChecked(config['show_unavailable'])
                 self.hide_launcher.setChecked(config['hide_original_launcher'])
+                self.show_menu_icons.setChecked(config.get('show_menu_icons', True))
                 for widget, key in ((self.appearance, 'appearance'), (self.icon_mode, 'button_icon_mode'),
                                     (self.launcher_target, 'launcher_applet_id')):
                     index = widget.findData(config[key])

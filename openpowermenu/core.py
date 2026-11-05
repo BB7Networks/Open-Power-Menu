@@ -140,6 +140,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "appearance": "native",
     "anchor": "cursor",
     "show_unavailable": False,
+    "show_menu_icons": True,
     "backup_retention": 10,  # Number of previous automatic menu.json versions to retain.
     # Opt-in, presentation-only Plasma panel integration; never writes panel config.
     "hide_original_launcher": False,
@@ -457,6 +458,8 @@ def prune_automatic_backups(target: Path, keep: int, protected: frozenset[str] =
 def validate_configuration(config: dict[str, Any]) -> None:
     if not isinstance(config, dict) or not isinstance(config.get("menu"), list):
         raise ValueError("Configuration must contain a menu array")
+    if not isinstance(config.get("show_menu_icons", True), bool):
+        raise ValueError("show_menu_icons must be a boolean")
     if config.get("appearance", "native") not in ("native", "aero"):
         raise ValueError("Invalid appearance")
     if config.get("anchor", "cursor") not in ("cursor", "bottom-left", "bottom-right"):

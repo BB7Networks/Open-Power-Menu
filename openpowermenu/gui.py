@@ -94,12 +94,12 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None, 
                 target_menu.addSeparator()
             elif kind == "submenu":
                 submenu = QMenu(entry["title"], target_menu)
-                submenu.setIcon(icon_for(entry["icon"]))
+                submenu.setIcon(icon_for(entry["icon"]) if cfg.get("show_menu_icons", True) else QIcon())
                 target_menu.addMenu(submenu)
                 submenus.append(submenu)
                 populate(submenu, entry["items"])
             else:
-                item_action = target_menu.addAction(icon_for(entry["icon"]), entry["title"])
+                item_action = target_menu.addAction(icon_for(entry["icon"]) if cfg.get("show_menu_icons", True) else QIcon(), entry["title"])
                 item_action.setEnabled(entry["command"] is not None)
                 if entry["command"] is not None:
                     item_action.setData(list(entry["command"].argv))

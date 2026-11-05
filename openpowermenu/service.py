@@ -124,11 +124,12 @@ def run_service() -> int:
                                    "launcher_applet_id": cfg.get("launcher_applet_id", 0),
                                    "button_icon_mode": cfg.get("button_icon_mode", "launcher"),
                                    "button_icon": cfg.get("button_icon", ""),
-                                   "appearance": cfg.get("appearance", "native")})
+                                   "appearance": cfg.get("appearance", "native"),
+                                   "show_menu_icons": cfg.get("show_menu_icons", True)})
             except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
                 print("Open Power Menu integration configuration error:", exc, file=sys.stderr)
                 return json.dumps({"hide_original_launcher": False, "launcher_applet_id": 0,
-                                   "button_icon_mode": "launcher", "button_icon": "", "appearance": "native"})
+                                   "button_icon_mode": "launcher", "button_icon": "", "appearance": "native", "show_menu_icons": True})
 
         @Slot(result=str)
         def Ping(self):

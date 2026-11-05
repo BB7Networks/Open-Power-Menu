@@ -1,5 +1,16 @@
 # Open Power Menu changelog
 
+## Unreleased - menu flyout UX refinements
+
+- Place submenu indicators on the side where each flyout opens, following
+  Plasma's effective direction with stable arrow gutters and aligned labels.
+- Clear reused and nested flyout selections on model and visibility changes;
+  preserve explicit hover, keyboard and accessibility selection.
+- Add **Show icons in Power User Menu** under Configure → General. The shared
+  setting defaults to enabled and covers normal root/nested and standalone
+  menus without changing launcher or toolbar icons or saved menu definitions.
+- Add four supplied desktop screenshots and concise product captions.
+
 ## Unreleased - native widget shortcut and single-pane editor
 
 - Attempt **Meta+X once per new Plasma widget instance**, invoking the existing
@@ -15,9 +26,8 @@
   to their parent level; the normal locked-menu flyouts remain unchanged.
 - Remove the obsolete manual Meta+X setup button and editing-flyout toggle,
   while preserving standalone launch diagnostics as an optional fallback.
-- Refresh README and linked troubleshooting/acceptance docs. Three genuine
-  Manjaro Plasma screenshots are captured for the repository gallery;
-  image publication remains pending.
+- Refresh README and linked troubleshooting/acceptance docs. The gallery now
+  includes the supplied desktop screenshots described above.
 - Keep version identifiers at **0.4.17** until review, live desktop acceptance,
   merge and an explicitly approved release.
 

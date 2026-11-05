@@ -75,6 +75,7 @@ PlasmoidItem {
     property bool fetching: false
     property int menuFetchEpoch: 0
     property string menuAppearance: "native"
+    property bool showMenuIcons: true
     property string commandError: ""
     property bool launchPending: false
     // Temporary state belongs to the applet, so closing its popup keeps the draft.
@@ -476,6 +477,7 @@ PlasmoidItem {
                      buttonIconMode = cfg.button_icon_mode === "custom" ? "custom" : "launcher";
                      customButtonIcon = String(cfg.button_icon || "");
                      menuAppearance = cfg.appearance === "aero" ? "aero" : "native";
+                     showMenuIcons = cfg.show_menu_icons !== false;
                      synchronizeLauncherVisibility();
                  } catch (e) {
                      console.warn("Open Power Menu: invalid integration configuration", e);
@@ -842,6 +844,7 @@ PlasmoidItem {
         SideFlyout {
             id: flyout
             appearance: root.menuAppearance
+            showMenuIcons: root.showMenuIcons
             onReturnToParent: {
                 if (!root.expanded) return;
                 if (popup.Window.window) popup.Window.window.requestActivate();
@@ -1033,34 +1036,15 @@ PlasmoidItem {
                                 color: Kirigami.Theme.highlightColor
                                 opacity: 0.30
                             }
-                            RowLayout {
-                                visible: menuRow.entry.kind !== "separator"
+                            MenuEntryContent {
                                 anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 9
-                                Kirigami.Icon {
-                                    source: menuRow.entry.icon || "application-x-executable"
-                                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
-                                    Layout.preferredHeight: 18
-                                    Layout.preferredWidth: 18
-                                    visible: menuRow.entry.kind !== "separator"
-                                    opacity: menuRow.entry.enabled === false ? 0.4 : 1
-                                }
-                                PC3.Label {
-                                    Layout.fillWidth: true
-                                    text: menuRow.entry.title || ""
-                                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
-                                    elide: Text.ElideRight
-                                    opacity: menuRow.entry.enabled === false ? 0.5 : 1
-                                }
-                                Kirigami.Icon {
-                                    Layout.preferredWidth: 14
-                                    Layout.preferredHeight: 14
-                                    source: "go-next-symbolic"
-                                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
-                                    visible: menuRow.entry.kind === "submenu"
-                                }
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                entry: menuRow.entry
+                                showIcons: root.showMenuIcons
+                                foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                                opensLeft: (flyout.visible && popup.activeFlyoutKey === menuRow.entry.key
+                                    ? flyout.indicatorDirection : flyout.chooseSide(menuRow, menuRow.menuScreen)) === Qt.LeftEdge
                             }
                             MouseArea {
                                 id: rowMouse

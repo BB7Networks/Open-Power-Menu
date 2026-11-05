@@ -89,7 +89,7 @@ class FlyoutAndConfigureTests(unittest.TestCase):
         self.assertIn('"visualParent": childAnchor', side)
         self.assertIn('Screen.desktopAvailableHeight', side)
         self.assertIn('anchor.mapToGlobal(0, 0)', side)
-        self.assertIn('screenRect.width <= 0', side)
+        self.assertIn('availableScreen.width <= 0', side)
         self.assertIn('freeRight >= required', side)
         self.assertIn('freeLeft >= required', side)
         self.assertIn('flyout.popupDirection = flyout.chooseSide(flyoutAnchor)', qml)
