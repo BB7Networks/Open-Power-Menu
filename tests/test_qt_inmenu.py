@@ -657,6 +657,56 @@ def test_editor_flyout_is_a_separate_row_anchored_popup_with_safe_moves(quick):
     assert [e['id'] for e in next(e for e in value['entries'] if e['id']=='g')['items']] == ['c']
 
 
+def test_editor_flyout_bottom_aligns_with_parent_row_on_first_open(quick):
+    """Match normal-use flyouts, not a popup at the editor window's top."""
+    _, view, root = quick
+    root.setProperty('cascadingEnabled', True)
+    view.resize(328, 430)
+    QTest.qWait(30)
+    parent = child(root, 'layoutRow-g')
+    assert parent is not None
+    parent_bottom = parent.mapToItem(root, QPointF(0, parent.height())).y()
+    click(view, root, 'layoutRow-g')
+    # Position must already be correct from the first opening, without
+    # waiting for a callLater correction that briefly flashes at y=0.
+    assert root.property('flyoutVisible')
+    popup_top = evaluate(root, 'flyoutPane.y')
+    popup_height = evaluate(root, 'flyoutPane.height')
+    assert abs(popup_top + popup_height - parent_bottom) <= 1.5
+    assert popup_top != 0
+
+
+def test_editor_flyout_uses_screen_clamp_when_bottom_alignment_overflows(quick):
+    """Tall flyouts use the same screen-boundary rules as SideFlyout."""
+    _, view, root = quick
+    long_menu(view, root)
+    root.setProperty('cascadingEnabled', True)
+    view.resize(328, 430)
+    QTest.qWait(30)
+    # Long group's 40 children produce a 410-pixel flyout. Its desired
+    # bottom-aligned top is above the virtual screen and must be clamped.
+    evaluate(root, "control.choose('x47')")
+    click(view, root, 'layoutRow-x47')
+    assert root.property('flyoutVisible')
+    expected = evaluate(root, """
+        (function () {
+            const row = list.itemAtIndex(control.rowIndex('x47'));
+            const p = row.mapToItem(control, 0, 0);
+            const global = row.mapToGlobal(0, 0);
+            const screenTop = Screen.virtualY;
+            const screenHeight = Screen.desktopAvailableHeight > 0
+                ? Screen.desktopAvailableHeight : Screen.height;
+            const h = flyoutPane.height, border = 4;
+            const limit = Math.max(screenTop + border,
+                screenTop + screenHeight - border - h);
+            const desired = global.y + row.height - h;
+            return p.y + Math.max(screenTop + border,
+                Math.min(desired, limit)) - global.y;
+        })()
+    """)
+    assert abs(evaluate(root, 'flyoutPane.y') - expected) <= 1.5
+
+
 def test_native_flyout_hover_state_prevents_premature_dismissal(quick):
     """When the separate popup gains hover, the parent's timer cannot dismiss it."""
     _, view, root = quick
