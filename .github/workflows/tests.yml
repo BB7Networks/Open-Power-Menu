@@ -54,7 +54,7 @@ jobs:
           import subprocess
           import PySide6
           parser = Path(PySide6.__file__).parent / "qmlformat"
-          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "adapters/AppGridPanelBridge.qml"]
+          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "LayoutPlasmaFlyout.qml", "adapters/AppGridPanelBridge.qml"]
           subprocess.run([str(parser), *["plasmoid/contents/ui/" + name for name in files]],
                          stdout=subprocess.DEVNULL, check=True)
           PY
