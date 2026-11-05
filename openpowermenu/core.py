@@ -128,6 +128,13 @@ COMMANDS: dict[str, dict[str, Any]] = {
         "commands": [["qdbus6", "org.kde.LogoutPrompt", "/LogoutPrompt", "promptReboot"]],
         "desktops": ["KDE", "PLASMA"],
     },
+    "show_desktop": {
+        "title": "Desktop", "icon": "user-desktop",
+        "desktops": ["KDE", "PLASMA"],
+        "commands": [{"argv": ["qdbus6", "org.kde.kglobalaccel", "/component/kwin",
+                               "org.kde.kglobalaccel.Component.invokeShortcut", "Show Desktop"],
+                      "kwin_shortcut": "Show Desktop"}],
+    },
     "shutdown": {
         "title": "Shut down...", "icon": "system-shutdown",
         "commands": [["qdbus6", "org.kde.LogoutPrompt", "/LogoutPrompt", "promptShutDown"]],
@@ -141,6 +148,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "anchor": "cursor",
     "show_unavailable": False,
     "show_menu_icons": True,
+    "auto_close_on_pointer_leave": False,
     "backup_retention": 10,  # Number of previous automatic menu.json versions to retain.
     # Opt-in, presentation-only Plasma panel integration; never writes panel config.
     "hide_original_launcher": False,
@@ -173,6 +181,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         {"submenu": "Shut down or sign out", "icon": "system-shutdown", "items": [
             {"action": "lock"}, {"action": "logout"}, {"action": "reboot"}, {"action": "shutdown"}
         ]},
+        {"action": "show_desktop"},
     ],
 }
 
@@ -223,6 +232,18 @@ def kcm_is_available(module: str) -> bool:
     return bool(executable and module in _kcm_modules(executable, int(time.monotonic() // 30)))
 
 
+@lru_cache(maxsize=1)
+def _kwin_shortcuts(executable: str, interval: int) -> frozenset[str]:
+    """Read the actual registered action IDs; never toggle during discovery."""
+    try:
+        result = subprocess.run([executable, "org.kde.kglobalaccel", "/component/kwin",
+                                 "org.kde.kglobalaccel.Component.shortcutNames"],
+                                capture_output=True, text=True, errors="replace", timeout=2)
+    except (OSError, subprocess.TimeoutExpired):
+        return frozenset()
+    return frozenset(result.stdout.splitlines()) if result.returncode == 0 else frozenset()
+
+
 def candidate_argv(candidate: list | dict, *, expand: bool = True) -> tuple[str, ...]:
     raw = candidate.get("argv") if isinstance(candidate, dict) else candidate
     if not isinstance(raw, list) or not raw or not all(isinstance(p, str) and p and "\x00" not in p for p in raw):
@@ -242,6 +263,9 @@ def candidate_is_available(candidate: list | dict, *, expand: bool = True) -> bo
         if not isinstance(requires, list) or not all(isinstance(name, str) and name for name in requires):
             raise ValueError("requires must be an array of executable names")
         if any(not which_executable(name) for name in requires):
+            return False
+        shortcut = candidate.get("kwin_shortcut")
+        if shortcut and shortcut not in _kwin_shortcuts(shutil.which(argv[0]) or argv[0], int(time.monotonic() // 30)):
             return False
         module = candidate.get("kcm")
         if module and not kcm_is_available(module):
@@ -325,7 +349,8 @@ def normalized_menu(items: list[dict[str, Any]], show_unavailable: bool = False)
         title, icon, command = get_item_info(item)
         if command is None and not show_unavailable:
             continue
-        output.append({"kind": "command", "title": title, "icon": icon, "command": command})
+        output.append({"kind": "command", "title": title, "icon": icon, "command": command,
+                       "close_before_run": item.get("action") == "show_desktop"})
     while output and output[-1]["kind"] == "separator":
         output.pop()
     return output
@@ -458,6 +483,8 @@ def prune_automatic_backups(target: Path, keep: int, protected: frozenset[str] =
 def validate_configuration(config: dict[str, Any]) -> None:
     if not isinstance(config, dict) or not isinstance(config.get("menu"), list):
         raise ValueError("Configuration must contain a menu array")
+    if type(config.get("auto_close_on_pointer_leave", False)) is not bool:
+        raise ValueError("auto_close_on_pointer_leave must be true or false")
     if not isinstance(config.get("show_menu_icons", True), bool):
         raise ValueError("show_menu_icons must be a boolean")
     if config.get("appearance", "native") not in ("native", "aero"):

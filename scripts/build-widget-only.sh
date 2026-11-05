@@ -11,7 +11,10 @@ PY_VER
 )"
 mkdir -p "$root/dist"
 archive="$root/dist/org.openpowermenu.start-$version.plasmoid"
-(cd "$root/plasmoid" && zip -qr "$archive" metadata.json contents)
+temporary=$(mktemp -d)
+trap 'rm -rf -- "$temporary"' EXIT
+(cd "$root/plasmoid" && zip -qr "$temporary/widget.zip" metadata.json contents)
+mv "$temporary/widget.zip" "$archive"
 printf 'Built widget-only archive: %s\n' "$archive"
 printf 'WARNING: This does not install the Python/PySide6 backend.\n'
 printf 'Do NOT advertise it as one-click Store compatible yet.\n'

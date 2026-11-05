@@ -36,9 +36,13 @@ PlasmaCore.PopupPlasmaWindow {
         activeIndex = -1;
         closeChild();
     }
-    readonly property int indicatorDirection: visible &&
-        (effectivePopupDirection === Qt.LeftEdge || effectivePopupDirection === Qt.RightEdge)
-        ? effectivePopupDirection : popupDirection
+    property int settledPopupDirection: Qt.RightEdge
+    readonly property int indicatorDirection: visible ? settledPopupDirection : popupDirection
+    function updateIndicatorDirection() {
+        const effective = effectivePopupDirection;
+        settledPopupDirection = effective === Qt.LeftEdge || effective === Qt.RightEdge
+            ? effective : popupDirection;
+    }
     signal returnToParent()
     function focusFirst() {
         activeIndex = LayoutDraft.nextIndex(entries, -1, 1, false);
@@ -50,7 +54,10 @@ PlasmaCore.PopupPlasmaWindow {
     // which edge the *panel* happens to occupy. This also handles multiple
     // monitors and non-corner launcher positions.
     property rect screenRect: Qt.rect(0, 0, 0, 0)
-    signal triggered(string key)
+    signal triggered(string key, bool closeBeforeRun)
+    signal keyboardUsed()
+    signal pointerMoved()
+    readonly property bool pointerInside: visible && (surfaceHover.hovered || (activeChild && activeChild.pointerInside))
 
     function chooseSide(anchor, availableScreen = screenRect) {
         if (!anchor) return Qt.RightEdge;
@@ -70,11 +77,11 @@ PlasmaCore.PopupPlasmaWindow {
         return freeRight >= freeLeft ? Qt.RightEdge : Qt.LeftEdge;
     }
     onEffectivePopupDirectionChanged: {
-        if (visible) console.info("Open Power Menu: requested side",
-            popupDirection === Qt.RightEdge ? "right" : "left",
-            "effective side", effectivePopupDirection === Qt.RightEdge ? "right" :
-                effectivePopupDirection === Qt.LeftEdge ? "left" : "other");
+        // Plasma 6.3 emits this signal BEFORE assigning the new value. Read
+        // on the next event-loop turn, including when a panel changes sides.
+        Qt.callLater(updateIndicatorDirection);
     }
+    onPopupDirectionChanged: Qt.callLater(updateIndicatorDirection)
     // Anchor side popups so their lower edge aligns with the parent item's
     // lower edge. Plasma centers RightEdge/LeftEdge popups on visualParent,
     // so a one-pixel-high proxy can be placed at the desired vertical center.
@@ -115,6 +122,7 @@ PlasmaCore.PopupPlasmaWindow {
     }
     onVisibleChanged: {
         resetSelection();
+        if (visible) Qt.callLater(updateIndicatorDirection);
     }
 
     // PlasmaWindow's mainItem is resized to the window's size minus its
@@ -131,7 +139,12 @@ PlasmaCore.PopupPlasmaWindow {
         border.width: 1
         radius: 3
         focus: true
+        HoverHandler {
+            id: surfaceHover
+            onPointChanged: flyout.pointerMoved()
+        }
         Keys.onPressed: event => {
+            flyout.keyboardUsed();
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                 flyout.closeChild();
                 flyout.activeIndex = LayoutDraft.nextIndex(flyout.entries, flyout.activeIndex, event.key === Qt.Key_Up ? -1 : 1, false);
@@ -150,7 +163,7 @@ PlasmaCore.PopupPlasmaWindow {
                 if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
                 if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
                 else if (event.key !== Qt.Key_Right) {
-                    flyout.triggered(row.entry.key);
+                    flyout.triggered(row.entry.key, row.entry.close_before_run === true);
                     flyout.visible = false;
                 }
             } else return;
@@ -212,10 +225,12 @@ PlasmaCore.PopupPlasmaWindow {
                                     console.warn("Open Power Menu: could not open nested flyout");
                                     return;
                                 }
-                                childPopup.triggered.connect(function(key) {
-                                    flyout.triggered(key);
+                                childPopup.triggered.connect(function(key, closeBeforeRun) {
+                                    flyout.triggered(key, closeBeforeRun);
                                     flyout.visible = false;
                                 });
+                                childPopup.keyboardUsed.connect(flyout.keyboardUsed);
+                                childPopup.pointerMoved.connect(flyout.pointerMoved);
                                 childPopup.returnToParent.connect(function() {
                                     if (!flyout.visible) return;
                                     flyout.requestActivate();
@@ -276,7 +291,7 @@ PlasmaCore.PopupPlasmaWindow {
                                 flyout.activeIndex = row.index;
                                 if (row.entry.kind === "submenu") row.openChild();
                                 else {
-                                    flyout.triggered(row.entry.key);
+                                    flyout.triggered(row.entry.key, row.entry.close_before_run === true);
                                     flyout.visible = false;
                                 }
                             }
@@ -288,7 +303,7 @@ PlasmaCore.PopupPlasmaWindow {
                             if (row.entry.enabled === false || row.entry.kind === "separator") return;
                             flyout.activeIndex = row.index;
                             if (row.entry.kind === "submenu") row.openChild();
-                            else { flyout.triggered(row.entry.key); flyout.visible = false; }
+                            else { flyout.triggered(row.entry.key, row.entry.close_before_run === true); flyout.visible = false; }
                         }
                     }
                 }

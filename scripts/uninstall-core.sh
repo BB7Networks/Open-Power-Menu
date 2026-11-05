@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Leaves the user's menu.json and other launchers untouched.
 set -euo pipefail
+[[ $EUID -ne 0 ]] || { echo "Run as your normal desktop user, WITHOUT sudo." >&2; exit 1; }
 src="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"

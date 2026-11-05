@@ -14,7 +14,7 @@ tmp="$(mktemp -d)"
 trap 'rm -rf -- "$tmp"' EXIT
 stage="$tmp/OpenPowerMenu-v$version"
 mkdir -p "$stage"
-for n in install.sh uninstall.sh LICENSE README.md CHANGELOG.md run.py RELEASE-NOTES-v0.4.17.md; do cp -a "$root/$n" "$stage/"; done
+for n in install.sh uninstall.sh LICENSE README.md CHANGELOG.md run.py "RELEASE-NOTES-v$version.md"; do cp -a "$root/$n" "$stage/"; done
 for n in assets examples openpowermenu plasmoid docs; do cp -a "$root/$n" "$stage/"; done
 mkdir -p "$stage/scripts"
 cp -a "$root/scripts/install-core.sh" "$root/scripts/uninstall-core.sh" "$stage/scripts/"

@@ -7,7 +7,7 @@ app_dir="$here"
 fail() { printf '\nERROR: %s\n\n' "$*" >&2; exit 1; }
 
 printf '\n================================================\n'
-printf ' OPEN POWER MENU 0.4.17 - EASY SETUP\n'
+printf ' OPEN POWER MENU - EASY SETUP\n'
 printf ' KDE Plasma 6 / Manjaro\n'
 printf '================================================\n\n'
 

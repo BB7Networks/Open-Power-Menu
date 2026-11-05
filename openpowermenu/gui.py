@@ -41,13 +41,53 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None, 
                        visible=menu.isVisible(), exposed=bool(win and win.isExposed()),
                        active=menu.isActiveWindow())
 
+    leave_timer = QTimer(menu)
+    leave_timer.setSingleShot(True)
+    leave_timer.setInterval(1200)
+
     class VisibilityProbe(QObject):
+        inside = set()
+        keyboard_mode = False
+        entered = False
+
+        def update_leave(self):
+            inside = any(item.isVisible() for item in self.inside)
+            if (not cfg.get('auto_close_on_pointer_leave', False) or not menu.isVisible()
+                    or inside or self.keyboard_mode or not self.entered):
+                leave_timer.stop()
+            elif not leave_timer.isActive():
+                leave_timer.start()
+
+        def close_if_outside(self):
+            if (menu.isVisible() and not self.keyboard_mode
+                    and not any(item.isVisible() for item in self.inside)):
+                menu.close()
+
         def eventFilter(self, watched, event):
+            if isinstance(watched, QMenu) and cfg.get('auto_close_on_pointer_leave', False):
+                kind = event.type()
+                if kind == QEvent.Enter:
+                    self.inside.add(watched)
+                    self.entered = True
+                elif kind in (QEvent.Leave, QEvent.Hide):
+                    self.inside.discard(watched)
+                elif kind == QEvent.KeyPress:
+                    self.keyboard_mode = True
+                elif kind == QEvent.MouseMove:
+                    self.keyboard_mode = False
+                if watched is menu and kind == QEvent.Hide:
+                    leave_timer.stop()
+                    self.inside.clear()
+                    self.entered = False
+                else:
+                    self.update_leave()
             if event.type() in (QEvent.Expose, QEvent.WindowActivate, QEvent.WindowDeactivate, QEvent.Hide):
                 report(event.type().name)
             return False
 
     probe = VisibilityProbe(menu)
+    leave_timer.timeout.connect(probe.close_if_outside)
+    menu.installEventFilter(probe)
     was_active = False
     def application_state(state):
         nonlocal was_active
@@ -94,6 +134,7 @@ def launch_menu(cfg: dict, anchor: str | None = None, theme: str | None = None, 
                 target_menu.addSeparator()
             elif kind == "submenu":
                 submenu = QMenu(entry["title"], target_menu)
+                submenu.installEventFilter(probe)
                 submenu.setIcon(icon_for(entry["icon"]) if cfg.get("show_menu_icons", True) else QIcon())
                 target_menu.addMenu(submenu)
                 submenus.append(submenu)

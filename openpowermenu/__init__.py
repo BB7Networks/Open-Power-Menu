@@ -1,2 +1,2 @@
 """Open Power Menu package."""
-__version__ = "0.4.17"
+__version__ = "1.0.1"

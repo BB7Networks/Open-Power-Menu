@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 
+from . import __version__
 from .launching import launch_detached, reap_children
 
 BUS_NAME = "org.openpowermenu.Service"
@@ -125,16 +126,17 @@ def run_service() -> int:
                                    "button_icon_mode": cfg.get("button_icon_mode", "launcher"),
                                    "button_icon": cfg.get("button_icon", ""),
                                    "appearance": cfg.get("appearance", "native"),
-                                   "show_menu_icons": cfg.get("show_menu_icons", True)})
+                                   "show_menu_icons": cfg.get("show_menu_icons", True),
+                                   "auto_close_on_pointer_leave": cfg.get("auto_close_on_pointer_leave", False)})
             except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
                 print("Open Power Menu integration configuration error:", exc, file=sys.stderr)
                 return json.dumps({"hide_original_launcher": False, "launcher_applet_id": 0,
-                                   "button_icon_mode": "launcher", "button_icon": "", "appearance": "native", "show_menu_icons": True})
+                                   "button_icon_mode": "launcher", "button_icon": "", "appearance": "native", "show_menu_icons": True, "auto_close_on_pointer_leave": False})
 
         @Slot(result=str)
         def Ping(self):
             self.touch()
-            return "Open Power Menu v0.4.17"
+            return f"Open Power Menu v{__version__}"
 
     bus = QDBusConnection.sessionBus()
     if not bus.isConnected():
@@ -192,7 +194,7 @@ def stop_owned_service() -> int:
             print("Backend belongs to a different process; leaving it running")
             return 0
         os.kill(pid, signal.SIGTERM)
-        print("Stopped previous Open Power Menu backend; D-Bus will activate v0.4.17 on demand")
+        print(f"Stopped previous Open Power Menu backend; D-Bus will activate v{__version__} on demand")
     except (OSError, StopIteration, ValueError):
         return 0
     return 0

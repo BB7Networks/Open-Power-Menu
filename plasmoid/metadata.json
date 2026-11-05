@@ -5,7 +5,7 @@
     "Description": "Left-click your Plasma launcher; right-click a standalone Power User menu",
     "Icon": "start-here-kde",
     "Category": "Application Launchers",
-    "Version": "0.4.17",
+    "Version": "1.0.1",
     "License": "MIT"
   },
   "X-Plasma-API-Minimum-Version": "6.0",

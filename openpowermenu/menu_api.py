@@ -23,7 +23,8 @@ def to_public_menu(items: list[dict], prefix: tuple[int, ...] = ()) -> list[dict
                            "items": to_public_menu(item["items"], prefix + (i,))})
         else:
             result.append({**common, "title": item["title"], "icon": item["icon"],
-                           "enabled": item["command"] is not None})
+                           "enabled": item["command"] is not None,
+                           "close_before_run": item.get("close_before_run", False)})
     return result
 
 
