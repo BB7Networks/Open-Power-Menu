@@ -413,8 +413,10 @@ QQC2.Control {
     Keys.onPressed: event => handleKey(event)
     onDraftChanged: {
         syncView();
-        // Closing or reparenting a submenu must never leave a stale target.
-        if (!draft || (flyoutId && !flyoutVisible)) flyoutId = "";
+        // A nested popup can temporarily be hidden while its parent changes.
+        // Validate the entry's existence, not the transient visibility binding.
+        if (!draft || (flyoutId && !Draft.find(draft.entries, flyoutId)))
+            flyoutId = "";
     }
     Component.onCompleted: { viewReady = true; syncView(); }
     onVisibleChanged: {
