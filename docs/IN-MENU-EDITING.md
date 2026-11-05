@@ -5,7 +5,10 @@ This unreleased change is based on PR #4 at `5017e33`, on branch
 Version identifiers remain **0.4.17**. No configuration migration is required.
 The follow-up addressing live Manjaro feedback starts at verified PR #5 head
 `85c9c5e` and continues in the same PR and branch. The latest shortcut, AppGrid,
-wheel and UI follow-up starts at `b236efd`.
+wheel and UI follow-up starts at `b236efd`. Draft PR #6 follows PR #5 with
+native widget Meta+X and the restored single-pane editor plus a dedicated
+full-width Go Back drop zone. This document preserves historical PR #5 notes
+where relevant; the current behavior is described below.
 
 ## What the interface looks like
 
@@ -17,8 +20,9 @@ These are descriptions of the implemented UI, not screenshots:
   configuration-retention control (default 10), **Manage / Restore Backups…**,
   and a separate widget snapshot path/count/default-five explanation, refreshed on tab visits.
   The backup browser can permanently delete one selected backup after confirmation.
-  General offers **Set up Meta+X…**, a real launch test, and a separate selectable
-  monospace Emergency Restore command with Copy.
+  General includes a separate selectable monospace Emergency Restore command
+  with Copy. Native Meta+X is initialized by the widget itself on first run;
+  the old standalone shortcut setup wizard has been removed.
 - **Locked menu:** the header has Lock, Refresh and Configure icons. Normal
   commands and hover flyouts work here. Native flyouts use the KDE color scheme;
   optional Aero retains its dark background and readable light foreground.
@@ -165,49 +169,39 @@ normal command behavior. The latest follow-up changes AppGrid close sequencing
 and tracing; timer durations, generic launcher behavior, original-button masking,
 icons, flyout placement and detached application launching remain unchanged.
 
-## Meta+X setup
+## Native Meta+X and optional standalone diagnostics
 
-Open **Configure → General → Keyboard shortcut → Set up Meta+X…**. The dialog
-resolves the installed `open-power-menu` executable, respecting `XDG_BIN_HOME`
-and then PATH, and supplies a quoted command that handles spaces and literal
-shell characters. It opens `kcmshell6 kcm_keys`, or `systemsettings kcm_keys` when
-the module runner is unavailable. Missing tools or installation produce guidance.
+With PR #6, the Open Power Menu **Start Button widget** attempts to register
+**Meta+X once per widget instance** using Plasma's native shortcut API. It
+activates the panel-attached Power User Menu rather than launching a separate
+standalone window. KDE owns conflicts: OPM will not steal an occupied key.
+Later user customization/removal of the key is respected across restarts
+and reinstallations.
 
-First use **Test menu launch**; it runs the installed command with `--diagnose-launch`
-and displays bounded local output, process failures, Qt exposure and focus reports.
-Then in KDE Shortcuts choose **Add New → Application… → Open Power Menu**,
-assign **Meta+X**, and Apply. If KDE reports an existing assignment,
-choose another shortcut or cancel. Change or remove the assignment on that same
-KDE page. OPM never registers a global shortcut, rewrites `kglobalshortcutsrc` or
-KWin files, or reports that the binding has been configured. Settings are opened
-only when the user selects the button. A stale OPM Command or Script assignment
-can be removed in KDE, applied, and replaced with the installed Application entry.
-The test is separate from global-key registration or compositor verification.
+Plasma exposes per-instance actions such as `activate widget 42`.
+The widget listens for the explicit removal lifecycle event and releases its
+own shortcut immediately; **Undo** restores the previous assignment where
+available. Removing an old pre-fix instance may have left an orphaned binding:
+remove it manually in **System Settings → Keyboard → Shortcuts**. See
+[native shortcut lifecycle](NATIVE-SHORTCUT-CASCADE.md) for acceptance checks.
+Live KDE Wayland dispatch/removal testing is still required.
 
-Qt's Wayland xdg-shell plugin rejects a grabbing popup without a transient parent
-that has received input. The previous standalone menu used exactly that shape.
-The standalone Wayland root now uses a frameless top-level QMenu, preserving native
-submenu navigation and Esc dismissal; leaving the application dismisses it after
-activation. KWin controls placement and focus. X11 retains its popup path. Explicit
-submenu parenting also avoids invalid wrappers in PySide6 6.10.2. Desktop Entry
-Exec quoting handles spaces, literal percent signs and reserved characters.
+The standalone command remains useful **for diagnostics, not as the default
+shortcut target**. Use `~/.local/bin/open-power-menu --check` to validate
+configuration, `open-power-menu` to open the standalone saved menu, and
+`open-power-menu --diagnose-launch` for bounded startup/exposure/focus traces.
+The legacy application-shortcut route through KDE's
+`org.openpowermenu.desktop` entry still exists for isolated testing; avoid
+assigning it **the same Meta+X combination** as the widget.
 
-This uses the explicitly supported **standalone Power User Menu fallback** with
-the same saved configuration. Native panel-menu shortcut activation remains
-unverified: KDE's standard applet activation directly changes expansion, outside
-OPM's asynchronous launcher-close/handoff path. Adding another handler would not
-suppress that default behavior. This follow-up leaves that path untouched pending
-live evidence, and introduces no D-Bus activation workaround or Plasma 5 component.
+Qt Wayland may reject an unparented grabbing popup. The standalone Wayland
+root uses a frameless top-level QMenu with explicitly parented submenus;
+X11 retains its popup path. KWin controls standalone placement and focus.
+These historical fixes remain relevant to diagnosing the standalone
+application independently of the widget.
 
-The supported routes were checked against KDE's current
-[Shortcuts KCM](https://github.com/KDE/plasma-desktop/blob/master/kcms/keys/ui/main.qml),
-[widget Shortcuts page](https://github.com/KDE/plasma-desktop/blob/master/desktoppackage/contents/configuration/ConfigurationShortcuts.qml),
-and [Plasmoid activation implementation](https://github.com/KDE/libplasma/blob/master/src/plasmaquick/plasmoid/plasmoiditem.cpp).
-Global-key delivery and conflict prompts require live Plasma 6 Wayland/X11 testing;
-the cloud test environment does not have a Plasma shell or KDE settings tools.
-
-See [shortcut and AppGrid diagnostics](SHORTCUT-APPGRID-DIAGNOSTICS.md) for the
-source evidence, failure distinctions and repeated-activation capture procedure.
+See [shortcut and AppGrid diagnostics](SHORTCUT-APPGRID-DIAGNOSTICS.md) for
+the source evidence and repeated-activation capture procedure.
 
 ## Verification
 
@@ -290,14 +284,16 @@ only access. Refresh the widget only through your normal local procedure.
     Restore a backup with retention zero and confirm its protected pre-restore
     copy. In the disposable profile, remove only OPM's widget, run
     `bash uninstall.sh`, and verify menu, backups and widget recovery history remain.
-17. In a test profile, run the installed executable with --check, then normally,
-    then --diagnose-launch. Use General → Set up Meta+X → Test menu launch. Confirm
-    standalone visibility/focus and Esc, submenu navigation, command selection
-    and outside-click dismissal. In KDE choose the installed Application entry,
-    including an installation path containing spaces. Try an
-    already assigned key, cancel KDE's conflict prompt and verify the old binding
-    remains. Assign a free Meta+X, Apply, open the standalone menu, then change and
-    remove the assignment. Repeat on Plasma 6 Wayland and X11 where available.
+17. In a test profile, clear any stale old OPM shortcut first, then add
+    the new widget. Verify native Meta+X opens next to the correct panel
+    button and a second press closes it. Remove/re-add the widget promptly;
+    the old per-instance shortcut must not block the new instance.
+    Check the widget-removal **Undo** path restores the previous assignment,
+    and customized/disabled shortcuts stay unchanged after restarting Plasma.
+    Test an already-occupied shortcut without taking over another widget.
+    Independently run `open-power-menu --check`, plain
+    `open-power-menu` and `open-power-menu --diagnose-launch` for standalone
+    diagnostics. Repeat on Wayland and X11 when practical.
 18. Delete a disposable corrupt backup after confirmation; cancel another deletion.
     Verify the name/date/size and protected-copy warning. Replace a selected backup
     before confirming and check refusal. The active row must never be deletable.
@@ -311,8 +307,8 @@ only access. Refresh the widget only through your normal local procedure.
 
 - Full first-run setup wizard and automatic dependency diagnostics.
 - General-purpose configuration import/export.
-- Native panel-menu shortcut activation with verified launcher handoff (the
-  supported KDE setup for the standalone menu is available).
+- Broader real-desktop acceptance of native widget Meta+X on different panel
+  placements and launcher adapters; the implementation exists in PR #6.
 - Search/filtering for very large menus.
 - KDE Store backend installation/onboarding.
 - Broader cross-distribution packaging and compatibility.
