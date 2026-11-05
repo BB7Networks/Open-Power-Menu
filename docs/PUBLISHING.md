@@ -1,43 +1,40 @@
 # Reviewing and preparing releases
 
-The canonical repository is <https://github.com/BB7Networks/Open-Power-Menu>.
-Use a feature branch and a pull request. Keep the widget ID
-`org.openpowermenu.start` stable so existing users retain the same applet.
+Version **1.0.1** is authorized as the public release candidate. A versioned
+build is not a published release. Keep the widget ID `org.openpowermenu.start`
+stable and preserve existing menu/panel settings.
 
-## Before a new beta
+## Review gates
 
-1. Merge prerequisite fixes in order after their checks and review: the
-   Windows-safe installer change, backup retention, then dependent feature work.
-2. Run [automated checks and the two-workstation matrix](TESTING.md). Review
-   [process findings](PROCESS-LIFECYCLE.md) and capture [real screenshots](images/README.md).
-3. Choose a new beta version only after successful review. Update Python,
-   metadata, installer labels, documentation, archive references and notes
-   consistently. Do not tag or publish merely because a local archive builds.
-4. Check license/attribution, clean-account setup and upgrade/rollback from the
-   actual prior release packages. Preserve user menu and launcher configuration.
+1. Review PR #8 and its dependent final-polish PR. PR #7's consolidation report
+   is useful history; do not overwrite the newer gallery with its earlier images.
+2. Run [automated and physical checks](TESTING.md), including the
+   [1.0.1 release checklist](RELEASE-1.0.1.md). Verify real Manjaro Wayland
+   Desktop toggling, cross-window pointer dismissal and launcher/shortcut behavior.
+3. Test clean installation, upgrade, failure rollback and uninstall from the
+   extracted EZ package. Preserve custom menus, widget instances and recovery
+   history. Review exact archive checksums and contents before distribution.
+4. Obtain explicit approval before merging, tagging or publishing. No release
+   or KDE Store listing is created by the build scripts.
 
-## Build local review artifacts
-
-Current version identifiers remain at 0.4.17:
+## Build review artifacts
 
 ```bash
 bash scripts/build-release.sh
 bash scripts/build-widget-only.sh
 (cd dist && sha256sum -c SHA256SUMS)
-unzip -t dist/OpenPowerMenu-EZ-v0.4.17.zip
-tar -tzf dist/OpenPowerMenu-EZ-v0.4.17.tar.gz
+unzip -t dist/OpenPowerMenu-EZ-v1.0.1.zip
+tar -tzf dist/OpenPowerMenu-EZ-v1.0.1.tar.gz
 ```
 
-The complete EZ ZIP and TAR.GZ include both backend and widget plus instructions.
-The `.plasmoid` is a separate widget-only artifact. Build scripts do not publish
-anything. After a new version is reviewed and explicitly approved for release,
-attach its complete EZ archives and checksums to the corresponding GitHub beta
-release with accurate notes. Do not overwrite an existing release's versioned
-artifacts with unreleased changes.
+The metadata version controls archive names, top-level directory and release-note
+selection. Python/CLI/D-Bus report the matching package version, covered by tests.
+The complete ZIP/TAR contain backend, widget, assets, screenshots, documentation
+and both installer wrappers. Widget-only packaging remains separate.
 
-## KDE Store
+After review and explicit publication approval, attach the complete EZ ZIP,
+TAR.GZ and SHA256SUMS to the approved GitHub release. Do not replace published
+versioned artifacts with different contents. Update the README's candidate notice
+only when the actual public release exists.
 
-Read [KDE-STORE.md](KDE-STORE.md). Store setup remains separate future work: a
-native widget archive does not install the Python/PySide6 backend. Do not claim
-one-click operation or publish a Store listing before the complete user-driven
-setup path has been implemented and tested in a clean Plasma 6 account.
+See [KDE Store](KDE-STORE.md) before considering that separate distribution path.

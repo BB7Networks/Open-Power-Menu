@@ -76,6 +76,7 @@ PlasmoidItem {
     property int menuFetchEpoch: 0
     property string menuAppearance: "native"
     property bool showMenuIcons: true
+    property bool autoCloseOnPointerLeave: false
     property string commandError: ""
     property bool launchPending: false
     // Temporary state belongs to the applet, so closing its popup keeps the draft.
@@ -478,6 +479,7 @@ PlasmoidItem {
                      customButtonIcon = String(cfg.button_icon || "");
                      menuAppearance = cfg.appearance === "aero" ? "aero" : "native";
                      showMenuIcons = cfg.show_menu_icons !== false;
+                     autoCloseOnPointerLeave = cfg.auto_close_on_pointer_leave === true;
                      synchronizeLauncherVisibility();
                  } catch (e) {
                      console.warn("Open Power Menu: invalid integration configuration", e);
@@ -736,11 +738,29 @@ PlasmoidItem {
              });
     }
 
-    function launchItem(key) {
+    function launchItem(key, closeBeforeRun = false) {
         if (layoutEditing || layoutBusy || launchPending) return;
         const epoch = menuSwitchEpoch;
         launchPending = true;
         commandError = "";
+        if (closeBeforeRun) {
+            expanded = false;
+            desktopCloseSettle.key = key;
+            desktopCloseSettle.epoch = epoch;
+            desktopCloseSettle.restart();
+        } else runItem(key, epoch);
+    }
+    Timer {
+        id: desktopCloseSettle
+        interval: 140
+        property string key: ""
+        property int epoch: -1
+        onTriggered: {
+            if (epoch === root.menuSwitchEpoch) root.runItem(key, epoch);
+            else root.launchPending = false;
+        }
+    }
+    function runItem(key, epoch) {
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
              "Run", [key], (ok, value) => {
                  launchPending = false;
@@ -805,6 +825,18 @@ PlasmoidItem {
         id: popup
         focus: true
         property int activeIndex: -1
+        PointerDismissal {
+            id: autoDismiss
+            enabled: root.autoCloseOnPointerLeave
+            menuOpen: root.expanded
+            pointerInside: popupHover.hovered || flyout.pointerInside
+            protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending
+            onDismissed: root.expanded = false
+        }
+        HoverHandler {
+            id: popupHover
+            onPointChanged: autoDismiss.pointerMoved()
+        }
         Rectangle {
             anchors.fill: parent
             color: root.menuAppearance === "aero" ? "#27313D" : "transparent"
@@ -850,9 +882,11 @@ PlasmoidItem {
                 if (popup.Window.window) popup.Window.window.requestActivate();
                 popup.forceActiveFocus();
             }
-            onTriggered: key => {
+            onKeyboardUsed: autoDismiss.keyboardUsed()
+            onPointerMoved: autoDismiss.pointerMoved()
+            onTriggered: (key, closeBeforeRun) => {
                 flyout.visible = false;
-                root.launchItem(key);
+                root.launchItem(key, closeBeforeRun);
             }
             onVisibleChanged: {
                 if (!visible) popup.activeFlyoutKey = "";
@@ -1066,7 +1100,7 @@ PlasmoidItem {
                                         popup.showFlyout(menuRow.entry, menuRow);
                                     } else {
                                         flyout.visible = false;
-                                        root.launchItem(menuRow.entry.key);
+                                        root.launchItem(menuRow.entry.key, menuRow.entry.close_before_run === true);
                                     }
                                 }
                             }
@@ -1076,7 +1110,7 @@ PlasmoidItem {
                             Accessible.onPressAction: {
                                 if (menuRow.entry.enabled === false || menuRow.entry.kind === "separator") return;
                                 if (menuRow.entry.kind === "submenu") popup.showFlyout(menuRow.entry, menuRow);
-                                else root.launchItem(menuRow.entry.key);
+                                else root.launchItem(menuRow.entry.key, menuRow.entry.close_before_run === true);
                             }
                         }
                     }
@@ -1095,6 +1129,7 @@ PlasmoidItem {
             }
         }
         Keys.onPressed: event => {
+            autoDismiss.keyboardUsed();
             if (root.layoutEditing || root.layoutBusy || root.launchPending) return;
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                 flyout.visible = false;
@@ -1111,7 +1146,7 @@ PlasmoidItem {
                 const row = normalRows.itemAt(activeIndex);
                 if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
                 if (row.entry.kind === "submenu") { showFlyout(row.entry, row); flyout.focusFirst(); }
-                else if (event.key !== Qt.Key_Right) root.launchItem(row.entry.key);
+                else if (event.key !== Qt.Key_Right) root.launchItem(row.entry.key, row.entry.close_before_run === true);
                 event.accepted = true;
             }
         }

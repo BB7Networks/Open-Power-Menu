@@ -95,7 +95,7 @@ raise SystemExit(run_service())'''
                     reply = interface.call(method, *args)
                     assert reply.type() != QDBusMessage.ErrorMessage, reply.errorMessage()
                     return reply.arguments()[0]
-                assert call('Ping') == 'Open Power Menu v0.4.17'
+                assert call('Ping') == 'Open Power Menu v1.0.1'
                 assert json.loads(call('GetMenu'))[0]['title'] == 'Safe workload'
                 assert call('Run', '0') is True
                 until(info.exists)
@@ -141,7 +141,7 @@ raise SystemExit(run_service())'''
                     until(lambda: bus.interface().isServiceRegistered('org.openpowermenu.Service').value())
                     assert replacement.poll() is None
                     interface = QDBusInterface('org.openpowermenu.Service', '/OpenPowerMenu', 'org.openpowermenu.Service', bus)
-                    assert call('Ping') == 'Open Power Menu v0.4.17'
+                    assert call('Ping') == 'Open Power Menu v1.0.1'
                 elif mode == 'backend-idle':
                     backend.wait(timeout=5)
                     assert backend.returncode == 0
@@ -263,7 +263,7 @@ def configuration_flow(temp):
     marker = temp / 'unexpected-launch'
     config = {'menu': [{'label': 'Must not execute', 'command': [sys.executable, '-c',
               'import pathlib,sys; pathlib.Path(sys.argv[1]).touch()', str(marker)]}],
-              'hide_original_launcher': True, 'show_menu_icons': False}
+              'hide_original_launcher': True, 'show_menu_icons': False, 'auto_close_on_pointer_leave': True}
     payload = json.dumps(config).encode('utf-8')
     backend = subprocess.Popen([sys.executable, str(ROOT / 'run.py'), '--service'], cwd=ROOT,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -280,6 +280,7 @@ def configuration_flow(temp):
             assert not any('Invalid menu.json' in entry.get('title', '') for entry in entries)
             assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
             assert json.loads(call('GetIntegration'))['show_menu_icons'] is True
+            assert json.loads(call('GetIntegration'))['auto_close_on_pointer_leave'] is False
             assert not target.exists()
         def assert_rejected():
             entries = json.loads(call('GetMenu'))
@@ -288,6 +289,7 @@ def configuration_flow(temp):
             assert call('Run', '0') is False
             assert json.loads(call('GetIntegration'))['hide_original_launcher'] is False
             assert json.loads(call('GetIntegration'))['show_menu_icons'] is True
+            assert json.loads(call('GetIntegration'))['auto_close_on_pointer_leave'] is False
             assert not marker.exists()
             assert backend.poll() is None
 
@@ -298,6 +300,7 @@ def configuration_flow(temp):
         assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
         assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
         assert json.loads(call('GetIntegration'))['show_menu_icons'] is False
+        assert json.loads(call('GetIntegration'))['auto_close_on_pointer_leave'] is True
         for invalid in (payload + b' ' * MAX_CONFIG_BYTES, b'{broken'):
             target.write_bytes(invalid)
             assert_rejected()
@@ -324,6 +327,7 @@ def configuration_flow(temp):
         assert json.loads(call('GetMenu'))[0]['title'] == 'Must not execute'
         assert json.loads(call('GetIntegration'))['hide_original_launcher'] is True
         assert json.loads(call('GetIntegration'))['show_menu_icons'] is False
+        assert json.loads(call('GetIntegration'))['auto_close_on_pointer_leave'] is True
         assert not marker.exists() and target.read_bytes() == payload
     finally:
         backend.terminate()

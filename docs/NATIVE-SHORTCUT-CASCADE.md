@@ -61,3 +61,7 @@ Repeat through two submenu levels, reorder top-level items, try Escape to
 cancel and verify Save/Cancel. Check Meta+X independently. Headless Qt tests
 cover menu transitions, the full-width top area and pointer release, but cannot
 prove live Wayland pointer behavior.
+
+The 1.0.1 Desktop entry invokes KWin through KGlobalAccel; it does not assign
+a new key binding. Automatic dismissal does not change Meta+X routing. See
+[release verification](RELEASE-1.0.1.md).

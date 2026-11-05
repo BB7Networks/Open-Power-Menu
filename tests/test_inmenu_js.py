@@ -96,7 +96,7 @@ for(let i=0;i<5;i++){
  assert.equal(root.layoutDraft,null);
 }
 '''
-    code += '\n' + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
+    code += '\n' + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
 let layoutEditing=true,layoutBusy=false,launchPending=false,menuSwitchEpoch=0,commandError='',expanded=true;
 function send(...args){root.send(...args)}
 launchItem('0'); assert.equal(requests.length,0);
@@ -131,7 +131,8 @@ const rows=entries.map((entry,i)=>({entry,y:i*28,height:28,
  openChild(){opens++},childPopup:{focusFirst(){childFocused++}}}));
 const root={visibleEntries:entries,layoutEditing:false,layoutBusy:false,launchPending:false,
  launchItem(key){launches.push(key)}};
-const flyout={entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
+const autoDismiss={keyboardUsed(){}};
+const flyout={keyboardUsed(){},entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
  closeChild(){childClosed++},returnToParent(){returned++},triggered(key){launches.push(key)}};
 const normalRows={itemAt(i){return rows[i]}},flyoutRows=normalRows;
 const menuScroll={contentItem:{contentY:0},availableHeight:55},viewport=menuScroll;
@@ -167,7 +168,7 @@ def test_icon_preference_transport_defaults_and_recovery():
     code = 'const assert=require("node:assert/strict");\n'
     code += function((UI / 'main.qml').read_text(), 'fetchIntegration')
     code += r'''
-let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true;
+let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
 let response={},ok=true;
 function send(service,path,iface,method,args,callback){callback(ok,JSON.stringify(response))}
 function synchronizeLauncherVisibility(){}
@@ -181,3 +182,26 @@ response={show_menu_icons:true};fetchIntegration();assert.equal(showMenuIcons,tr
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_desktop_dispatch_waits_for_popup_close_and_cancels_stale_request():
+    if not shutil.which('node'): pytest.skip('Node required')
+    from test_v0416_popup_handoff import timer_handler
+    source=(UI/'main.qml').read_text()
+    code='const assert=require("node:assert/strict");\n'
+    code+=function(source,'runItem')+function(source,'launchItem')
+    code+=timer_handler(source,'desktopCloseSettle').replace('function settleTick()', 'function desktopTick()')
+    code+=r'''
+let layoutEditing=false,layoutBusy=false,launchPending=false,commandError='',expanded=true,menuSwitchEpoch=1;
+let sent=[],waiting=0;
+const root={runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
+const desktopCloseSettle={key:'',epoch:-1,restart(){waiting++}};
+function send(...args){sent.push(args)}
+launchItem('desktop',true);assert.equal(expanded,false);assert.equal(sent.length,0);assert.equal(waiting,1);
+let {key,epoch}=desktopCloseSettle;desktopTick();assert.equal(sent.length,1);
+sent.shift().at(-1)(true,true);assert.equal(launchPending,false);
+expanded=true;launchItem('desktop',true);({key,epoch}=desktopCloseSettle);menuSwitchEpoch++;
+desktopTick();assert.equal(sent.length,0);assert.equal(launchPending,false);
+'''
+    result=subprocess.run(['node','-e',code],capture_output=True,text=True,timeout=15)
+    assert result.returncode==0,result.stdout+result.stderr

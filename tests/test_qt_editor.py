@@ -711,3 +711,14 @@ def test_standalone_icon_visibility_all_levels(app, monkeypatch, visible):
     QTimer.singleShot(50, check)
     assert launch_menu(config) == 0
     assert not errors, errors
+
+
+def test_auto_close_checkbox_persists_and_recovery_loads(editor):
+    assert not editor.auto_close.isChecked()
+    editor.auto_close.setChecked(True)
+    assert editor.is_dirty() and editor.accept()
+    config=decode_configuration(current_revision(editor.target).content)
+    assert config['auto_close_on_pointer_leave'] is True
+    config['auto_close_on_pointer_leave']=False
+    editor.load_state(config,current_revision(editor.target))
+    assert not editor.auto_close.isChecked() and not editor.is_dirty()

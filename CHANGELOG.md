@@ -1,5 +1,20 @@
 # Open Power Menu changelog
 
+## 1.0.1 - public release candidate
+
+- Add Desktop to new/default top-level menus using KDE’s registered Show Desktop
+  toggle, closing the popup before dispatch. Existing menus are preserved.
+- Add optional 1.2-second pointer-leave closing across the root and nested
+  flyouts, with keyboard/editing protection; support the standalone menu too.
+- Align version labels and EZ release notes at 1.0.1. Preserve prior installs
+  on failed or interrupted upgrades and validate the installed backend.
+- Refresh the quick-start README and actual left/center/right product gallery.
+- Retain root Refresh as a backend-retry/open-menu reload control.
+- Read Plasma's settled popup direction so arrows stay correct after moving
+  the panel, including Plasma 6.3's early direction notification.
+
+Publication remains subject to final desktop review and approval.
+
 ## Unreleased - menu flyout UX refinements
 
 - Place submenu indicators on the side where each flyout opens, following
@@ -28,8 +43,8 @@
   while preserving standalone launch diagnostics as an optional fallback.
 - Refresh README and linked troubleshooting/acceptance docs. The gallery now
   includes the supplied desktop screenshots described above.
-- Keep version identifiers at **0.4.17** until review, live desktop acceptance,
-  merge and an explicitly approved release.
+- At this development stage, version identifiers remained **0.4.17** pending
+  approval. The authorized **1.0.1** candidate above supersedes that hold.
 
 ## Unreleased - configuration UX and in-menu layout editing
 

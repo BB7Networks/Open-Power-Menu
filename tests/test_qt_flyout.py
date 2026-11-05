@@ -103,10 +103,13 @@ def test_nested_selection_icons_and_effective_direction(flyout):
     evaluate(flyout, 'showMenuIcons=true;')
     assert evaluate(flyout, 'activeChild.showMenuIcons') is True
     evaluate(flyout, 'popupDirection=Qt.RightEdge; effectivePopupDirection=Qt.LeftEdge;')
+    QTest.qWait(1)
     assert evaluate(flyout, 'indicatorDirection === Qt.LeftEdge') is True
     evaluate(flyout, 'effectivePopupDirection=Qt.RightEdge;')
+    QTest.qWait(1)
     assert evaluate(flyout, 'indicatorDirection === Qt.RightEdge') is True
     evaluate(flyout, 'effectivePopupDirection=Qt.TopEdge; popupDirection=Qt.LeftEdge;')
+    QTest.qWait(1)
     assert evaluate(flyout, 'indicatorDirection === Qt.LeftEdge') is True
 
 
@@ -115,6 +118,21 @@ def test_actual_side_policy_screen_edges(flyout):
             (-300,-1200,1200,'Left'), (20,0,500,'Right'), (400,0,800,'Left')]:
         code = f'chooseSide({{width:280,mapToGlobal:()=>({{x:{x},y:0}})}}, Qt.rect({screen_x},0,{screen_width},900)) === Qt.{expected}Edge'
         assert evaluate(flyout, code)
+
+
+def test_direction_notification_before_value_update_and_reopen(flyout):
+    # libplasma 6.3 emits before updating the value returned by its getter.
+    evaluate(flyout, 'effectivePopupDirection=Qt.RightEdge;')
+    QTest.qWait(1)
+    evaluate(flyout, '''effectivePopupDirectionChanged();
+        effectivePopupDirection=Qt.LeftEdge;''')
+    # The signal handler must not cache the old RightEdge synchronously.
+    QTest.qWait(1)
+    assert evaluate(flyout, 'indicatorDirection === Qt.LeftEdge')
+    evaluate(flyout, '''visible=false; popupDirection=Qt.RightEdge;
+        effectivePopupDirection=Qt.RightEdge; visible=true;''')
+    QTest.qWait(1)
+    assert evaluate(flyout, 'indicatorDirection === Qt.RightEdge')
 
 
 def test_row_alignment_and_icon_space(flyout):
@@ -146,8 +164,10 @@ def test_hover_and_nested_arrows_follow_open_child(flyout):
     item = evaluate(flyout, 'flyoutRows.itemAt(0)')
     content = next(c for c in item.childItems() if c.metaObject().indexOfProperty('opensLeft') >= 0)
     evaluate(flyout, 'activeChild.effectivePopupDirection=Qt.LeftEdge;')
+    QTest.qWait(1)
     assert content.property('opensLeft') is True
     evaluate(flyout, 'activeChild.effectivePopupDirection=Qt.RightEdge;')
+    QTest.qWait(1)
     assert content.property('opensLeft') is False
     child = evaluate(flyout, 'activeChild')
     evaluate(child, 'flyoutRows.itemAt(1).openChild();')

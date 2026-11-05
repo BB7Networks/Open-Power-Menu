@@ -1,8 +1,8 @@
 # Publishing to KDE Store / "Get New Widgets"
 
-## Current release: not yet suitable for a one-click Store install
+## Current package: not yet suitable for a one-click Store install
 
-Open Power Menu 0.4.17 consists of **two components**:
+Open Power Menu 1.0.1 consists of **two components**:
 
 1. `plasmoid/` — a valid Plasma 6 QML applet (`metadata.json` + `contents/`).
 2. `openpowermenu/`, `run.py`, and the user D-Bus activation service — a
@@ -56,7 +56,7 @@ experience. No Store integration is implemented by this PR.
 3. Verify with `unzip -l` and install in a fresh user profile with:
 
    ```bash
-   kpackagetool6 --type Plasma/Applet --install dist/org.openpowermenu.start-0.4.17.plasmoid
+   kpackagetool6 --type Plasma/Applet --install dist/org.openpowermenu.start-1.0.1.plasmoid
    ```
 
    On an update, use `--upgrade` instead of `--install`.

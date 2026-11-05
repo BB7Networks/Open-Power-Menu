@@ -2,7 +2,13 @@
 # User-local, reversible upgrade; leaves every existing panel widget untouched.
 # Installs its own separate Plasma widget; does not change panel layout.
 set -euo pipefail
+[[ $EUID -ne 0 ]] || { echo "Run as your normal desktop user, WITHOUT sudo." >&2; exit 1; }
 src="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+version=$(python3 - "$src/plasmoid/metadata.json" <<'PY_VERSION'
+import json, sys
+print(json.load(open(sys.argv[1]))['KPlugin']['Version'])
+PY_VERSION
+)
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 bin_home="${XDG_BIN_HOME:-$HOME/.local/bin}"
@@ -15,9 +21,53 @@ widget_dir="$data_home/plasma/plasmoids/org.openpowermenu.start"
 
 # Snapshot/migration failure stops the upgrade before replacing installed files.
 python3 "$src/openpowermenu/widget_snapshots.py" prepare "$data_home"
-mkdir -p "$app_dir" "$config_dir" "$bin_home" "$applications_dir" "$icons_dir" "$dbus_dir"
-cp -a "$src/openpowermenu" "$app_dir/"
-cp "$src/run.py" "$app_dir/run.py"
+mkdir -p "$data_home" "$config_dir" "$bin_home" "$applications_dir" "$icons_dir" "$dbus_dir"
+# Keep the previous installation usable if copying, KPackage or verification
+# fails. Recovery snapshots stay outside this temporary rollback transaction.
+transaction=$(mktemp -d "$data_home/.opm-install-XXXXXXXX")
+managed=("$app_dir" "$widget_dir" "$bin_home/open-power-menu"
+         "$applications_dir/org.openpowermenu.desktop"
+         "$icons_dir/open-power-menu.svg" "$dbus_dir/org.openpowermenu.Service.service")
+committed=false
+prepared=false
+new_config=false
+finish_install() {
+    result=$?
+    rollback_ok=true
+    trap - EXIT HUP INT TERM
+    if [[ "$committed" == false && "$prepared" == true ]]; then
+        printf 'Installation did not complete; restoring previous application files.\n' >&2
+        for i in "${!managed[@]}"; do
+            rm -rf -- "${managed[$i]}"
+            if [[ -e "$transaction/old-$i" || -L "$transaction/old-$i" ]]; then
+                mkdir -p -- "$(dirname -- "${managed[$i]}")"
+                cp -a -- "$transaction/old-$i" "${managed[$i]}" || { result=1; rollback_ok=false; }
+            fi
+        done
+        if [[ "$new_config" == true ]]; then rm -f -- "$config_dir/menu.json"; fi
+    fi
+    if [[ "$rollback_ok" == true ]]; then
+        rm -rf -- "$transaction"
+    else
+        printf 'Rollback incomplete; preserved recovery files in %s\n' "$transaction" >&2
+    fi
+    exit "$result"
+}
+trap finish_install EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+for i in "${!managed[@]}"; do
+    if [[ -e "${managed[$i]}" || -L "${managed[$i]}" ]]; then
+        cp -a -- "${managed[$i]}" "$transaction/old-$i"
+    fi
+done
+mkdir "$transaction/new-app"
+cp -a "$src/openpowermenu" "$transaction/new-app/"
+cp "$src/run.py" "$transaction/new-app/run.py"
+prepared=true
+if [[ -e "$app_dir" || -L "$app_dir" ]]; then mv -- "$app_dir" "$transaction/replaced-app"; fi
+mv -- "$transaction/new-app" "$app_dir"
 cp "$src/assets/open-power-menu.svg" "$icons_dir/open-power-menu.svg"
 cat > "$bin_home/open-power-menu" <<'BIN'
 #!/bin/sh
@@ -25,7 +75,8 @@ appdir="${XDG_DATA_HOME:-$HOME/.local/share}/open-power-menu"
 exec python3 "$appdir/run.py" "$@"
 BIN
 chmod 755 "$bin_home/open-power-menu"
-if [[ ! -e "$config_dir/menu.json" ]]; then
+if [[ ! -e "$config_dir/menu.json" && ! -L "$config_dir/menu.json" ]]; then
+    new_config=true
     python3 "$src/run.py" --default-config > "$config_dir/menu.json"
 fi
 cat > "$dbus_dir/org.openpowermenu.Service.service" <<SERVICE
@@ -70,6 +121,9 @@ else
     cp -a "$src/plasmoid/." "$widget_dir/"
     echo 'Warning: kpackagetool6 not found. Copied widget directly; log out/in if it does not appear.' >&2
 fi
+# Validate the installed code/config before considering the transaction complete.
+"$bin_home/open-power-menu" --check > /dev/null
+committed=true
 if command -v kbuildsycoca6 >/dev/null 2>&1; then
     kbuildsycoca6 >/dev/null 2>&1 || true
 fi
@@ -79,7 +133,7 @@ if command -v busctl >/dev/null 2>&1; then
     busctl --user call org.freedesktop.DBus /org/freedesktop/DBus \
         org.freedesktop.DBus ReloadConfig >/dev/null 2>&1 || true
 fi
-printf '\nOpen Power Menu v0.4.17 installed (no panel widgets or shortcuts changed).\n'
+printf '\nOpen Power Menu v%s installed (no panel widgets or shortcuts changed).\n' "$version"
 printf '  Widget:  Open Power Menu Start Button\n'
 printf '  Backend: %s/open-power-menu\n' "$bin_home"
 printf '  Config:  %s/menu.json (preserved)\n' "$config_dir"

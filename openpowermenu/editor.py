@@ -495,6 +495,10 @@ def create_editor(path: Path | None = None):
             self.show_menu_icons = QCheckBox("Show icons in Power User Menu", style_group)
             self.show_menu_icons.setChecked(cfg.get("show_menu_icons", True))
             style_form.addRow(self.show_menu_icons)
+            self.auto_close = QCheckBox("Automatically close when pointer leaves menu", style_group)
+            self.auto_close.setChecked(cfg.get("auto_close_on_pointer_leave", False))
+            self.auto_close.setToolTip("Close after 1.2 seconds outside the menu and its submenus. Keyboard navigation and editing keep it open.")
+            style_form.addRow(self.auto_close)
             general_layout.addWidget(style_group)
 
             general_layout.addStretch(1)
@@ -675,6 +679,7 @@ def create_editor(path: Path | None = None):
                 control.currentIndexChanged.connect(self.update_dirty)
             self.hide_launcher.toggled.connect(self.update_dirty)
             self.show_menu_icons.toggled.connect(self.update_dirty)
+            self.auto_close.toggled.connect(self.update_dirty)
             self.button_icon.textChanged.connect(self.update_dirty)
             self.backup_retention.valueChanged.connect(self.update_dirty)
             self.show_missing.toggled.connect(self.unavailable_changed)
@@ -988,6 +993,7 @@ def create_editor(path: Path | None = None):
             config['show_unavailable'] = self.show_missing.isChecked()
             config['appearance'] = self.appearance.currentData()
             config['show_menu_icons'] = self.show_menu_icons.isChecked()
+            config['auto_close_on_pointer_leave'] = self.auto_close.isChecked()
             config['hide_original_launcher'] = self.hide_launcher.isChecked()
             config['launcher_applet_id'] = int(self.launcher_target.currentData())
             config['button_icon_mode'] = self.icon_mode.currentData()
@@ -1015,6 +1021,7 @@ def create_editor(path: Path | None = None):
                 self.show_missing.setChecked(config['show_unavailable'])
                 self.hide_launcher.setChecked(config['hide_original_launcher'])
                 self.show_menu_icons.setChecked(config.get('show_menu_icons', True))
+                self.auto_close.setChecked(config.get('auto_close_on_pointer_leave', False))
                 for widget, key in ((self.appearance, 'appearance'), (self.icon_mode, 'button_icon_mode'),
                                     (self.launcher_target, 'launcher_applet_id')):
                     index = widget.findData(config[key])

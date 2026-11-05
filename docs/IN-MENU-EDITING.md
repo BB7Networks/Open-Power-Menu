@@ -1,6 +1,6 @@
 # In-menu layout editing
 
-This guide covers the current layout editor in the **0.4.17 source code**.
+This guide covers the current layout editor in the **1.0.1 source code**.
 It combines full-row dragging, spring-loaded submenu navigation, a full-width
 **Go Back** drop area, configuration recovery and native widget Meta+X.
 The features are in the development source but **not yet a published GitHub
@@ -314,3 +314,6 @@ only access. Refresh the widget only through your normal local procedure.
 Native cross-window drag behavior can be reconsidered after live Wayland evidence.
 Merging source changes does not tag, release or publish software; versioning and
 live-desktop release acceptance are handled separately.
+
+Automatic pointer-leave dismissal is suspended while layout editing or saving.
+See [release verification](RELEASE-1.0.1.md) for the new General preference.

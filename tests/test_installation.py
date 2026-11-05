@@ -80,7 +80,7 @@ def test_upgrade_preserves_menu_panel_and_widget_backup(isolated_install, previo
     assert json.loads((backups[0] / 'metadata.json').read_text())['KPlugin']['Version'] == previous_version
     launcher = temp / 'bin/open-power-menu'
     assert stat.S_IMODE(launcher.stat().st_mode) == 0o755
-    assert 'Open Power Menu v0.4.17' in run(str(launcher), '--check', env=env).stdout
+    assert 'Open Power Menu v1.0.1' in run(str(launcher), '--check', env=env).stdout
     run('bash', 'scripts/uninstall-core.sh', env=env)
     assert config.read_bytes() == before
     assert panel.read_text() == 'existing favorites and panel layout'
@@ -322,3 +322,87 @@ def test_uninstall_aborts_when_legacy_history_cannot_be_migrated(isolated_instal
                             capture_output=True, text=True, timeout=30)
     assert result.returncode != 0
     assert (temp / 'bin/open-power-menu').exists() and legacy.is_symlink()
+
+
+def test_failed_kpackage_rolls_back_backend_and_registration(isolated_install):
+    temp,env=isolated_install
+    run('bash','scripts/install-core.sh',env=env)
+    app=temp/'data/open-power-menu'
+    (app/'old-release-marker').write_text('preserve on failed upgrade')
+    files=[temp/'bin/open-power-menu',temp/'data/applications/org.openpowermenu.desktop',
+           temp/'config/open-power-menu/menu.json', app/'run.py']
+    before={p:p.read_bytes() for p in files}
+    (temp/'tools/kpackagetool6').write_text('#!/bin/sh\nexit 1\n')
+    result=subprocess.run(['bash','scripts/install-core.sh'],cwd=ROOT,env=env,capture_output=True,text=True)
+    assert result.returncode!=0
+    assert {p:p.read_bytes() for p in files}==before
+    assert (app/'old-release-marker').read_text()=='preserve on failed upgrade'
+    assert not list((temp/'data').glob('.opm-install-*'))
+
+
+def test_ez_extracted_install_upgrade_and_uninstall(isolated_install):
+    temp,env=isolated_install
+    run('bash','scripts/build-release.sh')
+    version=json.loads((ROOT/'plasmoid/metadata.json').read_text())['KPlugin']['Version']
+    extraction=temp/'EZ extracted with spaces'
+    with zipfile.ZipFile(ROOT/f'dist/OpenPowerMenu-EZ-v{version}.zip') as z:z.extractall(extraction)
+    source=extraction/f'OpenPowerMenu-v{version}'
+    # Portable suite lacks PySide6, so test the core there; Qt job tests the full wrapper.
+    import importlib.util
+    wrapper='install.sh' if importlib.util.find_spec('PySide6') and os.geteuid()!=0 else 'scripts/install-core.sh'
+    run('bash',wrapper,cwd=source,env=env)
+    config=temp/'config/open-power-menu/menu.json'
+    data=json.loads(config.read_text());data['menu']=[{'label':'Personal Desktop','command':['true']}]
+    data['auto_close_on_pointer_leave']=True
+    config.write_text(json.dumps(data));original=config.read_bytes()
+    run('bash',wrapper,cwd=source,env=env)
+    assert config.read_bytes()==original
+    assert 'v'+version in run(str(temp/'bin/open-power-menu'),'--check',env=env).stdout
+    recovery=temp/'data/open-power-menu-recovery/widget-backups'
+    assert list(recovery.iterdir())
+    run('bash','scripts/uninstall-core.sh',cwd=source,env=env)
+    assert config.read_bytes()==original and list(recovery.iterdir())
+
+
+def test_release_versions_and_notes_consistent():
+    from openpowermenu import __version__
+    version=json.loads((ROOT/'plasmoid/metadata.json').read_text())['KPlugin']['Version']
+    assert version==__version__=='1.0.1'
+    assert (ROOT/f'RELEASE-NOTES-v{version}.md').is_file()
+    assert version in run(sys.executable,'run.py','--version').stdout
+
+
+@pytest.mark.parametrize('answer',['','n\n','yes\n'])
+def test_pyside_install_requires_explicit_consent(isolated_install,answer):
+    if os.geteuid()==0:pytest.skip('User installer refuses root')
+    temp,env=isolated_install;tools=temp/'tools';marker=temp/'consented'
+    (tools/'python3').write_text('#!/bin/sh\nif [ "$1" = "-c" ]; then test -f '+shlex.quote(str(marker))+'; exit $?; fi\nexec '+shlex.quote(sys.executable)+' "$@"\n')
+    (tools/'pacman').write_text('#!/bin/sh\nexit 0\n');(tools/'pacman').chmod(0o755)
+    (tools/'sudo').write_text('#!/bin/sh\nprintf "%s\\n" "$*" > '+shlex.quote(str(marker))+'\n');(tools/'sudo').chmod(0o755)
+    result=subprocess.run(['bash','install.sh'],cwd=ROOT,env=env,input=answer,capture_output=True,text=True,timeout=30)
+    assert marker.exists()==(answer=='yes\n')
+    if answer=='yes\n':
+        assert result.returncode==0,result.stdout+result.stderr
+        assert marker.read_text().strip()=='pacman -S --needed pyside6'
+    else:
+        assert result.returncode!=0 and not (temp/'bin/open-power-menu').exists()
+
+
+def test_terminated_upgrade_restores_previous_install(isolated_install):
+    import signal,time
+    temp,env=isolated_install
+    run('bash','scripts/install-core.sh',env=env)
+    old=temp/'data/open-power-menu/old-marker';old.write_text('original')
+    ready=temp/'kpackage-entered'
+    (temp/'tools/kpackagetool6').write_text('#!/bin/sh\ntouch '+shlex.quote(str(ready))+'\nsleep 30\n')
+    process=subprocess.Popen(['bash','scripts/install-core.sh'],cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE,start_new_session=True)
+    try:
+        deadline=time.monotonic()+10
+        while not ready.exists() and time.monotonic()<deadline:time.sleep(.05)
+        assert ready.exists()
+        os.killpg(process.pid,signal.SIGTERM)
+        process.communicate(timeout=10)
+        assert process.returncode!=0 and old.read_text()=='original'
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid,signal.SIGKILL);process.communicate(timeout=5)
