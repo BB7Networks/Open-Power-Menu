@@ -12,7 +12,7 @@ import org.kde.plasma.core as PlasmaCore
 
 PlasmaCore.PopupPlasmaWindow {
     id: flyout
-    visible: false
+    visible: !!editor && editor.visible && editor.flyoutVisible && editor.plasmaFlyoutActive
     floating: true
     margin: 0
     animated: false
