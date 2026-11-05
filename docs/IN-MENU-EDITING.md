@@ -103,7 +103,7 @@ widget or restarting Plasma loses an unsaved draft. Use Save layout before such
 actions. Configuration restoration in Configure is blocked while any editor tab
 has unsaved changes; preview remains available. See [recovery](EDITOR-RECOVERY.md).
 
-Command launch failures stay visible in the locked menu or Start-button tooltip,
+Command launch failures stay visible in the locked menu or OPM button tooltip,
 without echoing private arguments. An unavailable backend points to
 `open-power-menu --check` and the complete `bash install.sh` installation.
 Successful process creation is treated as success; normal later exit codes do
@@ -245,7 +245,7 @@ only access. Refresh the widget only through your normal local procedure.
    instructions, right-aligned/wrapping history controls and snapshot information.
 4. Reorder nested entries in Configure, Duplicate, Undo/Redo, and Save. Try restore
    with unsaved General/Layout/Backups changes and confirm nothing is discarded.
-5. Right-click the Start button. Confirm locked normal behavior, then unlock; all
+5. Right-click the OPM launcher button. Confirm locked normal behavior, then unlock; all
    commands must remain inactive under clicks, Enter and dragging.
 6. Drag from row labels and empty row space, including a held submenu press. Test
    before/after insertion, whole groups, a brief pass over a submenu, a deliberate
