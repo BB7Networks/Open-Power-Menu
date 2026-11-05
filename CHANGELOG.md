@@ -1,5 +1,26 @@
 # Open Power Menu changelog
 
+## Unreleased - native widget shortcut and single-pane editor (draft PR #6)
+
+- Attempt **Meta+X once per new Plasma widget instance**, invoking the existing
+  panel-attached Power User Menu and guarded launcher handoff. Respect
+  conflicting, user-changed or deliberately cleared shortcuts on later loads.
+- Release **only the removed widget's** shortcut on Plasma's explicit removal
+  signal; restore the previous binding on Undo if still available. Guard
+  against first-run initialization racing with removal. Older orphaned actions
+  may still need one-time cleanup in KDE Shortcuts.
+- Restore PR #5's single-popup spring-loaded layout editing after real
+  Wayland problems with experimental floating editor windows. A **full-width,
+  48px Go Back** strip now supports click navigation and dragging items back
+  to their parent level; the normal locked-menu flyouts remain unchanged.
+- Remove the obsolete manual Meta+X setup button and editing-flyout toggle,
+  while preserving standalone launch diagnostics as an optional fallback.
+- Refresh README and linked troubleshooting/acceptance docs. Three genuine
+  Manjaro Plasma screenshots are captured and prepared for the repository
+  gallery; images remain pending check-in.
+- Keep version identifiers at **0.4.17** until review, live desktop acceptance,
+  merge and an explicitly approved release.
+
 ## Unreleased - configuration UX and in-menu layout editing
 
 - Preserve viewport anchors, selection and focus when rearranging long menus;
