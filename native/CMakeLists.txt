@@ -1,0 +1,18 @@
+add_library(opm_native STATIC
+    model.cpp storage.cpp layouts.cpp catalog.qrc)
+target_link_libraries(opm_native PUBLIC Qt6::Core)
+target_include_directories(opm_native PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(opm_native PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(open-power-menu-native main.cpp service.cpp service.hpp)
+target_link_libraries(open-power-menu-native PRIVATE opm_native Qt6::DBus)
+target_compile_definitions(open-power-menu-native PRIVATE OPM_NATIVE_VERSION="${PROJECT_VERSION}-dev")
+install(TARGETS open-power-menu-native RUNTIME DESTINATION bin)
+# Deliberately no activation/desktop files or installer cutover before UI parity.
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+    add_executable(native-model-tests tests/model_test.cpp)
+    target_link_libraries(native-model-tests PRIVATE opm_native Qt6::Test)
+    add_test(NAME native-model COMMAND native-model-tests)
+    add_executable(native-launch-probe tests/launch_probe.cpp)
+    target_link_libraries(native-launch-probe PRIVATE Qt6::Core)
+endif()
