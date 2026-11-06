@@ -1,6 +1,6 @@
 # Native backend development preview
 
-This is the first v1.1 migration milestone, based on released 1.0.1. It is a
+This is the first v2.0 migration milestone, based on released 1.0.1. It is a
 working native backend, **not a replacement installation of the complete app**.
 The normal installer and its Python/PySide6 editor and standalone menu remain
 available. Native Configure, standalone UI and full recovery-browser operations
@@ -99,5 +99,5 @@ checks Python's absence, validates a missing configuration using defaults, and
 starts/calls the native service on a private D-Bus session. It uses a temporary
 configuration directory and never connects to the desktop session bus.
 
-No v1.1 release package, tag, global shortcut or Plasma restart is created by
+No v2.0 release package, tag, global shortcut or Plasma restart is created by
 these development commands. Do not uninstall PySide6 from a user's system.

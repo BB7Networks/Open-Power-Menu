@@ -83,7 +83,7 @@ signals on a physical Plasma desktop.
 
 ## Native backend migration checks
 
-The v1.1 preview adds CMake/Qt Test checks and a Python-standard-library
+The v2.0 preview adds CMake/Qt Test checks and a Python-standard-library
 differential harness; PySide6 is not required for these tests. See
 [native development](../native/README.md) for the commands and the isolated
 no-Python runtime smoke image. The new **Native Qt backend** CI job runs

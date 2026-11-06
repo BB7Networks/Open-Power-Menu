@@ -1,7 +1,7 @@
 # Native migration status
 
-This branch targets v1.1.0 development. The native binary identifies itself as
-`1.1.0-dev`; the working application and EZ installer remain at 1.0.1 until
+This branch targets v2.0.0 development. The native binary identifies itself as
+`2.0.0-dev`; the working application and EZ installer remain at 1.0.1 until
 the native UI and installation path reach parity.
 
 ## Implemented
@@ -32,10 +32,11 @@ the native UI and installation path reach parity.
 4. Native widget-snapshot/install helper and reversible binary installation.
    Source CMake installation currently stages only the preview executable;
    the normal EZ installer still requires Python/PySide6.
-5. Windows-inspired configurable access keys, visibility/reset preferences,
-   0.5–5.0-second automatic closing, optional hover delay/import/export, and
-   capability-aware Sleep/Hibernate following KDE policy.
-6. Full physical Plasma acceptance and release review before runtime cutover.
+5. Compatibility/performance measurements and full physical Plasma acceptance
+   and release review before runtime cutover.
+
+Access keys, timing controls, Sleep/Hibernate and other new usability features
+are reserved for 2.1 after 2.0 acceptance; see the [version roadmap](ROADMAP.md).
 
 The editor and recovery browser are the next reviewable milestone. Replacing
 them with a reduced UI, or launching the Python editor invisibly from the

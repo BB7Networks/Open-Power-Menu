@@ -159,7 +159,7 @@ class NativeContract(unittest.TestCase):
     def test_dbus_protocol_and_invalid_config_fallback(self):
         self.write({'menu': [{'command': ['true']}], 'hide_original_launcher': True})
         with self.service():
-            self.assertEqual(self.call('Ping'), 'Open Power Menu v1.1.0-dev')
+            self.assertEqual(self.call('Ping'), 'Open Power Menu v2.0.0-dev')
             self.assertTrue(json.loads(self.call('GetIntegration'))['hide_original_launcher'])
             self.assertEqual(json.loads(self.call('GetMenu'))[0]['key'], '0')
             # No editor stub masquerades as successful functionality.

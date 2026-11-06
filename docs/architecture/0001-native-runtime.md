@@ -1,6 +1,6 @@
 # Native runtime migration
 
-Status: accepted for v1.1 development; production cutover is gated on parity.
+Status: accepted for v2.0 development; production cutover is gated on parity.
 Baseline: main `34058480b6e3bc1ecc1f19d420fb744f570eca34` (released 1.0.1).
 
 ## Decision
@@ -86,7 +86,7 @@ binary installations must not compile on the user's desktop.
 4. Native snapshot/install helper; distro-specific binary packaging, missing
    dependency diagnostics, clean installs and failure-safe upgrades. Keep
    source builds separate from ordinary EZ binary installation.
-5. Item access keys, visibility modes and independent binding reset; then
+5. After 2.0 parity and acceptance, 2.1 adds item access keys, visibility modes and independent binding reset; then
    configurable closing/hover delay and native Sleep/Hibernate capability
    checks. Preserve KDE policies, inhibitors and confirmations.
 6. Complete automated regression and physical Plasma Wayland/X11 acceptance;
