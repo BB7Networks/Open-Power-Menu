@@ -81,6 +81,26 @@ still test command resolution/quoting, missing KDE tools and failed launches.
 These tests **cannot** prove KWin's actual global-key delivery or lifecycle
 signals on a physical Plasma desktop.
 
+## Native backend migration checks
+
+The v1.1 preview adds CMake/Qt Test checks and a Python-standard-library
+differential harness; PySide6 is not required for these tests. See
+[native development](../native/README.md) for the commands and the isolated
+no-Python runtime smoke image. The new **Native Qt backend** CI job runs
+alongside the existing portable and Qt jobs.
+
+Native tests cover bounded/no-symlink reads, malformed configurations, atomic
+saves, backup retention, file-identity/content conflicts, reference-only layout
+transactions, capability probes, D-Bus compatibility and detached argv launch.
+All power commands are fake tools during automated testing. The existing Python
+model is the comparison oracle for normal configurations. Legacy GUI tests stay
+in place until native editor and standalone parity are implemented.
+
+These tests do not certify a native Configure window, backup browser, standalone
+frontend, binary EZ installer or live widget integration. See the
+[migration gates](architecture/native-migration-status.md) before changing the
+installed service or claiming that the complete app no longer needs PySide6.
+
 ## Live acceptance matrix (still required)
 
 Use a test account or VM and retain a recovery terminal. Do not restart Plasma

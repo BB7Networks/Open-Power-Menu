@@ -161,4 +161,10 @@ Contributors can start with [contributing](docs/CONTRIBUTING.md),
 [shortcut troubleshooting](docs/NATIVE-SHORTCUT-CASCADE.md) and
 [release preparation](docs/PUBLISHING.md).
 
+The v1.1 development branch introduces a [native Qt backend](native/README.md).
+See the [architecture and dependency review](docs/architecture/0001-native-runtime.md)
+and [migration status](docs/architecture/native-migration-status.md) for completed
+work and the remaining editor, standalone and installation milestones. The
+released 1.0.1 installation still uses Python/PySide6.
+
 Independent community project, not affiliated with KDE. **MIT license:** [LICENSE](LICENSE).

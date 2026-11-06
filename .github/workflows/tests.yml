@@ -4,6 +4,40 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
+  native-runtime:
+    name: Native Qt backend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev dbus
+      - name: Build native runtime
+        run: |
+          cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/native --parallel 2
+      - name: Native model and storage tests
+        run: ctest --test-dir build/native --output-on-failure
+      - name: Legacy compatibility and private D-Bus tests
+        run: |
+          dbus-run-session -- python3 native/tests/contract.py \
+            --binary build/native/native/open-power-menu-native \
+            --probe build/native/native/native-launch-probe
+      - name: Check staged source installation
+        run: |
+          cmake --install build/native --prefix "$RUNNER_TEMP/opm-native"
+          "$RUNNER_TEMP/opm-native/bin/open-power-menu-native" --version
+          test ! -e "$RUNNER_TEMP/opm-native/share/dbus-1/services/org.openpowermenu.Service.service"
+      - name: Smoke test without Python installed
+        run: |
+          mkdir -p "$RUNNER_TEMP/opm-runtime"
+          cp native/tests/runtime.Dockerfile "$RUNNER_TEMP/opm-runtime/Dockerfile"
+          cp build/native/native/open-power-menu-native "$RUNNER_TEMP/opm-runtime/"
+          docker build -t opm-native-runtime:test "$RUNNER_TEMP/opm-runtime"
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE/native/tests/runtime-smoke.sh:/smoke.sh:ro" \
+            opm-native-runtime:test sh /smoke.sh
   portable:
     name: Portable tests
     runs-on: ubuntu-latest
