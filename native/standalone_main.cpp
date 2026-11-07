@@ -3,6 +3,7 @@
 #include <QApplication>
 #include <QCommandLineParser>
 #include <QJsonDocument>
+#include <QMessageBox>
 #include <QTextStream>
 #include <memory>
 
@@ -58,7 +59,17 @@ int main(int argc, char **argv) {
             return 0;
         }
         Opm::Standalone menu(config, parser.value("theme"), parser.isSet("diagnose-launch"));
-        return menu.open(parser.value("anchor"));
+        const int result = menu.open(parser.value("anchor"));
+        if (result == 1) {
+            if (menu.actions().isEmpty())
+                QMessageBox::information(nullptr, "Open Power Menu",
+                    "No configured commands are available on this system.");
+            else
+                QMessageBox::critical(nullptr, "Open Power Menu",
+                    "Could not launch the selection. The application may have become unavailable; "
+                    "reopen the menu to refresh it.");
+        }
+        return result;
     } catch (const Opm::Error &error) {
         QTextStream(stderr) << "Open Power Menu: " << error.what() << '\n';
         return 2;
