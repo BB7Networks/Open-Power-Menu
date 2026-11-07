@@ -4,6 +4,27 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
+  native-standalone:
+    name: Native standalone menu
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native menu
+        run: docker build -f native/tests/standalone.Dockerfile -t opm-native-standalone:test .
+      - name: Staged launch without Python or compiler and missing-library diagnostic
+        run: docker run --rm --network none opm-native-standalone:test
+      - name: Install virtual compositor test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev qt6-wayland dbus xvfb xauth weston kwin-wayland
+      - name: Test X11 and Wayland menu interaction
+        run: |
+          cmake -S . -B build/standalone -G Ninja -DOPM_BUILD_STANDALONE=ON
+          cmake --build build/standalone --parallel 2
+          dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb build/standalone/native/native-standalone-tests
+          dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin OPM_OUTPUT_COUNT=2 OPM_SCALE=1.25 sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
   native-editor:
     name: Native editor and recovery
     runs-on: ubuntu-24.04
