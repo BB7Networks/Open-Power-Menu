@@ -54,3 +54,33 @@ if(OPM_BUILD_STANDALONE)
         set_tests_properties(native-standalone PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     endif()
 endif()
+
+if(OPM_BUILD_PACKAGE)
+    if(CMAKE_VERSION VERSION_LESS 3.22)
+        message(FATAL_ERROR "Complete native bundles require CMake 3.22+ for distribution metadata")
+    endif()
+    add_executable(open-power-menu-install packaging/installer.cpp)
+    target_link_libraries(open-power-menu-install PRIVATE opm_native Qt6::DBus)
+    target_compile_definitions(open-power-menu-install PRIVATE OPM_NATIVE_VERSION="${PROJECT_VERSION}-dev")
+    # Embed the exact released icon for conservative legacy ownership checks.
+    execute_process(COMMAND base64 -w0 "${PROJECT_SOURCE_DIR}/assets/open-power-menu.svg" OUTPUT_VARIABLE OPM_ICON_BASE64 COMMAND_ERROR_IS_FATAL ANY)
+    target_compile_definitions(open-power-menu-install PRIVATE OPM_ICON_BASE64="${OPM_ICON_BASE64}")
+    if(OPM_INSTALL_TEST_HOOKS)
+        target_compile_definitions(open-power-menu-install PRIVATE OPM_INSTALL_TEST_HOOKS=1)
+    endif()
+    add_executable(open-power-menu packaging/dispatcher.cpp)
+    target_link_libraries(open-power-menu PRIVATE opm_native)
+    install(TARGETS open-power-menu open-power-menu-install RUNTIME DESTINATION bin)
+    cmake_host_system_information(RESULT OPM_PACKAGE_OS QUERY DISTRIB_ID)
+    cmake_host_system_information(RESULT OPM_PACKAGE_OS_VERSION QUERY DISTRIB_VERSION_ID)
+    configure_file(packaging/install.sh.in ${CMAKE_CURRENT_BINARY_DIR}/install.sh @ONLY)
+    configure_file(packaging/uninstall.sh.in ${CMAKE_CURRENT_BINARY_DIR}/uninstall.sh @ONLY)
+    configure_file(packaging/bundle.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/bundle.cmake @ONLY)
+    configure_file(packaging/archive.cmake.in ${CMAKE_CURRENT_BINARY_DIR}/archive.cmake @ONLY)
+    add_custom_target(native-package
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/archive.cmake
+        DEPENDS native-bundle)
+    add_custom_target(native-bundle
+        COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/bundle.cmake
+        DEPENDS open-power-menu-native open-power-menu-editor open-power-menu-standalone open-power-menu-install open-power-menu)
+endif()
