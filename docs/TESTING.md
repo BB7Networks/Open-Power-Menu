@@ -99,7 +99,8 @@ zero, malformed/oversized/unsafe backups and changed previews. Editor-session
 tests cover metadata and alternative-command preservation, bounded Undo/Redo,
 hidden nested entries, unsaved drafts, concurrent writers and overwrite preview
 conflicts. GUI tests exercise actual controls, canceled/confirmed restoration
-and protected deletion. KService fixtures cover hidden/unavailable apps and
+and protected deletion, builtin customization, application replacement and
+manual edits after application selection. KService fixtures cover hidden/unavailable apps and
 KDE desktop-file dispatch; KConfig discovery leaves panel bytes unchanged.
 All power commands are fake tools during automated testing. The existing Python
 model is the comparison oracle for normal configurations. Legacy GUI tests stay

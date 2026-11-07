@@ -365,7 +365,7 @@ Kirigami.ApplicationWindow {
                     }
                     Controls.Button {
                         text: "Restore default layout…"
-                        onClicked: window.confirm("defaults", "Restore default layout", "Replace the menu layout with its defaults? General settings and backups are preserved. You can undo this change.")
+                        onClicked: window.confirm("defaults", "Restore default layout", "Replace the menu layout and unavailable-entry option with their defaults? General settings and backups are preserved. You can undo this change.")
                     }
                 }
             }
@@ -487,12 +487,18 @@ Kirigami.ApplicationWindow {
         session: editorSession
         catalog: editorCatalog
         parent: Controls.Overlay.overlay
+        onChooseApplication: {
+            applications.forEntry = true;
+            editorCatalog.refresh();
+            applications.open();
+        }
     }
     Controls.Menu {
         id: addMenu
         Controls.MenuItem {
             text: "Installed application…"
             onTriggered: {
+                applications.forEntry = false;
                 editorCatalog.refresh();
                 applications.open();
             }
@@ -518,6 +524,7 @@ Kirigami.ApplicationWindow {
     }
     Controls.Dialog {
         id: applications
+        property bool forEntry: false
         objectName: "applicationPicker"
         title: "Choose an installed application"
         modal: true
@@ -530,6 +537,7 @@ Kirigami.ApplicationWindow {
             anchors.fill: parent
             Controls.TextField {
                 id: appSearch
+                objectName: "applicationSearch"
                 Layout.fillWidth: true
                 placeholderText: "Search applications"
                 Accessible.name: "Search applications"
@@ -542,12 +550,14 @@ Kirigami.ApplicationWindow {
                 Layout.fillWidth: true
             }
             ListView {
+                objectName: "applicationList"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
                 model: Array.from(editorCatalog.applications).filter(row => (row.name + " " + row.genericName + " " + row.description).toLowerCase().includes(appSearch.text.toLowerCase()))
                 delegate: Controls.ItemDelegate {
                     required property var modelData
+                    objectName: "applicationEntry:" + modelData.id
                     width: ListView.view.width
                     text: modelData.name + (modelData.description ? " — " + modelData.description : "")
                     icon.name: modelData.icon
@@ -557,7 +567,10 @@ Kirigami.ApplicationWindow {
                             appError.text = "The application is unavailable or the KDE desktop-file launcher is missing. Install the KDE command-line tools and refresh the list.";
                             return;
                         }
-                        if (editorSession.addItem(window.layoutDraft.parentId, "", item))
+                        if (applications.forEntry) {
+                            entryDialog.useApplication(JSON.parse(item));
+                            applications.close();
+                        } else if (editorSession.addItem(window.layoutDraft.parentId, "", item))
                             applications.close();
                         else
                             appError.text = editorSession.error;

@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 Controls.Dialog {
     id: dialog
@@ -18,11 +19,42 @@ Controls.Dialog {
     property var session
     property var catalog
     property string problem: ""
+    property string desktopFile: ""
+    property var pickedCommand: []
+    property var builtin: entryKind === "builtin" && actionField.currentIndex >= 0 ? catalog.builtinDetails(catalog.actions[actionField.currentIndex].id) : ({})
+    signal chooseApplication
+    function setCommand(argv) {
+        programField.text = argv[0] || "";
+        argumentModel.clear();
+        argv.slice(1).forEach(value => argumentModel.append({
+                value: value
+            }));
+    }
+    function useApplication(item) {
+        entryKind = "command";
+        nameField.text = item.label;
+        iconField.text = item.icon;
+        desktopFile = item.desktop_file;
+        pickedCommand = item.command;
+        setCommand(item.command);
+    }
+    function customizeBuiltin() {
+        const details = builtin;
+        if (!nameField.text.trim())
+            nameField.text = details.title;
+        if (!iconField.text.trim())
+            iconField.text = details.icon;
+        setCommand(details.command);
+        desktopFile = "";
+        entryKind = "command";
+    }
     function begin(kind, id, container) {
         itemId = id || "";
         parentId = container || "";
         entryKind = kind;
         original = itemId ? JSON.parse(session.itemFields(itemId)) : {};
+        desktopFile = original.desktop_file || "";
+        pickedCommand = original.command || [];
         if (itemId)
             entryKind = original.kind;
         nameField.text = entryKind === "submenu" ? (original.submenu || "New submenu") : (original.label || "");
@@ -68,6 +100,8 @@ Controls.Dialog {
                 icon: iconField.text.trim(),
                 command: argv
             };
+            if (desktopFile && desktopFile !== (original.desktop_file || "") && JSON.stringify(argv) === JSON.stringify(pickedCommand))
+                changes.desktop_file = desktopFile;
         }
         if (itemId) {
             for (const key of Object.keys(changes))
@@ -111,6 +145,29 @@ Controls.Dialog {
                 Layout.fillWidth: true
             }
             Controls.Label {
+                visible: dialog.entryKind === "builtin"
+                text: "Runs on this PC: " + (dialog.builtin.effective || "")
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+            }
+            Controls.TextArea {
+                objectName: "builtinFallbacks"
+                visible: dialog.entryKind === "builtin"
+                text: dialog.builtin.candidates || ""
+                readOnly: true
+                selectByMouse: true
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
+                Accessible.name: "Fallback order"
+            }
+            Controls.Button {
+                objectName: "customizeBuiltin"
+                visible: dialog.entryKind === "builtin"
+                text: "Customize this command…"
+                onClicked: dialog.customizeBuiltin()
+            }
+            Controls.Label {
                 text: dialog.entryKind === "builtin" ? "Name (leave empty to use the action's name)" : "Name"
                 visible: dialog.entryKind !== "separator"
             }
@@ -142,6 +199,24 @@ Controls.Dialog {
                 visible: dialog.entryKind === "command"
                 Layout.fillWidth: true
                 Accessible.name: "Program to run"
+            }
+            RowLayout {
+                visible: dialog.entryKind === "command"
+                Controls.Button {
+                    text: "Choose installed application…"
+                    onClicked: dialog.chooseApplication()
+                }
+                Controls.Button {
+                    text: "Browse executable…"
+                    onClicked: executablePicker.open()
+                }
+            }
+            Controls.Label {
+                visible: dialog.entryKind === "command" && !!dialog.desktopFile
+                text: "Selected application: " + dialog.desktopFile
+                textFormat: Text.PlainText
+                wrapMode: Text.Wrap
+                Layout.fillWidth: true
             }
             Controls.Label {
                 visible: dialog.entryKind === "command"
@@ -194,5 +269,10 @@ Controls.Dialog {
             Controls.DialogButtonBox.buttonRole: Controls.DialogButtonBox.RejectRole
             onClicked: dialog.close()
         }
+    }
+    FileDialog {
+        id: executablePicker
+        title: "Choose executable"
+        onAccepted: programField.text = dialog.catalog.localFile(selectedFile)
     }
 }

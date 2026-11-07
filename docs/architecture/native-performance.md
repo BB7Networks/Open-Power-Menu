@@ -11,6 +11,8 @@ below. Standalone and complete installation measurements await their ports.
   exported unchanged with `git archive`.
 - Native implementation: `37b3e45d9f376aac7defc0cd75f48c383be233bf`
   (2.0.0-dev), CMake Release, GCC 14.2, Debian 13 x86-64.
+  These measurements precede the final command-picker/layout-reset parity
+  follow-up; they are retained with the exact measured source and binary hashes.
 - Same fresh disposable container for both implementations: Qt 6.8.2,
   KDE Frameworks 6.13, Python/PySide6 3.13.5/6.8.2.1 for the baseline and test
   client; Linux 6.18.57, glibc 2.41, shared cloud CPU, software rendering.

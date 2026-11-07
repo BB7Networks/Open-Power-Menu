@@ -62,6 +62,19 @@ class EditorTests : public QObject {
         QVERIFY(!changed.contains("commands"));
         QVERIFY(!changed.contains("desktop_file"));
         QCOMPARE(changed["future"], item["future"]);
+        QVERIFY(editor.addItem(
+            "", "", R"({"action":"terminal","future":{"integer":9223372036854775807}})"));
+        const auto builtin = id(entries(editor).last());
+        const auto beforeConversion = editor.configuration();
+        QVERIFY(!editor.editItem(builtin, R"({"action":"terminal","command":["true"]})"));
+        QVERIFY(editor.editItem(
+            builtin, R"({"label":"My terminal","command":["true","literal argument"]})"));
+        const auto converted = editor.configuration()["menu"].toArray().last().toObject();
+        QVERIFY(!converted.contains("action"));
+        QCOMPARE(converted["future"],
+                 beforeConversion["menu"].toArray().last().toObject()["future"]);
+        editor.undo();
+        QCOMPARE(editor.configuration(), beforeConversion);
     }
     void undoRedoAddDuplicateRemoveAndReset() {
         QTemporaryDir dir;
@@ -84,9 +97,11 @@ class EditorTests : public QObject {
         const auto parent = id(entries(editor)[1]);
         QVERIFY(editor.addItem(parent, "", R"({"submenu":"New","items":[{"separator":true}]})"));
         QCOMPARE(entries(editor)[1].toObject()["items"].toArray().size(), 2);
+        QVERIFY(editor.preference(R"({"show_unavailable":true})"));
         const auto beforeReset = editor.configuration();
         QVERIFY(editor.resetLayout());
         QCOMPARE(editor.configuration()["unknown"], initial["unknown"]);
+        QCOMPARE(editor.configuration()["show_unavailable"], defaults()["show_unavailable"]);
         editor.undo();
         QCOMPARE(editor.configuration(), beforeReset);
         QVERIFY(editor.preference(R"({"show_menu_icons":false})"));

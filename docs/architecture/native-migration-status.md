@@ -22,6 +22,8 @@ branch and draft PR #10 retain their development history.
 - Qt Quick/Kirigami General/Layout/Backups window, shared QML drag editor,
   installed-app and builtin pickers, individual command arguments, nested
   entries, duplicate/remove/edit, Undo/Redo and default-layout restoration.
+  Builtin command preview/customization and application/executable selection
+  within command editing preserve the corresponding legacy editor operations.
 - KService application discovery and KDE desktop-file execution; KConfig
   launcher discovery reads existing panels without changing them.
 - Unsaved-draft handling, external-change detection, explicit overwrite preview

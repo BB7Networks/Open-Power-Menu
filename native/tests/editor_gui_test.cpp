@@ -15,8 +15,12 @@
 using namespace Opm;
 class EditorGuiTests : public QObject {
     Q_OBJECT
+    bool clickable(QQuickItem *item) {
+        return item && item->isVisible() && item->isEnabled() && item->width() > 0 &&
+               item->height() > 0 && item->window();
+    }
     QQuickItem *visualItem(QQuickItem *root, const QString &name) {
-        if (root->objectName() == name)
+        if (root->objectName() == name && clickable(root))
             return root;
         for (auto *child : root->childItems())
             if (auto *found = visualItem(child, name))
@@ -25,13 +29,22 @@ class EditorGuiTests : public QObject {
     }
     bool click(QQuickWindow *window, const char *name) {
         auto *item = window->findChild<QQuickItem *>(QString::fromLatin1(name));
+        // Ignore delegates that are not currently clickable.
+        if (!clickable(item))
+            item = nullptr;
         if (!item)
             item = visualItem(window->contentItem(), QString::fromLatin1(name));
-        if (!item || !item->isVisible() || !item->isEnabled() || item->width() <= 0 ||
-            item->height() <= 0)
+        // Popup delegates can belong to a separate visual tree/window in Qt 6.8.
+        if (!item)
+            for (auto *root : window->findChildren<QQuickItem *>()) {
+                item = visualItem(root, QString::fromLatin1(name));
+                if (item)
+                    break;
+            }
+        if (!clickable(item))
             return false;
         QTest::mouseClick(
-            window, Qt::LeftButton, Qt::NoModifier,
+            item->window(), Qt::LeftButton, Qt::NoModifier,
             item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         QCoreApplication::processEvents();
         return true;
@@ -127,6 +140,49 @@ class EditorGuiTests : public QObject {
         QVERIFY(QMetaObject::invokeMethod(confirmation, "accept"));
         QTRY_VERIFY(!confirmation->property("visible").toBool());
         QCOMPARE(store.backups().size(), 1);
+        QVERIFY(click(window, "layoutTab"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "begin", Q_ARG(QVariant, "builtin"),
+                                          Q_ARG(QVariant, ""), Q_ARG(QVariant, "")));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        auto *fallbacks = window->findChild<QObject *>("builtinFallbacks");
+        QVERIFY(fallbacks && !fallbacks->property("text").toString().isEmpty());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "customizeBuiltin"));
+        QCOMPARE(dialog->property("entryKind").toString(), QString("command"));
+        QVERIFY(!program->property("text").toString().isEmpty());
+        QVERIFY(program->setProperty("text", "/bin/true"));
+        QVERIFY(click(window, "applyEntry"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QCOMPARE(session.configuration()["menu"].toArray().size(), 1);
+        QVERIFY(!session.configuration()["menu"].toArray()[0].toObject().contains("action"));
+        QVERIFY(click(window, "editEntry"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QVERIFY(QMetaObject::invokeMethod(dialog, "chooseApplication"));
+        auto *picker = window->findChild<QObject *>("applicationPicker");
+        QVERIFY(picker);
+        QTRY_VERIFY(picker->property("opened").toBool());
+        auto *search = window->findChild<QObject *>("applicationSearch");
+        QVERIFY(search && search->setProperty("text", "Native fixture"));
+        auto *appList = window->findChild<QQuickItem *>("applicationList");
+        QVERIFY(appList);
+        QTRY_COMPARE(appList->property("count").toInt(), 1);
+        QVERIFY(appList->width() > 0 && appList->height() > 0);
+        QTRY_VERIFY(visualItem(appList, "applicationEntry:opm-native-fixture.desktop"));
+        // QTRY evaluates its condition repeatedly; click exactly once because
+        // choosing an application closes this popup.
+        QVERIFY(click(window, "applicationEntry:opm-native-fixture.desktop"));
+        QTRY_VERIFY(!picker->property("visible").toBool());
+        QVERIFY(dialog->property("opened").toBool());
+        QVERIFY(click(window, "applyEntry"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        const auto picked = session.configuration()["menu"].toArray()[0].toObject();
+        QVERIFY(picked["desktop_file"].toString().endsWith("opm-native-fixture.desktop"));
+        QCOMPARE(picked["command"].toArray()[2], picked["desktop_file"]);
+        QVERIFY(click(window, "editEntry"));
+        QTRY_VERIFY(dialog->property("opened").toBool());
+        QVERIFY(program->setProperty("text", "/bin/true"));
+        QVERIFY(click(window, "applyEntry"));
+        QTRY_VERIFY(!dialog->property("visible").toBool());
+        QVERIFY(!session.configuration()["menu"].toArray()[0].toObject().contains("desktop_file"));
         QCOMPARE(warnings, QStringList{});
         window->setProperty("closingApproved", true);
         window->close();
@@ -150,6 +206,11 @@ class EditorGuiTests : public QObject {
         QVERIFY(panel.open(QIODevice::ReadOnly));
         QCOMPARE(panel.readAll(), contents);
         QVERIFY(!catalog.actions().isEmpty());
+        QVERIFY(!catalog.builtinDetails("terminal")["candidates"].toString().isEmpty());
+        QVERIFY(!catalog.builtinDetails("terminal")["command"].toList().isEmpty());
+        QVERIFY(catalog.builtinDetails("opm-no-such-action").isEmpty());
+        QCOMPARE(catalog.localFile(QUrl("file:///tmp/program%20with%20spaces")),
+                 QString("/tmp/program with spaces"));
         QVERIFY(catalog.applicationItem("opm-nonexistent.desktop").isEmpty());
         const auto applications = catalog.applications();
         QVERIFY(std::any_of(applications.begin(), applications.end(), [](const QVariant &row) {

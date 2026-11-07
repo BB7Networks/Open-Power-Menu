@@ -65,6 +65,7 @@ QJsonObject fields(const QJsonObject &node) {
     if (type == "submenu")
         result["submenu"] = item["submenu"];
     if (type == "command") {
+        result["desktop_file"] = item["desktop_file"].toString();
         const auto first =
             item.contains("command") ? item["command"] : item["commands"].toArray().first();
         result["command"] = first.isObject() ? first.toObject()["argv"] : first;
@@ -287,17 +288,21 @@ bool EditorSession::editItem(const QString &id, const QString &text) {
             throw Error("Select an existing entry", "invalid");
         const auto type = kind(selectedNode["definition"].toObject());
         const auto changes = object(text);
-        const QSet<QString> allowed = type == "submenu"   ? QSet<QString>{"submenu", "icon"}
-                                      : type == "builtin" ? QSet<QString>{"action", "label", "icon"}
-                                      : type == "command"
-                                          ? QSet<QString>{"label", "icon", "command"}
-                                          : QSet<QString>{};
+        const QSet<QString> allowed =
+            type == "submenu" ? QSet<QString>{"submenu", "icon"}
+            : type == "builtin"
+                ? QSet<QString>{"action", "label", "icon", "command", "desktop_file"}
+            : type == "command" ? QSet<QString>{"label", "icon", "command", "desktop_file"}
+                                : QSet<QString>{};
         for (const auto &key : changes.keys())
             if (!allowed.contains(key))
                 throw Error("This field does not belong to the selected entry", "invalid");
+        if (changes.contains("command") && changes.contains("action"))
+            throw Error("Choose a built-in action or a custom command", "invalid");
         state.nodes = modify(state.nodes, id, [&](QJsonObject node) {
             auto item = node["definition"].toObject();
             if (changes.contains("command") && changes["command"] != fields(node)["command"]) {
+                item.remove("action");
                 item.remove("commands");
                 item.remove("desktop_file");
             }
@@ -386,6 +391,7 @@ bool EditorSession::resetLayout() {
     return perform([&] {
         auto state = history[position];
         state.nodes = nodes(defaults()["menu"].toArray());
+        state.settings["show_unavailable"] = defaults()["show_unavailable"];
         apply(state);
     });
 }

@@ -111,6 +111,48 @@ QString EditorCatalog::applicationItem(const QString &storageId) const {
                 {"command", QJsonArray{launcher, "exec", app->entryPath()}}})
             .toJson(QJsonDocument::Compact));
 }
+QVariantMap EditorCatalog::builtinDetails(const QString &actionId) const {
+    const auto spec = Opm::actions().value(actionId).toObject();
+    if (spec.isEmpty())
+        return {};
+    const auto display = [](const QStringList &argv) {
+        QStringList words;
+        for (const auto &word : argv) {
+            if (word.contains(QRegularExpression("[\\s\\\"\\\\']")) || word.isEmpty()) {
+                const auto quoted = QJsonDocument(QJsonArray{word}).toJson(QJsonDocument::Compact);
+                words.append(QString::fromUtf8(quoted.mid(1, quoted.size() - 2)));
+            } else
+                words.append(word);
+        }
+        return words.join(' ');
+    };
+    Model model;
+    const auto selected = model.normalize(QJsonArray{spec}, true).first().argv;
+    QStringList candidates;
+    QJsonArray first;
+    int number = 0;
+    for (const auto &candidate : spec["commands"].toArray()) {
+        const auto argv =
+            candidate.isObject() ? candidate.toObject()["argv"].toArray() : candidate.toArray();
+        if (first.isEmpty())
+            first = argv;
+        auto single = spec;
+        single["commands"] = QJsonArray{candidate};
+        const bool available = !model.normalize(QJsonArray{single}, true).first().argv.isEmpty();
+        QStringList words;
+        for (const auto &word : argv)
+            words.append(word.toString());
+        candidates.append(QString::number(++number) + ". " + display(words) +
+                          (available ? "  [installed]" : "  [not available]"));
+    }
+    return {{"effective",
+             selected.isEmpty() ? QString("Not available on this computer") : display(selected)},
+            {"candidates", candidates.join('\n')},
+            {"command", selected.isEmpty() ? first.toVariantList()
+                                           : QJsonArray::fromStringList(selected).toVariantList()},
+            {"title", spec["title"].toString()},
+            {"icon", spec["icon"].toString()}};
+}
 QString EditorCatalog::snapshotStatus() const {
     const auto path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) +
                       "/open-power-menu-recovery/widget-backups";

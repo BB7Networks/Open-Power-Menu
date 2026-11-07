@@ -164,7 +164,7 @@ Contributors can start with [contributing](docs/CONTRIBUTING.md),
 The v2.0 development branch introduces a [native Qt backend and configuration editor](native/README.md).
 See the [architecture and dependency review](docs/architecture/0001-native-runtime.md)
 and [migration status](docs/architecture/native-migration-status.md) for completed
-work and the remaining editor, standalone and installation milestones. The
+work and the remaining standalone and installation milestones. The
 released 1.0.1 installation still uses Python/PySide6.
 
 Independent community project, not affiliated with KDE. **MIT license:** [LICENSE](LICENSE).

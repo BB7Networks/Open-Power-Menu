@@ -56,6 +56,10 @@ reuses the widget's QML drag editor, retains unknown JSON metadata in C++, and
 supports Undo/Redo, nested editing, explicit conflict recovery and guarded
 backup preview/restore/delete. Custom commands use a program and individual
 argument fields. No implicit shell parsing occurs.
+Builtin editing shows the effective command and fallback order, with an option
+to customize it as an independent command. Command editing can select another
+installed application or browse an executable; layout reset also restores the
+unavailable-entry option, with Undo preserving the previous draft.
 
 KService supplies installed applications and localized names. Newly selected
 applications use `kioclient6 exec` or `kioclient exec` with the desktop-file

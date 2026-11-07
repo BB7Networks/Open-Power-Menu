@@ -1,5 +1,6 @@
 #pragma once
 #include <QObject>
+#include <QUrl>
 #include <QVariantList>
 
 namespace Opm {
@@ -19,6 +20,8 @@ class EditorCatalog : public QObject {
     QString snapshotStatus() const;
     Q_INVOKABLE void refresh();
     Q_INVOKABLE QString applicationItem(const QString &storageId) const;
+    Q_INVOKABLE QVariantMap builtinDetails(const QString &actionId) const;
+    Q_INVOKABLE QString localFile(const QUrl &url) const { return url.toLocalFile(); }
     Q_INVOKABLE void copy(const QString &text) const;
   signals:
     void refreshed();
