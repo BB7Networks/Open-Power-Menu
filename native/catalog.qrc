@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/opm">
+    <file alias="actions.json">../openpowermenu/data/actions.json</file>
+    <file alias="defaults.json">../openpowermenu/data/defaults.json</file>
+  </qresource>
+</RCC>

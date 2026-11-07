@@ -1,0 +1,108 @@
+#include "service.hpp"
+#include "launch.hpp"
+#include <QCoreApplication>
+#include <QDebug>
+#include <QFileInfo>
+#include <QJsonDocument>
+#include <QProcess>
+
+namespace Opm {
+static QString json(const QJsonObject &value) {
+    return QString::fromUtf8(QJsonDocument(value).toJson(QJsonDocument::Compact));
+}
+static QString reply(const std::function<QJsonObject()> &operation) {
+    try {
+        return json(operation());
+    } catch (const Error &error) {
+        const auto message =
+            error.code == "configuration"
+                ? QString("Could not read or save configuration safely; your draft is retained")
+                : QString::fromUtf8(error.what());
+        return json({{"ok", false}, {"code", error.code}, {"message", message}});
+    }
+}
+Service::Service(Storage source, QObject *parent)
+    : QObject(parent), storage(std::move(source)), layouts(storage) {
+    idle.setSingleShot(true);
+    idle.setInterval(5 * 60 * 1000);
+    connect(&idle, &QTimer::timeout, QCoreApplication::instance(), &QCoreApplication::quit);
+    touch();
+}
+void Service::touch() {
+    idle.start();
+}
+QString Service::Ping() {
+    touch();
+    return "Open Power Menu v" OPM_NATIVE_VERSION;
+}
+QString Service::GetMenu() {
+    touch();
+    try {
+        return QString::fromUtf8(
+            QJsonDocument(model.publicMenu(storage.load())).toJson(QJsonDocument::Compact));
+    } catch (const Error &error) {
+        qWarning() << "Open Power Menu configuration error:" << error.what();
+        return QString::fromUtf8(
+            QJsonDocument(QJsonArray{QJsonObject{{"kind", "command"},
+                                                 {"key", ""},
+                                                 {"title", "Invalid menu.json — see README"},
+                                                 {"icon", "dialog-error"},
+                                                 {"enabled", false}}})
+                .toJson(QJsonDocument::Compact));
+    }
+}
+QString Service::GetIntegration() {
+    touch();
+    try {
+        return json(integration(storage.load()));
+    } catch (const Error &error) {
+        qWarning() << "Integration configuration error:" << error.what();
+        return json(integration(defaults()));
+    }
+}
+bool Service::Run(const QString &key) {
+    touch();
+    try {
+        auto args = model.command(storage.load(), key);
+        if (args.isEmpty())
+            return false;
+        return launchDetached(args);
+    } catch (const Error &error) {
+        qWarning() << "Could not resolve menu item:" << error.what();
+        return false;
+    }
+}
+bool Service::Edit() {
+    touch();
+    const auto editor = QCoreApplication::applicationDirPath() + "/open-power-menu-editor";
+    if (!QFileInfo(editor).isExecutable()) {
+        qWarning("Native Configure is not installed beside the backend. Build with "
+                 "OPM_BUILD_EDITOR=ON or install the complete native developer build.");
+        return false;
+    }
+    QProcess process;
+    process.setProgram(editor);
+    process.setArguments({"--config", storage.path()});
+    process.setStandardInputFile(QProcess::nullDevice());
+    process.setStandardOutputFile(QProcess::nullDevice());
+    // Keep startup diagnostics in the user service log while GUI migration is
+    // being validated; no Python frontend is launched as a fallback.
+    return process.startDetached();
+}
+QString Service::BeginLayoutEdit() {
+    touch();
+    return reply([this] { return layouts.begin(); });
+}
+QString Service::SaveLayoutEdit(const QString &token, const QString &references) {
+    touch();
+    return reply([&] { return layouts.save(token, references); });
+}
+bool Service::CancelLayoutEdit(const QString &token) {
+    touch();
+    return layouts.cancel(token);
+}
+QString Service::KeepLayoutEdit(const QString &token) {
+    touch();
+    return reply([&] { return QJsonObject{{"ok", layouts.keep(token)}}; });
+}
+} // namespace Opm

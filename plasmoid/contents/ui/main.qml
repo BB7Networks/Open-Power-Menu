@@ -73,6 +73,7 @@ PlasmoidItem {
     property var visibleEntries: []
     property string menuStatus: "Loading system shortcuts..."
     property bool fetching: false
+    property bool backendMissing: false
     property int menuFetchEpoch: 0
     property string menuAppearance: "native"
     property bool showMenuIcons: true
@@ -664,9 +665,11 @@ PlasmoidItem {
                  if (epoch !== menuFetchEpoch || layoutEditing || layoutBusy) return;
                  fetching = false;
                  if (!ok) {
-                     menuStatus = "Backend unavailable. Run open-power-menu --check. Install the complete package with bash install.sh if needed.";
+                     backendMissing = true;
+                     menuStatus = "";
                      menuEntries = [];
                  } else {
+                     backendMissing = false;
                      try {
                          menuEntries = JSON.parse(String(value));
                          menuStatus = menuEntries.length ? "" : "No available commands";
@@ -929,6 +932,7 @@ PlasmoidItem {
                 + Math.max(1, menuDivider.implicitHeight)
                 + (root.layoutEditing ? layoutEditor.implicitHeight : menuColumn.implicitHeight)
                 + (menuStatusLabel.visible ? menuStatusLabel.implicitHeight : 0)
+                + (backendSetup.visible ? backendSetup.implicitHeight : 0)
                 + 4;
         }
         readonly property real heightCap: Math.min(590,
@@ -1115,6 +1119,15 @@ PlasmoidItem {
                         }
                     }
                 }
+            }
+            BackendSetup {
+                id: backendSetup
+                foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                visible: root.backendMissing && !root.layoutEditing
+                Layout.fillWidth: true
+                Layout.leftMargin: 12
+                Layout.rightMargin: 12
+                onRetryRequested: { root.fetchMenu(); root.fetchIntegration(); }
             }
             PC3.Label {
                 id: menuStatusLabel
