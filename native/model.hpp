@@ -31,7 +31,8 @@ class Model {
   public:
     QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false);
     QJsonArray publicMenu(const QJsonObject &config);
-    QStringList command(const QJsonObject &config, const QString &key);
+    QStringList command(const QJsonObject &config, const QString &key,
+                        const QJsonArray *expectedPresentation = nullptr);
 
   private:
     struct Probe {

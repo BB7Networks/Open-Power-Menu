@@ -455,11 +455,14 @@ static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {
 QJsonArray Model::publicMenu(const QJsonObject &config) {
     return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])));
 }
-QStringList Model::command(const QJsonObject &config, const QString &key) {
+QStringList Model::command(const QJsonObject &config, const QString &key,
+                           const QJsonArray *expectedPresentation) {
     static const QRegularExpression pattern("^[0-9]{1,5}(?:\\.[0-9]{1,5}){0,11}$");
     if (key.size() > 128 || !pattern.match(key).hasMatch())
         return {};
     auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]));
+    if (expectedPresentation && present(tree) != *expectedPresentation)
+        return {};
     auto parts = key.split('.');
     for (qsizetype n = 0; n < parts.size(); ++n) {
         const auto i = parts[n].toInt();

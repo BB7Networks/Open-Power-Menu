@@ -1,4 +1,5 @@
 #include "service.hpp"
+#include "launch.hpp"
 #include <QCoreApplication>
 #include <QDebug>
 #include <QFileInfo>
@@ -65,15 +66,7 @@ bool Service::Run(const QString &key) {
         auto args = model.command(storage.load(), key);
         if (args.isEmpty())
             return false;
-        QProcess process;
-        process.setProgram(args.takeFirst());
-        process.setArguments(args);
-        process.setStandardInputFile(QProcess::nullDevice());
-        process.setStandardOutputFile(QProcess::nullDevice());
-        process.setStandardErrorFile(QProcess::nullDevice());
-        // Qt's Unix detached launch creates a new session and reaps its
-        // intermediate child; no shell or inherited service pipes are used.
-        return process.startDetached();
+        return launchDetached(args);
     } catch (const Error &error) {
         qWarning() << "Could not resolve menu item:" << error.what();
         return false;
