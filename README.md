@@ -161,7 +161,7 @@ Contributors can start with [contributing](docs/CONTRIBUTING.md),
 [shortcut troubleshooting](docs/NATIVE-SHORTCUT-CASCADE.md) and
 [release preparation](docs/PUBLISHING.md).
 
-The v2.0 development branch introduces a [native Qt backend](native/README.md).
+The v2.0 development branch introduces a [native Qt backend and configuration editor](native/README.md).
 See the [architecture and dependency review](docs/architecture/0001-native-runtime.md)
 and [migration status](docs/architecture/native-migration-status.md) for completed
 work and the remaining editor, standalone and installation milestones. The

@@ -81,23 +81,32 @@ still test command resolution/quoting, missing KDE tools and failed launches.
 These tests **cannot** prove KWin's actual global-key delivery or lifecycle
 signals on a physical Plasma desktop.
 
-## Native backend migration checks
+## Native migration checks
 
 The v2.0 preview adds CMake/Qt Test checks and a Python-standard-library
 differential harness; PySide6 is not required for these tests. See
 [native development](../native/README.md) for the commands and the isolated
-no-Python runtime smoke image. The new **Native Qt backend** CI job runs
-alongside the existing portable and Qt jobs.
+no-Python runtime smoke images. **Native Qt backend** and **Native editor and
+recovery** CI jobs run alongside the existing portable and Qt jobs. The editor
+job builds Qt Quick/Kirigami on Debian 13, runs all four native test targets,
+then opens the actual editor in a separate image without Python or a compiler.
 
 Native tests cover bounded/no-symlink reads, malformed configurations, atomic
 saves, backup retention, file-identity/content conflicts, reference-only layout
 transactions, capability probes, D-Bus compatibility and detached argv launch.
+Recovery tests cover preview/restore/delete, protected copies with retention
+zero, malformed/oversized/unsafe backups and changed previews. Editor-session
+tests cover metadata and alternative-command preservation, bounded Undo/Redo,
+hidden nested entries, unsaved drafts, concurrent writers and overwrite preview
+conflicts. GUI tests exercise actual controls, canceled/confirmed restoration
+and protected deletion. KService fixtures cover hidden/unavailable apps and
+KDE desktop-file dispatch; KConfig discovery leaves panel bytes unchanged.
 All power commands are fake tools during automated testing. The existing Python
 model is the comparison oracle for normal configurations. Legacy GUI tests stay
-in place until native editor and standalone parity are implemented.
+in place until the entire native application replaces the normal installation.
 
-These tests do not certify a native Configure window, backup browser, standalone
-frontend, binary EZ installer or live widget integration. See the
+These tests do not certify the pending standalone frontend, binary EZ installer
+or physical widget integration. See the
 [migration gates](architecture/native-migration-status.md) before changing the
 installed service or claiming that the complete app no longer needs PySide6.
 

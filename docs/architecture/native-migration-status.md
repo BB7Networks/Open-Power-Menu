@@ -1,87 +1,111 @@
 # Native migration status
 
-This branch targets v2.0.0 development. The native binary identifies itself as
-`2.0.0-dev`; the working application and EZ installer remain at 1.0.1 until
-the native UI and installation path reach parity.
+Current milestone: **native recovery and configuration editor implemented**.
+The development executables report `2.0.0-dev`. The normal application and EZ
+installer remain at 1.0.1. The existing `feature/native-architecture-v1.1`
+branch and draft PR #10 retain their development history.
 
 ## Implemented
 
-- Qt 6 Core/DBus C++ service and diagnostic CLI, built with CMake.
-- One shared checked-in catalog for Python and native defaults/builtins.
-- Configuration loading, default merging, validation, capability probes,
-  menu normalization and presentation-only serialization.
-- Re-resolved position-key dispatch with detached argv execution; application
-  picker arguments stay literal, and service exit does not stop applications.
-- Integration preferences and the existing D-Bus method signatures.
-- Reference-only layout editing, session bounds/expiry/keepalive, unknown
-  property preservation, conflict detection, and unchanged-layout no-op saves.
-- Descriptor-relative no-symlink reads and writes, regular-file/4 MiB checks,
-  cooperative locking, atomic replacement, automatic backups and retention.
-- Native unit tests, legacy/native differential tests, private D-Bus tests,
-  and a CI job that builds without installing PySide6.
+- Qt Core/DBus C++ service and diagnostic CLI with the shared defaults/builtin
+  catalog, configuration validation, capability probes and menu presentation.
+- Detached argv dispatch, existing integration preferences and D-Bus contracts;
+  native `Edit` launches the adjacent native editor, never the Python editor.
+- Reference-only in-menu layout transactions, bounded sessions, keepalive,
+  unknown/hidden entry preservation, conflict checks and no-op saves.
+- Descriptor-relative/no-symlink reads and atomic writes, 4 MiB limits,
+  cooperative locking, automatic backups and retention.
+- Native recovery enumeration, metadata, preview, restore and deletion. Source
+  identity/content checks protect preview-to-action operations. Protected
+  pre-restore/pre-overwrite copies survive retention zero. History retains
+  metadata rather than every decoded backup in memory.
+- Qt Quick/Kirigami General/Layout/Backups window, shared QML drag editor,
+  installed-app and builtin pickers, individual command arguments, nested
+  entries, duplicate/remove/edit, Undo/Redo and default-layout restoration.
+- KService application discovery and KDE desktop-file execution; KConfig
+  launcher discovery reads existing panels without changing them.
+- Unsaved-draft handling, external-change detection, explicit overwrite preview
+  and recovery copies. Unknown JSON metadata remains in C++, avoiding JavaScript
+  precision loss; editing a label preserves alternative command candidates.
+- Native unit/GUI tests, legacy differential/private D-Bus tests, staged CMake
+  installation and separate backend/editor runtime images without Python.
 
 ## Remaining before changing the default runtime
 
-1. Native recovery list/preview/restore/delete API and editor model, retaining
-   protected copies, changed-source checks and explicit overwrite recovery.
-2. Qt Quick/Kirigami General/Layout/Backups UI with application/builtin pickers,
-   custom commands, Undo/Redo, nested editing and configuration conflicts.
-   Reuse the shipped QML drag editor rather than dropping its behavior.
-3. Native standalone frontend with keyboard, hover, focus and dismissal parity.
-   **The preview's `Edit` returns false**, and no standalone GUI is claimed.
-4. Native widget-snapshot/install helper and reversible binary installation.
-   Source CMake installation currently stages only the preview executable;
-   the normal EZ installer still requires Python/PySide6.
-5. Compatibility/performance measurements and full physical Plasma acceptance
-   and release review before runtime cutover.
+1. Native standalone frontend with keyboard, cascading submenus, adaptive screen
+   placement, focus, high-DPI and dismissal parity on Wayland/X11.
+2. Native widget-snapshot/install helper, D-Bus activation and reversible binary
+   EZ installation. CMake currently stages development executables only. Normal
+   installation still requires Python/PySide6 and must remain usable.
+3. Full migration corpus: unusual legacy encodings/presentation fields and
+   integer ranges; distribution/architecture-specific binary compatibility.
+4. Clean install, reinstall, upgrade, failed-upgrade rollback and uninstall
+   acceptance preserving settings, launcher, shortcuts and recovery history.
+5. Physical Plasma integration and release review. Virtual compositor and CI
+   checks do not certify Meta+X, multi-monitor placement, launcher handoff,
+   remote-desktop operation or standalone behavior.
 
-Access keys, timing controls, Sleep/Hibernate and other new usability features
-are reserved for 2.1 after 2.0 acceptance; see the [version roadmap](ROADMAP.md).
+Access keys, configurable timing, Sleep/Hibernate and other new usability
+features remain reserved for **2.1** after 2.0 acceptance. See the
+[version roadmap](ROADMAP.md). No release has been merged, tagged or published
+by this milestone.
 
-The editor and recovery browser are the next reviewable milestone. Replacing
-them with a reduced UI, or launching the Python editor invisibly from the
-native service, would leave the dependency goal unfinished while hiding the
-loss of parity. The preview instead keeps that boundary explicit.
+## Compatibility and security findings
 
-## Compatibility limits to close
+Normal OPM-generated UTF-8 configurations are covered by differential tests.
+The native preview rejects non-UTF-8 JSON, integers outside signed 64-bit range
+and JSON nesting beyond 256 without rewriting the original. Unusual non-string
+legacy presentation fields still need a wider compatibility corpus. These
+remain cutover gates, not implicit schema migrations.
 
-- Normal OPM-generated UTF-8 JSON is covered by differential tests. Native
-  preview rejects non-UTF-8 sources, integers outside signed 64-bit range and
-  JSON nesting beyond 256. These errors do not rewrite the original file.
-- Ordinary labels/icons are strings; unusual legacy non-string presentation
-  fields need a wider compatibility corpus before production cutover.
-- The command catalog retains existing qdbus6/KCM probes and available-tool
-  selection. Converting builtin power/desktop calls to direct Qt DBus should
-  preserve the verified KDE interfaces and capability checks.
-- Native writes use the same `.menu.lock` but return a retryable busy error
-  instead of blocking the D-Bus event loop behind another writer indefinitely.
-- No native recovery UI, ordinary binary EZ package or physical native-widget
-  integration has been certified by headless tests.
+Native writers use the existing `.menu.lock`; a busy lock produces a retryable
+error instead of freezing the event loop. Restoration/deletion additionally
+refuse symlinked path components, foreign-owned or hard-linked backup files,
+and backup directories writable by other users. A selected backup changing
+between preview and action is rejected. Invalid active configuration requires
+explicit protected overwrite or valid recovery; opening defaults does not
+silently replace it.
 
-## Acceptance still required
+Builtin power/desktop commands retain the existing qdbus6/KCM capability
+probes and KDE confirmations. No power action is run during tests. Native
+launcher discovery is read-only; runtime/installer cutover must still preserve
+the user's authorization boundary for panel changes.
 
-Local validation for this milestone (Debian 13, Qt 6.8.2 native build):
+## Validation of this milestone
+
+Local native builds use Debian 13, Qt 6.8.2 and KDE Frameworks 6.13. Legacy Qt
+regressions use the existing PySide6 6.10.2 environment.
 
 | Check | Result |
 | --- | --- |
-| Existing Python/Qt regression suite | 445 passed, 8 historical-source skips, 18 subtests passed |
-| Native Qt Test model/storage/layout executable | 26 passed, 0 failed, 0 skipped (includes test setup/cleanup) |
-| Python standard-library differential/private D-Bus harness | 8 tests passed |
-| Minimal runtime image without Python, PySide6 or compiler | CLI validation and Ping/GetMenu/GetIntegration passed |
-| Staged CMake installation | Preview binary runs; no production service activation installed |
+| Existing Python/Qt regressions | 445 passed, 8 historical-source skips, 18 subtests passed |
+| Native Qt Test targets | Model 26, recovery 13, editor session 11, GUI 4 passed, including setup/cleanup |
+| Standard-library differential/private D-Bus harness | 9 tests passed, including native editor launch with a literal config path |
+| Minimal backend runtime | CLI and Ping/GetMenu/GetIntegration work without Python/PySide6/compiler |
+| Minimal editor runtime | Actual Qt Quick editor starts without Python/PySide6/compiler; missing config stays absent |
+| Virtual Plasma 6.3.6 X11 and Wayland sessions | Actual editor GUI checks and screenshots passed using Xvfb/KWin X11 and KWin's virtual Wayland backend |
+| Staged CMake installation | Both development executables run; production activation remains unchanged |
 
-CI also builds on Ubuntu 24.04/Qt 6.4 and repeats the no-Python runtime test.
-The draft PR records its current results. Python/Qt regression tests use the
-existing PySide6 6.10.2 test environment; the native harness does not import it.
+GUI tests open the actual window and exercise entry validation, duplicate,
+Undo/Redo, editing, saving, backup preview, canceled/confirmed restoration and
+protected deletion. Session tests additionally cover concurrent writers,
+changed overwrite/backup previews and unsaved drafts. Shared widget drag
+regressions cover reordering/reparenting and selection/scroll behavior.
 
-Check Kickoff/Kicker and supported AppGrid handoff; Meta+X open/close and removal;
-launcher-button hide/restore; theme/icons; nested flyouts and placement across
-monitors/scales; keyboard versus mouse interaction; in-menu drag/Go Back;
-configuration conflicts, backups and restoration; standalone focus on both
-Wayland and X11; clean native install, failed upgrade and uninstall preserving
-the original launcher and recovery data. Do not restart an active Plasma
-session to run these checks.
+CI has four jobs: **Portable tests**, **Qt and D-Bus runtime**, **Native Qt
+backend** (Ubuntu 24.04/Qt 6.4) and **Native editor and recovery** (Debian 13).
+Current run status is recorded on draft PR #10.
 
-See [native build/test instructions](../../native/README.md) and the
-[architecture decision](0001-native-runtime.md). Exact milestone validation
-results are recorded in the draft PR.
+The virtual desktop runs used separate configuration/data/runtime directories,
+private D-Bus sessions and software rendering. No active desktop was changed.
+The editor emitted no QML warnings in the final GUI tests. Explicit as-needed
+scrollbars avoided layout binding loops in Debian's Breeze 6.3.5 style; tests
+wait for dialog close animations before clicking the next control. Container
+session logs still include unavailable global-shortcut/PipeWire services, so
+these runs establish editor interaction coverage, not full desktop integration.
+
+[Performance observations](native-performance.md) compare the released 1.0.1
+baseline with native Release binaries, including the editor memory tradeoff.
+See [native build instructions](../../native/README.md),
+[testing and physical acceptance](../TESTING.md), and the
+[architecture decision](0001-native-runtime.md).

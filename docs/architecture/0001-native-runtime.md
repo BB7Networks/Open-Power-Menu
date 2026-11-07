@@ -8,9 +8,9 @@ Baseline: main `34058480b6e3bc1ecc1f19d420fb744f570eca34` (released 1.0.1).
 Use a small, out-of-process C++17 backend built with CMake and Qt 6 Core/DBus.
 Keep the existing Plasma QML launcher integration, native Meta+X binding,
 flyouts, row content, pointer-dismissal policy and layout editor. Put the
-configuration model and guarded storage in a reusable native library. A later
-Qt Quick/Kirigami editor and standalone frontend can use that library without
-embedding Python or running another command interpreter.
+configuration model and guarded storage in a reusable native library. The
+Qt Quick/Kirigami editor now uses it; the standalone frontend is the next
+consumer. Neither native executable embeds Python or invokes an interpreter.
 
 The first native target is an explicit development executable. The normal
 installer, D-Bus activation file and working Python UI remain available until
@@ -34,12 +34,13 @@ alone is not proof that the complete application no longer needs PySide6.
 | Config validation, command candidates, menu normalization | Python standard library | Qt Core + POSIX file operations |
 | Session service and layout transactions | Python + PySide6 Core/DBus | Qt Core/DBus; same method signatures |
 | Detached command launch | Python subprocess | QProcess detached argv execution |
-| General/Layout/Backups editor, Undo/Redo, dialogs | Python + PySide6 Core/Gui/Widgets | Qt Quick/Controls + Kirigami, shared native model; pending |
+| General/Layout/Backups editor, Undo/Redo, dialogs | Python + PySide6 Core/Gui/Widgets | Qt Quick/Controls/Dialogs + Kirigami, shared native model; implemented as an opt-in development build |
 | Standalone menu and Wayland toplevel | Python + PySide6 Widgets | Native Qt Quick frontend; pending |
 | Backup reads, conflicts, atomic writes, restore/delete | Python + POSIX descriptors/flock | Native descriptor-relative storage with equivalent recovery tests |
 | Panel button, Meta+X, launcher handoff, AppGrid adapter | Plasma 6, Qt Quick, Plasma/Kirigami QML modules | Reuse; no Python in the widget itself |
 | In-menu drag, Go Back, draft reference trees | Existing QML/JavaScript + service | Reuse; port service transactions |
-| Application discovery/desktop Exec semantics | Python scanner; kioclient6, GIO or conservative fallback | Prefer KDE's application model/KService in the native editor; preserve existing picker argv literally in backend |
+| Application discovery/desktop Exec semantics | Python scanner; kioclient6, GIO or conservative fallback | KF6 Service and kioclient6/kioclient desktop-file execution; existing picker argv stays literal |
+| Launcher discovery | Python panel-file scanner | KF6 Config reads panel applets without modifying settings |
 | Widget snapshots and reversible EZ installer | Bash, Python, kpackagetool6; optional kbuildsycoca6/busctl | Native snapshot/install helper before installer cutover; pending |
 | Built-in tools | Installed applications, kcmshell6, qdbus6, loginctl as applicable | Preserve candidate availability and KDE confirmations; don't install missing tools |
 
@@ -48,9 +49,15 @@ development headers/tools, and Ninja or Make. Qt Test is used only for tests.
 Python/pytest and Node remain development compatibility-test tools. They are
 not linked into, embedded in, or spawned by the native model/service.
 
-The native backend itself needs Qt Core, Qt DBus, the C++ runtime and libc.
-The eventual GUI adds the Qt Quick/Controls and KDE QML modules already used
-on Plasma. Binary packages must declare actual distro/architecture/Qt/glibc
+The backend needs Qt 6.4+ Core/DBus, the C++ runtime and libc. The opt-in editor
+needs Qt 6.6+ Gui/Qml/Quick/QuickControls2, KF6 Service/Config and Kirigami plus
+Qt Quick Controls/Dialogs/Layouts/Window/Qml WorkerScript runtime modules.
+Application selection requires the KDE desktop-file launcher (`kde-cli-tools`
+on Debian). QPA plugins provide offscreen/X11/Wayland support; actual platform
+packages must be declared for distribution builds. The tested Debian 13
+[runtime recipe](../../native/tests/editor.Dockerfile) declares these modules
+explicitly rather than assuming every Plasma installation includes them.
+Binary packages must declare actual distro/architecture/Qt/glibc
 requirements; a locally built ELF is not a universal Linux binary. Ordinary
 binary installations must not compile on the user's desktop.
 
@@ -81,8 +88,8 @@ binary installations must not compile on the user's desktop.
 1. Audit/decision, shared catalog and CMake native foundation.
 2. Native configuration reads, validation, resolution, D-Bus dispatch and layout
    transactions with differential and private-session tests.
-3. Native recovery browser operations, full configuration editing model,
-   application discovery, Qt Quick editor and standalone parity.
+3. Native recovery operations, configuration model, KDE application discovery
+   and Qt Quick editor: implemented. Native standalone parity: next milestone.
 4. Native snapshot/install helper; distro-specific binary packaging, missing
    dependency diagnostics, clean installs and failure-safe upgrades. Keep
    source builds separate from ordinary EZ binary installation.
