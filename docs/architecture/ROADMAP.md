@@ -8,8 +8,9 @@ the working legacy installer remain unchanged until production cutover.
 ## 2.0.0 — Native architecture
 
 1. Native Core/DBus backend, safe storage and layout transactions (implemented).
-2. Native recovery and Qt Quick/Kirigami General/Layout/Backups editor.
-3. Native standalone menu with navigation, focus, flyout and dismissal parity.
+2. Native recovery and Qt Quick/Kirigami General/Layout/Backups editor (implemented).
+3. Native standalone menu (implemented; virtual navigation/focus/flyout/dismissal
+   checks pass; physical desktop acceptance remains).
 4. Complete native installation, widget snapshots and upgrade rollback, with
    distribution/architecture-specific binary compatibility and source builds.
 5. Legacy configuration and integration validation, measured performance, and

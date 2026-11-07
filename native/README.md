@@ -1,8 +1,8 @@
 # Native v2.0 development preview
 
 The native backend, recovery operations and Qt Quick/Kirigami configuration
-editor are implemented. The normal installer and standalone menu still use
-Python/PySide6 and remain at **1.0.1**. This preview identifies itself as
+editor and an optional Qt Widgets standalone frontend are implemented.
+The normal installer and production standalone entry point still use Python/PySide6 and remain at **1.0.1**. This preview identifies itself as
 **2.0.0-dev**; it is not a complete native replacement installation.
 
 See the [architecture and dependency inventory](../docs/architecture/0001-native-runtime.md),
@@ -150,3 +150,66 @@ These images prove dependency boundaries on Debian 13, not universal ELF
 compatibility or physical desktop acceptance. No production activation,
 shortcut, Plasma restart, release package or tag is created. Never uninstall
 system Python/PySide6 as part of the migration.
+
+## Standalone menu development build
+
+See [the architecture comparison](../docs/architecture/0002-native-standalone.md).
+Qt Widgets is optional and never linked into the backend-only target. It can
+be enabled alongside the editor or independently:
+
+```bash
+cmake -S . -B build/standalone -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_STANDALONE=ON
+cmake --build build/standalone --parallel 2
+ctest --test-dir build/standalone --output-on-failure
+cmake --install build/standalone --prefix /tmp/opm-standalone-stage
+/tmp/opm-standalone-stage/bin/open-power-menu-standalone --config /tmp/opm-preview/menu.json --diagnose-launch
+```
+
+Build: Qt 6.4+ Core/Gui/Widgets (`qt6-base-dev`), CMake 3.21+, C++17 and Qt Test
+when testing. Runtime: Qt 6 Core/Gui/Widgets shared libraries, libc/libstdc++ and
+the distribution's transitive dependencies, a Qt platform plugin for the
+session, fonts and the desktop icon/theme provider. Debian 13 runtime packages:
+`libqt6widgets6 qt6-qpa-plugins` for X11; add `qt6-wayland` for Wayland. No QML,
+Kirigami, Python, PySide6 or compiler is needed by this executable. Configured
+actions still need their own applications/KDE command helpers, as in 1.0.1;
+unavailable applications follow `show_unavailable`. The Qt dynamic loader names
+missing shared libraries; Qt reports missing platform plugins before main can
+create a menu. Install matching distro Qt runtime packages rather than copying
+an ELF to an incompatible system.
+
+Default invocation opens the menu independently of Plasma or a backend service.
+`--anchor cursor|bottom-left|bottom-right`, `--theme native|aero`,
+`--diagnose-launch`, `--list`, `--check`, `--default-config` and `--version` are
+supported; `--config FILE` selects a disposable profile. `--list` and `--check`
+print native normalized menu JSON rather than the legacy textual tree. These
+read-only diagnostics (and help/version) need no display. Service/widget/editor
+operations remain on their dedicated existing native executables; the native
+standalone does not replace the legacy command wrapper in this milestone.
+
+The configuration is read without writes for each process opening. Commands
+resolve against the validated opening snapshot, never action data or supplied
+argv. If availability changes the normalized tree before selection, execution
+is refused; reopen to refresh it. Detached applications survive the menu process.
+The existing power catalog retains KDE's normal confirmations. Pointer dismissal
+uses the existing preference and fixed 1200 ms delay across all submenus;
+keyboard navigation suspends it until mouse movement resumes.
+
+Wayland uses a frameless root toplevel and a single activation request. The
+compositor may refuse activation or global placement, particularly without a
+launcher token. Absolute cursor/anchor placement and knowledge of the global
+pointer are not guaranteed by Wayland. Qt handles child popup placement and
+adaptive direction. X11 uses native QMenu popup handling. The initial minimum
+width is 292 logical pixels; long menus scroll using Qt's menu scrollers.
+
+```bash
+# Dedicated minimal-runtime acceptance, including missing-library diagnostics:
+docker build -f native/tests/standalone.Dockerfile -t opm-standalone:test .
+docker run --rm --network none opm-standalone:test
+# Interaction on private virtual displays (test tooling only):
+dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb build/standalone/native/native-standalone-tests
+dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+```
+
+Both staging and these recipes leave production binaries, activation, shortcuts,
+widget and the 1.0.1 EZ installer unchanged. Physical Plasma, mixed fractional-DPI
+monitors, work-area/panel variations and launcher activation remain release gates.

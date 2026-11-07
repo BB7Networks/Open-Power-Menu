@@ -9,8 +9,9 @@ Use a small, out-of-process C++17 backend built with CMake and Qt 6 Core/DBus.
 Keep the existing Plasma QML launcher integration, native Meta+X binding,
 flyouts, row content, pointer-dismissal policy and layout editor. Put the
 configuration model and guarded storage in a reusable native library. The
-Qt Quick/Kirigami editor now uses it; the standalone frontend is the next
-consumer. Neither native executable embeds Python or invokes an interpreter.
+Qt Quick/Kirigami editor and optional Qt Widgets standalone now use it.
+The three native executables neither embed Python nor invoke an interpreter.
+The standalone choice is documented in [decision 0002](0002-native-standalone.md).
 
 The first native target is an explicit development executable. The normal
 installer, D-Bus activation file and working Python UI remain available until
@@ -89,7 +90,8 @@ binary installations must not compile on the user's desktop.
 2. Native configuration reads, validation, resolution, D-Bus dispatch and layout
    transactions with differential and private-session tests.
 3. Native recovery operations, configuration model, KDE application discovery
-   and Qt Quick editor: implemented. Native standalone parity: next milestone.
+   and Qt Quick editor: implemented. Native standalone: implemented with virtual
+   compositor coverage; physical Plasma acceptance remains a release gate.
 4. Native snapshot/install helper; distro-specific binary packaging, missing
    dependency diagnostics, clean installs and failure-safe upgrades. Keep
    source builds separate from ordinary EZ binary installation.

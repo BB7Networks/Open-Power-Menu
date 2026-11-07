@@ -175,3 +175,33 @@ Do not mark this matrix complete based on offscreen tests. Attach real
 
 See [release verification](RELEASE-1.0.1.md) for Desktop, optional pointer-leave
 dismissal, EZ installation/rollback and the final Manjaro Wayland checklist.
+
+## Native standalone release gate
+
+Build with `OPM_BUILD_STANDALONE=ON` and use disposable configuration/data/cache
+profiles and private session buses. See [the standalone recipes](../native/README.md#standalone-menu-development-build).
+The dedicated CI job covers Core-only build isolation, Widgets interaction,
+minimal runtime exposure without Python/compiler, missing-library diagnostics,
+Xvfb/X11, headless Weston and virtual KWin. Set `OPM_WAYLAND_COMPOSITOR=kwin`,
+`OPM_OUTPUT_COUNT=2`, `OPM_SCALE=1.25` on `standalone-wayland.sh` for two virtual
+outputs at fractional scale. KWin's binary is copied without optional file
+capabilities inside the disposable test runtime; no privileged compositor runs.
+
+Before production installer migration/release, repeat on physical Plasma:
+
+- Launcher and shortcut activation under both Wayland and X11, including
+  compositor-granted/refused activation and keyboard focus on first opening.
+- Parent/child/grandchild hover, rapid crossing, keyboard arrows/Enter/Escape,
+  outside click/application focus loss and repeated opening/closing.
+- Pointer exit/re-entry at the fixed 1200 ms timeout, keyboard suspension and
+  dismissal while a submenu or timer is active.
+- Panels at top/bottom/left/right, different work areas, screen-edge collisions,
+  adaptive flyout direction, negative/non-primary monitors and mixed
+  100/125/150% scales. Wayland global positioning remains compositor controlled.
+- Native desktop light/dark themes and Aero, system icons on/off, disabled rows,
+  selection contrast, long-menu scrolling, high-DPI and accessibility behavior.
+- Harmless literal-argv probes only; detached applications must survive menu
+  exit. Confirm power prompts separately with deliberate human supervision.
+
+Virtual sessions and palette captures do not certify this physical gate. Never
+restart an active Plasma session or replace production activation for these tests.

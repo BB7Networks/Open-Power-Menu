@@ -95,10 +95,11 @@ Gui/Qml/Quick/Controls, KF6 Service/Config, Kirigami/Qt QML modules and a KDE
 desktop-file launcher. See the [dependency inventory](0001-native-runtime.md)
 and [tested Debian runtime recipe](../../native/tests/editor.Dockerfile).
 
-Still unmeasured: true cold startup, physical menu-opening latency, standalone
-memory, total installed dependency footprint, isolated config-loading time,
-interaction CPU/frame timing and long-session growth. Complete packaging,
-standalone parity and representative physical-desktop runs are required first.
+At the editor milestone, standalone memory had not been measured; the next
+section records the subsequent standalone work. True cold startup, physical
+menu-opening latency, total installed dependency footprint, isolated loading,
+interaction CPU/frame timing and long-session growth remain unmeasured.
+Complete packaging and representative physical-desktop runs are still required.
 
 ## Reproduce
 
@@ -122,3 +123,66 @@ dbus-run-session -- python3 native/tests/benchmark.py \
 Do not run on the active desktop bus. Do not drop host caches or stop a user's
 services to manufacture a cold-start result. The script reports observations
 and has no pass/fail speedup threshold.
+
+## Native standalone milestone
+
+A separate, quiet disposable Debian 13 container compared released 1.0.1
+`3405848` with native Widgets implementation `de763de` (Release/GCC 14.2,
+Qt/PySide6 6.8.2, x86-64). Xvfb supplied a private X11 display and a private
+D-Bus session; identical temporary default/200-command configurations and
+harmless executable capability fixtures were used. Neither frontend executed
+power actions. Python/PySide6 are baseline/test tooling only.
+
+Each cell uses 15 fresh processes after one discarded warmup with warm filesystem
+caches. Exposure time is wall time from Popen to the first diagnostic reporting
+both visible and exposed. It includes interpreter/dynamic-loader, Qt startup,
+configuration/probes, window creation and diagnostic delivery. It is an observed
+upper bound, with frontend event-loop instrumentation differences; it is not
+physical first-pixel, cold-start or shortcut-dispatch latency. Memory is median
+of three `/proc/PID/smaps_rollup` samples two seconds after exposure.
+
+| Configuration / metric | Released 1.0.1 | Native Widgets |
+| --- | ---: | ---: |
+| Default: Exposure diagnostic, median | 253.288 ms | 36.277 ms |
+| Default: Fresh `--check` process, median | 95.906 ms | 19.477 ms |
+| Default: RSS | 67.59 MiB | 33.94 MiB |
+| Default: PSS | 58.54 MiB | 29.61 MiB |
+| 200 commands: Exposure diagnostic, median | 267.158 ms | 36.754 ms |
+| 200 commands: Fresh `--check` process, median | 111.111 ms | 18.988 ms |
+| 200 commands: RSS | 72.58 MiB | 34.82 MiB |
+| 200 commands: PSS | 61.28 MiB | 30.21 MiB |
+
+The native standalone uses less memory and reaches an exposed diagnostic sooner
+in these runs. Shared-host variance and frontend instrumentation limit the
+interpretation; raw samples and p95 values are retained in
+[the measurement artifact](measurements/native-standalone-milestone.json), along
+with the binary SHA-256 and complete `ldd` inventory. These observations do not
+change the editor result above: its previously measured PSS increased from
+63.69 to 71.57 MiB. That regression remains a release-review consideration.
+
+The standalone ELF occupies 320,264 bytes before distribution packaging. Direct
+Qt dependencies are Core/Gui/Widgets; this Debian Qt Gui build also pulls Qt DBus
+transitively. X11/Wayland platform plugins, fonts, desktop styles/icons and
+configured application/KDE helpers are runtime dependencies supplied by the
+system. The standalone closure contains no QML/Quick/Kirigami or Python/PySide6.
+The complete installed dependency footprint is not measured: shared desktop
+libraries and packaging choices make program payload size an incomplete proxy.
+The separate minimal runtime image proves menu exposure without Python,
+PySide6 or a compiler and tests the loader's missing-Widgets-library diagnostic.
+
+Hover/adaptive placement, deep keyboard selection, long-menu scrolling and rapid
+pointer movement have functional virtual-session coverage. Submenu frame timing,
+interaction latency/CPU and long-session memory are not measured; functional
+pass results are not responsiveness benchmarks. Physical Plasma validation and
+repeated profiling there remain release gates.
+
+Reproduce after building the standalone Release target and exporting the exact
+baseline into `build/legacy-1.0.1` as above:
+
+```bash
+dbus-run-session -- xvfb-run -a python3 native/tests/standalone_benchmark.py \
+  --native "$PWD/build/standalone/native/open-power-menu-standalone" \
+  --legacy-root "$PWD/build/legacy-1.0.1" \
+  --native-revision de763de \
+  --output "$PWD/build/standalone-measurements.json"
+```

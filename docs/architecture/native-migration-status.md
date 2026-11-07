@@ -1,6 +1,6 @@
 # Native migration status
 
-Current milestone: **native recovery and configuration editor implemented**.
+Current milestone: **native standalone frontend implemented and virtually tested**.
 The development executables report `2.0.0-dev`. The normal application and EZ
 installer remain at 1.0.1. The existing `feature/native-architecture-v1.1`
 branch and draft PR #10 retain their development history.
@@ -32,10 +32,18 @@ branch and draft PR #10 retain their development history.
 - Native unit/GUI tests, legacy differential/private D-Bus tests, staged CMake
   installation and separate backend/editor runtime images without Python.
 
+- Optional `open-power-menu-standalone` Qt Widgets executable: native/Aero menus,
+  nested hover flyouts, keyboard/mouse selection, themed optional icons, disabled
+  entries, scrolling, anchored placement and fixed 1200 ms pointer dismissal.
+  Shared native resolution and detached launch; presentation contains no argv.
+  Configuration is read-only and availability changes fail closed at selection.
+- Dedicated standalone CI job, staged no-Python runtime and X11/Weston/KWin tests.
+
 ## Remaining before changing the default runtime
 
-1. Native standalone frontend with keyboard, cascading submenus, adaptive screen
-   placement, focus, high-DPI and dismissal parity on Wayland/X11.
+1. Physical standalone Plasma acceptance: launcher/shortcut handoff, mixed-DPI
+   monitors, non-primary output choice, screen work areas/panel edges and desktop
+   theme integration. Wayland may refuse global positioning or tokenless focus.
 2. Native widget-snapshot/install helper, D-Bus activation and reversible binary
    EZ installation. CMake currently stages development executables only. Normal
    installation still requires Python/PySide6 and must remain usable.
@@ -45,7 +53,7 @@ branch and draft PR #10 retain their development history.
    acceptance preserving settings, launcher, shortcuts and recovery history.
 5. Physical Plasma integration and release review. Virtual compositor and CI
    checks do not certify Meta+X, multi-monitor placement, launcher handoff,
-   remote-desktop operation or standalone behavior.
+   remote-desktop operation or physical standalone behavior.
 
 Access keys, configurable timing, Sleep/Hibernate and other new usability
 features remain reserved for **2.1** after 2.0 acceptance. See the
@@ -94,8 +102,9 @@ protected deletion. Session tests additionally cover concurrent writers,
 changed overwrite/backup previews and unsaved drafts. Shared widget drag
 regressions cover reordering/reparenting and selection/scroll behavior.
 
-CI has four jobs: **Portable tests**, **Qt and D-Bus runtime**, **Native Qt
-backend** (Ubuntu 24.04/Qt 6.4) and **Native editor and recovery** (Debian 13).
+CI has five jobs: **Portable tests**, **Qt and D-Bus runtime**, **Native Qt
+backend** (Ubuntu 24.04/Qt 6.4), **Native editor and recovery** (Debian 13), and
+**Native standalone menu** (minimal Debian runtime plus virtual Ubuntu sessions).
 Current run status is recorded on draft PR #10.
 
 The virtual desktop runs used separate configuration/data/runtime directories,
@@ -111,3 +120,39 @@ baseline with native Release binaries, including the editor memory tradeoff.
 See [native build instructions](../../native/README.md),
 [testing and physical acceptance](../TESTING.md), and the
 [architecture decision](0001-native-runtime.md).
+
+## Standalone milestone validation
+
+The implementation uses [Qt Widgets/QMenu](0002-native-standalone.md), keeping
+Gui/Widgets off the backend target. Production installation/activation and the
+Plasma widget remain unchanged. The shared model and recovery/editor suites
+continue passing. The native standalone uses no QML or Python runtime.
+
+| Check | Result |
+| --- | --- |
+| Full legacy suite | 445 passed, 8 existing skips, 18 subtests passed |
+| Combined Release build | All 5 CTest targets pass, including editor/recovery |
+| Dedicated standalone Qt Test | 23 passed on KWin Wayland; 22 passed + 1 focus-seat skip on X11/Weston (counts include setup/cleanup) |
+| Private backend-only D-Bus contract | 9 passed; lightweight dependency boundary retained |
+| Virtual X11/Xvfb | Nested keyboard selection, real command dispatch, mouse selection, left/right hover placement, repeated cancellation and scrolling pass |
+| Virtual Wayland/Weston | Interaction tests pass; no input seat, so cross-process activation test explicitly skips |
+| Virtual Wayland/KWin 6.3.6 | All standalone checks pass, including separate-process focus loss; repeated with 2 outputs at scale 1.25 |
+| Minimal staged Debian runtime | Menu exposes without Python/PySide6/compiler; CLI works without a display; missing Widgets library is named by the ELF loader |
+| Appearance | Native light/dark palette and Aero captures inspected; optional icons tested with a disposable theme |
+
+Virtual scaling/output configuration exercises compositor and Qt paths; it does
+not certify physical mixed-DPI placement or pointer/shortcut delivery. Logical
+geometry tests cover negative/non-primary work areas, oversized menus and edge
+clamping. Wayland deliberately leaves absolute placement to the compositor.
+The focus test requires KWin's virtual seat and demonstrates application focus
+loss without treating submenu transitions as an application switch. Hover tests
+inject Qt mouse events because Wayland prohibits cursor warping. Qt's initial
+popup click suppression is respected by synthesizing pointer motion before a
+click. No power action is executed. No active Plasma session is restarted.
+
+No known functional gap remains in the implemented standalone menu path within
+these tested configurations. Production cutover, physical Plasma theme/focus,
+real panel/work-area variations, non-primary-output choice and mixed fractional
+scales remain unverified. Submenu frame/interaction latency and complete installed
+dependency size are not benchmarked. See [measurements](native-performance.md)
+and [CLI/dependency differences](../../native/README.md#standalone-menu-development-build).
