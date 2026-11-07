@@ -278,6 +278,7 @@ Backup previewAt(int directory, const QByteArray &base, const QString &name) {
             throw Error("Backup exceeds the 4 MiB limit; it can be deleted but not restored",
                         "too-large");
         result.config = decode(read.bytes);
+        result.valid = true;
     } catch (const Error &error) {
         result.error = QString::fromUtf8(error.what());
     }
@@ -368,8 +369,13 @@ QList<Backup> Storage::backups() const {
     }
     ::closedir(stream);
     QList<Backup> result;
-    for (const auto &name : names)
-        result.append(previewAt(directory, base, name));
+    for (const auto &name : names) {
+        auto backup = previewAt(directory, base, name);
+        // Keep history metadata only. A large retention limit must not retain
+        // every decoded configuration in the editor's memory.
+        backup.config.reset();
+        result.append(std::move(backup));
+    }
     std::sort(result.begin(), result.end(), [](const Backup &a, const Backup &b) {
         return a.modified == b.modified ? a.name > b.name : a.modified > b.modified;
     });

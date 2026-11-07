@@ -4,6 +4,15 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
+  native-editor:
+    name: Native editor and recovery
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native editor on Debian 13
+        run: docker build -f native/tests/editor.Dockerfile -t opm-native-editor:test .
+      - name: Run GUI without Python or a compiler
+        run: docker run --rm --network none opm-native-editor:test
   native-runtime:
     name: Native Qt backend
     runs-on: ubuntu-24.04

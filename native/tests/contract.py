@@ -3,6 +3,7 @@ import argparse
 from contextlib import contextmanager
 import json
 import os
+import shutil
 from pathlib import Path
 import subprocess
 import sys
@@ -134,12 +135,12 @@ class NativeContract(unittest.TestCase):
         self.run_native('--check', ok=False)
 
     @contextmanager
-    def service(self):
+    def service(self, binary=BINARY):
         # Caller runs this suite under dbus-run-session; never use a desktop bus.
         self.assertIn('DBUS_SESSION_BUS_ADDRESS', self.env)
         log = self.root / 'backend.log'
         with log.open('wb') as output:
-            child = subprocess.Popen([BINARY, '--service'], env=self.env, stdout=output, stderr=output)
+            child = subprocess.Popen([binary, '--service'], env=self.env, stdout=output, stderr=output)
             try:
                 def ready():
                     if child.poll() is not None:
@@ -180,6 +181,20 @@ class NativeContract(unittest.TestCase):
             self.write({'menu': [{'command': ['missing-application']}]})
             self.assertEqual(self.call('Run', '0'), 'false')
             self.assertFalse(marker.exists())
+
+    def test_native_editor_launch_uses_same_configuration(self):
+        install = self.root / 'native install; literal'
+        install.mkdir()
+        backend = install / 'open-power-menu-native'
+        shutil.copy2(BINARY, backend)
+        shutil.copy2(PROBE, install / 'open-power-menu-editor')
+        self.env['XDG_CONFIG_HOME'] = str(self.root / 'configuration; literal')
+        config = Path(self.env['XDG_CONFIG_HOME']) / 'open-power-menu/menu.json'
+        config.parent.mkdir(parents=True)
+        config.write_text('{"menu":[]}')
+        with self.service(str(backend)):
+            self.assertEqual(self.call('Edit'), 'true')
+            until(lambda: Path(str(config) + '.editor-probe').exists())
 
     def test_dbus_layout_transaction_and_conflict(self):
         original = {'menu': [{'command': ['true'], 'unknown': {'access_key': 'z'}},
@@ -234,6 +249,8 @@ class NativeContract(unittest.TestCase):
                 self.assertFalse(injected.exists())
         finally:
             stop.touch()
+            if marker.exists():
+                until(lambda: Path(str(stop) + '.ack').exists())
 
 
 if __name__ == '__main__':

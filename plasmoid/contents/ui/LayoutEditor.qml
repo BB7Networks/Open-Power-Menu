@@ -10,6 +10,7 @@ QQC2.Control {
     property var draft: null
     property bool busy: false
     property bool expired: false
+    property bool showActions: true
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
     property string draggedId: ""
@@ -83,7 +84,8 @@ QQC2.Control {
         const entries = Draft.children(draft.entries, draft.parentId) || [];
         const changedLevel = displayedToken !== draft.token || displayedParent !== draft.parentId;
         const changedRows = rowModel.count !== entries.length || entries.some((entry, index) =>
-            index >= rowModel.count || rowModel.get(index).itemId !== entry.id);
+            index >= rowModel.count || rowModel.get(index).itemId !== entry.id
+                || rowModel.get(index).itemTitle !== entry.title || rowModel.get(index).itemKind !== entry.kind);
         if (!changedLevel && !changedRows) { revealSelection = false; rememberView(); return; }
         restoringView = true;
         displayedToken = draft.token;
@@ -95,6 +97,8 @@ QQC2.Control {
             const existing = rowIndex(entry.id);
             if (existing < 0) rowModel.insert(index, {itemId: entry.id, itemTitle: entry.title, itemKind: entry.kind});
             else if (existing !== index) rowModel.move(existing, index, 1);
+            rowModel.setProperty(index, "itemTitle", entry.title);
+            rowModel.setProperty(index, "itemKind", entry.kind);
         }
         if (rowModel.count > entries.length) rowModel.remove(entries.length, rowModel.count - entries.length);
         const reveal = revealSelection;
@@ -116,6 +120,9 @@ QQC2.Control {
 
     function choose(id) {
         edited(Draft.select(draft, draft.parentId, id));
+    }
+    function revealCurrent() {
+        if (selectedIndex >= 0) list.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
     function move(id, parentId, beforeId) {
         if (busy || expired) return;
@@ -408,6 +415,7 @@ QQC2.Control {
             }
         }
         RowLayout {
+            visible: control.showActions
             Layout.fillWidth: true
             QQC2.Button {
                 objectName: "saveLayout"

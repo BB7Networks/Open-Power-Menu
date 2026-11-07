@@ -44,6 +44,8 @@ class RecoveryTests : public QObject {
         QVERIFY(!QFile::exists(marker));
         QVERIFY(!store.revision().content);
         QCOMPARE(store.backups().size(), 1);
+        QVERIFY(store.backups().first().valid);
+        QVERIFY(!store.backups().first().config);
     }
     void restoreWithAutomaticBackupsDisabled() {
         QTemporaryDir dir;

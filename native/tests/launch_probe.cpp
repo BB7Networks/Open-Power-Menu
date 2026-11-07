@@ -3,12 +3,17 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSaveFile>
 #include <QThread>
 #include <unistd.h>
 
 int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     const auto args = app.arguments();
+    if (args.size() == 3 && args[1] == "--config") {
+        QFile launched(args[2] + ".editor-probe");
+        return launched.open(QIODevice::WriteOnly) ? 0 : 3;
+    }
     if (args.size() < 4)
         return 2;
     QJsonArray descriptors;
@@ -30,10 +35,14 @@ int main(int argc, char **argv) {
             .toJson());
     marker.close();
     for (int count = 1; count < 2000 && !QFile::exists(args[2]); ++count) {
-        QFile heartbeat(args[3]);
-        if (heartbeat.open(QIODevice::WriteOnly))
+        QSaveFile heartbeat(args[3]);
+        if (heartbeat.open(QIODevice::WriteOnly)) {
             heartbeat.write(QByteArray::number(count));
+            heartbeat.commit();
+        }
         QThread::msleep(10);
     }
+    QFile stopped(args[2] + ".ack");
+    stopped.open(QIODevice::WriteOnly);
     return 0;
 }

@@ -1,6 +1,7 @@
 #include "service.hpp"
 #include <QCoreApplication>
 #include <QDebug>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QProcess>
 
@@ -80,9 +81,20 @@ bool Service::Run(const QString &key) {
 }
 bool Service::Edit() {
     touch();
-    qWarning("Native Configure is not implemented yet. Keep using the normal 1.0.1 application for "
-             "editing.");
-    return false;
+    const auto editor = QCoreApplication::applicationDirPath() + "/open-power-menu-editor";
+    if (!QFileInfo(editor).isExecutable()) {
+        qWarning("Native Configure is not installed beside the backend. Build with "
+                 "OPM_BUILD_EDITOR=ON or install the complete native developer build.");
+        return false;
+    }
+    QProcess process;
+    process.setProgram(editor);
+    process.setArguments({"--config", storage.path()});
+    process.setStandardInputFile(QProcess::nullDevice());
+    process.setStandardOutputFile(QProcess::nullDevice());
+    // Keep startup diagnostics in the user service log while GUI migration is
+    // being validated; no Python frontend is launched as a fallback.
+    return process.startDetached();
 }
 QString Service::BeginLayoutEdit() {
     touch();

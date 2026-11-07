@@ -31,6 +31,7 @@ struct Backup {
     qint64 size = 0;
     QDateTime modified;
     bool protectedCopy = false;
+    bool valid = false;
     std::optional<BackupSnapshot> snapshot;
     std::optional<QJsonObject> config;
     QString error;
