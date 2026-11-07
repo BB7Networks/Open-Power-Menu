@@ -213,3 +213,18 @@ dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/nativ
 Both staging and these recipes leave production binaries, activation, shortcuts,
 widget and the 1.0.1 EZ installer unchanged. Physical Plasma, mixed fractional-DPI
 monitors, work-area/panel variations and launcher activation remain release gates.
+
+## Complete native installation and upgrades
+
+Build `OPM_BUILD_PACKAGE=ON` and the `native-package` target for the full native
+bundle, CPU/distribution-labelled archive, checksum and Store-only widget.
+This option requires the backend, editor and standalone together. The prebuilt
+native installer and dispatcher handle user-local integration and reversible
+upgrades without Python or a compiler. The 1.0.1 release installer is retained.
+
+See [package installation and exact runtime dependencies](packaging/README.md),
+[transaction architecture](../docs/architecture/0003-native-packaging.md), and
+[Store requirements](../docs/KDE-STORE.md). Debian 13 amd64 is the tested native
+bundle baseline. Other distributions/architectures require matching builds and
+acceptance; a Debian binary is not a Manjaro package. Physical Plasma acceptance
+remains mandatory before publishing or changing the normal released download.

@@ -11,8 +11,9 @@ the working legacy installer remain unchanged until production cutover.
 2. Native recovery and Qt Quick/Kirigami General/Layout/Backups editor (implemented).
 3. Native standalone menu (implemented; virtual navigation/focus/flyout/dismissal
    checks pass; physical desktop acceptance remains).
-4. Complete native installation, widget snapshots and upgrade rollback, with
-   distribution/architecture-specific binary compatibility and source builds.
+4. Complete native installation and upgrade snapshots/rollback (implemented
+   for the Debian 13 amd64 development bundle). Qualify physical Plasma and
+   additional distribution/CPU baselines before release.
 5. Legacy configuration and integration validation, measured performance, and
    physical Plasma acceptance on Wayland and X11.
 

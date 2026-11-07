@@ -1,6 +1,6 @@
 # Native migration status
 
-Current milestone: **native standalone frontend implemented and virtually tested**.
+Current milestone: **complete native packaging and reversible user-local upgrades implemented**.
 The development executables report `2.0.0-dev`. The normal application and EZ
 installer remain at 1.0.1. The existing `feature/native-architecture-v1.1`
 branch and draft PR #10 retain their development history.
@@ -44,9 +44,10 @@ branch and draft PR #10 retain their development history.
 1. Physical standalone Plasma acceptance: launcher/shortcut handoff, mixed-DPI
    monitors, non-primary output choice, screen work areas/panel edges and desktop
    theme integration. Wayland may refuse global positioning or tokenless focus.
-2. Native widget-snapshot/install helper, D-Bus activation and reversible binary
-   EZ installation. CMake currently stages development executables only. Normal
-   installation still requires Python/PySide6 and must remain usable.
+2. Qualify the new native package on physical Plasma and additional distribution/
+   CPU baselines before publishing it or replacing the released EZ download.
+   The native development bundle installs all components without Python; the
+   retained 1.0.1 release installer still requires its original runtime.
 3. Full migration corpus: unusual legacy encodings/presentation fields and
    integer ranges; distribution/architecture-specific binary compatibility.
 4. Clean install, reinstall, upgrade, failed-upgrade rollback and uninstall
@@ -102,7 +103,7 @@ protected deletion. Session tests additionally cover concurrent writers,
 changed overwrite/backup previews and unsaved drafts. Shared widget drag
 regressions cover reordering/reparenting and selection/scroll behavior.
 
-CI has five jobs: **Portable tests**, **Qt and D-Bus runtime**, **Native Qt
+CI retains these five jobs: **Portable tests**, **Qt and D-Bus runtime**, **Native Qt
 backend** (Ubuntu 24.04/Qt 6.4), **Native editor and recovery** (Debian 13), and
 **Native standalone menu** (minimal Debian runtime plus virtual Ubuntu sessions).
 Current run status is recorded on draft PR #10.
@@ -156,3 +157,39 @@ real panel/work-area variations, non-primary-output choice and mixed fractional
 scales remain unverified. Submenu frame/interaction latency and complete installed
 dependency size are not benchmarked. See [measurements](native-performance.md)
 and [CLI/dependency differences](../../native/README.md#standalone-menu-development-build).
+
+## Native packaging milestone
+
+`OPM_BUILD_PACKAGE=ON` builds all three applications plus native installer and
+compatibility CLI, and creates a labelled tar.gz/checksum and a separate
+`.plasmoid`. Desktop/service entries use the installed absolute paths. The
+explicit bootstrap checks OS/version/CPU before starting the ELF. The native
+installer checks bundle hashes, libraries, X11/Wayland plugins, editor QML,
+a private service and actual production-name activation before commit.
+
+Installation uses no-follow held directory descriptors, an exclusive lock,
+durable journals/snapshots and component renames without replacement of an
+unexpected staging entry. Recovery refuses changed files and supports a process
+interrupted between component replacements. Identified old service owners are
+retired using pidfds; unrelated owners are refused. No Plasma restart occurs.
+
+Tests cover clean install, reinstall, actual v1.0.1 migration with a running
+Python service, rollback, uninstall, dependency/architecture failures, failed
+activation, crash and partial-failure recovery, symlinks/collisions, modified
+receipts/snapshots and unrelated service ownership. Personal configuration,
+backups, panel applets/launcher selections and customized/disabled shortcuts
+are checked byte-for-byte. A sixth CI job performs complete-package tests and
+installation/removal/rollback in a separate image without Python or a compiler.
+
+Store-only UI explains the missing native backend, links to instructions and
+retries the existing D-Bus connection. It never executes an installer. The
+backend-free setup surface is tested separately; a full backend-free command
+mode is deferred to avoid duplicating the model or adding an executable engine.
+
+Install history is retained without automatic pruning and is restored through
+`open-power-menu --rollback`; it is separate from the editor's configuration
+backup browser. Embedded legacy widget-backups remain in the old-app snapshot;
+external widget history remains untouched. Remove a saved OPM panel applet before
+uninstall so its existing launcher/shortcut restoration runs in Plasma.
+See [package instructions](../../native/packaging/README.md) and
+[decision 0003](0003-native-packaging.md) for supported systems and limits.

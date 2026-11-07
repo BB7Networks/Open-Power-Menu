@@ -205,3 +205,30 @@ Before production installer migration/release, repeat on physical Plasma:
 
 Virtual sessions and palette captures do not certify this physical gate. Never
 restart an active Plasma session or replace production activation for these tests.
+
+## Native packaging acceptance
+
+Export the exact 1.0.1 source baseline for the upgrade tests, then build the
+complete disposable test image:
+
+```sh
+mkdir -p work/package-legacy
+git archive 34058480b6e3bc1ecc1f19d420fb744f570eca34 | tar -x -C work/package-legacy
+docker build -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+docker run --rm --network none opm-native-package:test
+```
+
+The build stage runs the existing five native CTest targets and nine packaging
+scenarios with actual temporary XDG profiles and private buses. It invokes the
+released legacy installer and activates the real 1.0.1 Python service before
+upgrading/rolling back. Test-only crash/failure hooks are compiled out before
+copying the bundle to the runtime image. The final image contains no Python,
+PySide6 or compiler and verifies the explicit bootstrap, native CLI, editor,
+production D-Bus activation, reinstall, removal and rollback. Package hashes,
+distro/version/CPU, platform plugins and missing runtime components are checked.
+
+The remaining physical release gate covers the installed widget, Meta+X,
+original-launcher masking/restoration, native editor/backups, standalone menu,
+light/dark/Aero themes, focus, real panel work areas and mixed-DPI monitors on
+Plasma Wayland and X11. Virtual-session and private-bus results do not certify
+that gate. No live installation is replaced by these automated tests.

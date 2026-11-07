@@ -1,8 +1,11 @@
 .git
 .venv
-venv
 build
 dist
 .pytest_cache
 **/__pycache__
+**/*.pyc
+work/*
+!work/package-legacy
+venv
 *.log
