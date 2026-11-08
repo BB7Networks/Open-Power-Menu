@@ -13,6 +13,9 @@
 #include <algorithm>
 
 namespace Opm {
+EditorCatalog::EditorCatalog(QObject *parent) : QObject(parent) {
+    connect(power.get(), &PowerManager::changed, this, &EditorCatalog::powerChanged);
+}
 QVariantList EditorCatalog::actions() const {
     QVariantList result;
     const auto catalog = Opm::actions();
@@ -116,7 +119,7 @@ QVariantMap EditorCatalog::builtinDetails(const QString &actionId) const {
     if (spec.isEmpty())
         return {};
     if (spec.contains("native_power")) {
-        const auto availability = powerManager()->capability(actionId);
+        const auto availability = power->capability(actionId);
         return {{"title", spec["title"].toString()}, {"icon", spec["icon"].toString()},
                 {"native_power", true}, {"available", availability.available},
                 {"effective", availability.available ? "Available via KDE/logind" : availability.reason},

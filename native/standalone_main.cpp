@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
         const auto config = storage.load();
         if (parser.isSet("check") || parser.isSet("list")) {
             Opm::Model model;
-            QTextStream(stdout) << QJsonDocument(model.publicMenu(config)).toJson(QJsonDocument::Indented);
+            QTextStream(stdout) << QJsonDocument(model.diagnosticMenu(config)).toJson(QJsonDocument::Indented);
             return 0;
         }
         Opm::Standalone menu(config, parser.value("theme"), parser.isSet("diagnose-launch"));

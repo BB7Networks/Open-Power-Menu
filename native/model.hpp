@@ -33,8 +33,12 @@ class Model {
   public:
     explicit Model(std::shared_ptr<PowerManager> power = powerManager()) : power(std::move(power)) {}
     bool execute(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation = nullptr);
-    QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false);
+    QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false, bool discoverPower = true);
     QJsonArray publicMenu(const QJsonObject &config);
+    // One-shot CLI diagnostics can await discovery; interactive frontends must
+    // use publicMenu(), which never waits for a power service.
+    QJsonArray diagnosticMenu(const QJsonObject &config);
+    std::shared_ptr<PowerManager> powerCapabilities() const { return power; }
     QStringList command(const QJsonObject &config, const QString &key,
                         const QJsonArray *expectedPresentation = nullptr);
 

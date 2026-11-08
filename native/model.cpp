@@ -1,4 +1,6 @@
 #include "model.hpp"
+#include <QEventLoop>
+#include <QTimer>
 #include "interaction.hpp"
 #include "launch.hpp"
 #include <QDateTime>
@@ -82,7 +84,7 @@ class JsonContract {
         }
         return s.mid(begin, at - begin);
     }
-    void value(int depth) {
+    void value(int depth, const QJsonValue &shape, bool menuEntry = false, bool menuList = false) {
         if (depth > 256)
             throw Error("JSON nesting exceeds the native safety limit");
         whitespace();
@@ -110,6 +112,7 @@ class JsonContract {
         whitespace();
         const char end = kind == '{' ? '}' : ']';
         QSet<QString> keys;
+        qsizetype index = 0;
         while (s[at] != end) {
             QString key;
             if (kind == '{') {
@@ -122,7 +125,15 @@ class JsonContract {
             }
             whitespace();
             const auto begin = at;
-            value(depth + 1);
+            const auto child = kind == '{' ? shape.toObject()[key] : shape.toArray()[index++];
+            const bool childMenu = (depth == 0 && key == "menu") ||
+                (menuEntry && key == "items" && shape.toObject().contains("submenu"));
+            value(depth + 1, child, kind == '[' && menuList, childMenu);
+            if (menuEntry && (key == "label" || key == "icon") && child.isDouble()) {
+                const auto token = s.mid(begin, at - begin);
+                if (token.contains('.') || token.contains('e') || token.contains('E'))
+                    throw Error(key + " must use text for decimal legacy presentation values; configuration was not changed");
+            }
             if (depth == 0 && (key == "backup_retention" || key == "launcher_applet_id")) {
                 const auto token = s.mid(begin, at - begin);
                 if (token.contains('.') || token.contains('e') || token.contains('E'))
@@ -138,8 +149,8 @@ class JsonContract {
     }
 
   public:
-    JsonContract(const QByteArray &bytes, bool uniqueFields) : s(bytes), unique(uniqueFields) {
-        value(0);
+    JsonContract(const QByteArray &bytes, bool uniqueFields, const QJsonValue &shape) : s(bytes), unique(uniqueFields) {
+        value(0, shape);
     }
 };
 
@@ -154,7 +165,7 @@ QJsonDocument parseJson(const QByteArray &bytes, bool uniqueKeys) {
     auto result = QJsonDocument::fromJson(text.toUtf8(), &error);
     if (error.error != QJsonParseError::NoError)
         throw Error("Invalid configuration JSON: " + error.errorString());
-    JsonContract check(text.toUtf8(), uniqueKeys);
+    JsonContract check(text.toUtf8(), uniqueKeys, result.isObject() ? QJsonValue(result.object()) : QJsonValue(result.array()));
     return result;
 }
 static bool truth(const QJsonValue &v) {
@@ -177,6 +188,8 @@ static QString textValue(const QJsonValue &v) {
         return v.toBool() ? "True" : "False";
     if (v.isNull())
         return "None";
+    if (v.isDouble() && v.toVariant().metaType().id() == QMetaType::LongLong)
+        return QString::number(v.toInteger());
     if (v.isDouble())
         return QString::number(v.toDouble(), 'g', 16);
     return {};
@@ -217,6 +230,9 @@ static void validateMenu(const QJsonValue &items, int depth = 0) {
         if (!value.isObject())
             throw Error("Menu entries must be objects");
         const auto item = value.toObject();
+        for (const auto &field : {"label", "icon"})
+            if (item[field].isArray() || item[field].isObject())
+                throw Error(QString(field) + " must be text or a scalar legacy value; configuration was not changed");
         if (item["separator"] == QJsonValue(true))
             continue;
         if (item.contains("submenu")) {
@@ -435,7 +451,7 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand) {
     }
     return {};
 }
-QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable) {
+QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, bool discoverPower) {
     QList<Entry> result;
     for (const auto &value : items) {
         const auto item = value.toObject();
@@ -445,7 +461,7 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable) {
                 continue;
             entry.view = {{"kind", "separator"}};
         } else if (item.contains("submenu")) {
-            entry.children = normalize(item["items"].toArray(), showUnavailable);
+            entry.children = normalize(item["items"].toArray(), showUnavailable, discoverPower);
             if (entry.children.isEmpty())
                 continue;
             entry.view = {{"kind", "submenu"},
@@ -457,7 +473,8 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable) {
             PowerAvailability powerState;
             if (builtin && spec.contains("native_power")) {
                 entry.powerAction = spec["native_power"].toString();
-                powerState = power->capability(entry.powerAction);
+                powerState = discoverPower ? power->capability(entry.powerAction)
+                                           : power->presentedCapability(entry.powerAction);
             } else
                 entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]));
             const bool enabled = !entry.argv.isEmpty() || powerState.available;
@@ -503,12 +520,27 @@ QJsonArray Model::publicMenu(const QJsonObject &config) {
     return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])), {},
                    config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
 }
+QJsonArray Model::diagnosticMenu(const QJsonObject &config) {
+    auto menu = publicMenu(config);
+    if (!power->discoveryPending()) return menu;
+    QEventLoop wait;
+    QTimer deadline;
+    deadline.setSingleShot(true);
+    QObject::connect(&deadline, &QTimer::timeout, &wait, &QEventLoop::quit);
+    QObject::connect(power.get(), &PowerManager::changed, &wait, [&] {
+        menu = publicMenu(config);
+        if (!power->discoveryPending()) wait.quit();
+    });
+    deadline.start(1600);
+    wait.exec();
+    return menu;
+}
 std::optional<Entry> Model::selection(const QJsonObject &config, const QString &key,
                                       const QJsonArray *expectedPresentation) {
     static const QRegularExpression pattern("^[0-9]{1,5}(?:\\.[0-9]{1,5}){0,11}$");
     if (key.size() > 128 || !pattern.match(key).hasMatch())
         return {};
-    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]));
+    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), false);
     if (expectedPresentation && present(tree, {}, config["access_keys_enabled"].toBool(true),
                                         config["show_access_key_hints"].toBool(true)) != *expectedPresentation)
         return {};

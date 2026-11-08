@@ -13,7 +13,9 @@ QPoint menuPosition(const QRect &workArea, const QSize &size, const QPoint &curs
 class Standalone : public QMenu {
     Q_OBJECT
   public:
-    explicit Standalone(QJsonObject config, QString theme = {}, bool diagnostics = false);
+    explicit Standalone(QJsonObject config, QString theme = {}, bool diagnostics = false,
+                        std::shared_ptr<PowerManager> power = powerManager());
+    ~Standalone() override;
     int open(const QString &anchor = {});
     bool executeSelection(QAction *action);
     bool pointerTimerActive() const { return leaveTimer.isActive(); }

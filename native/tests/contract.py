@@ -135,6 +135,50 @@ class NativeContract(unittest.TestCase):
         os.mkfifo(self.config)
         self.run_native('--check', ok=False)
 
+    def test_legacy_presentation_and_metadata_corpus(self):
+        for value in [None, False, True, 0, -7, 9223372036854775807, -9223372036854775808, "Ω icons"]:
+            with self.subTest(value=value):
+                config = {'menu': [{'label': value, 'icon': value, 'command': ['true']}],
+                          'extension': {'label': [1.25, {'future': True}], 'large': 9223372036854775807}}
+                self.compare(config)
+                before = self.config.read_bytes()
+                dumped = json.loads(self.run_native('--dump-config').stdout)
+                self.assertEqual(dumped['extension'], config['extension'])
+                self.assertEqual(dumped['menu'][0]['label'], value)
+                self.assertEqual(self.config.read_bytes(), before)
+        for token in ['1.0', '1e3', '-0.0', '1.2345678901234567']:
+            with self.subTest(decimal_presentation=token):
+                source = ('{"menu":[{"submenu":"Group","items":[{"command":["true"],"label":' + token + '}]}]}').encode()
+                self.config.write_bytes(source)
+                self.run_native('--check', ok=False)
+                self.assertEqual(self.config.read_bytes(), source)
+        # Unsupported presentation structures are refused rather than silently
+        # converted to an empty label/icon. Extension metadata stays unrestricted.
+        for value in [[], {}, [1, 'label'], {'extension': 'icon'}]:
+            for field in ['label', 'icon']:
+                with self.subTest(field=field, value=value):
+                    self.write({'menu': [{'command': ['true'], field: value}]})
+                    before = self.config.read_bytes()
+                    self.run_native('--check', ok=False)
+                    self.assertEqual(self.config.read_bytes(), before)
+
+    def test_incompatible_sources_preserve_active_and_backup_bytes(self):
+        nested = {'command': ['true']}
+        for _ in range(10):
+            nested = {'submenu': 'Nested', 'items': [nested]}
+        sources = [b'{"menu":[],"bad":"\\xff"}'.replace(b'\\xff', b'\xff'),
+                   b'{"menu":[],"extension":9223372036854775808}',
+                   b'{"menu":[],"extension":-9223372036854775809}',
+                   json.dumps({'menu': [nested]}).encode(), b'{broken backup']
+        backup = self.config.with_name('menu.json.bak-manual')
+        backup.write_bytes(b'personal recovery bytes')
+        for source in sources:
+            with self.subTest(source=source[:80]):
+                self.config.write_bytes(source)
+                self.run_native('--dump-config', ok=False)
+                self.assertEqual(self.config.read_bytes(), source)
+                self.assertEqual(backup.read_bytes(), b'personal recovery bytes')
+
     def test_exact_capabilities_and_runtime_requirements(self):
         self.executable('qdbus6', '#!/bin/sh\nprintf "Show Desktop extra\\n"\n')
         self.executable('kcmshell6', '#!/bin/sh\nprintf "kcm_printer_manager_extra\\n"\n')

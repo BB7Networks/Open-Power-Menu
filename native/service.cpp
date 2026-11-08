@@ -60,6 +60,10 @@ QString Service::GetIntegration() {
         return json(integration(defaults()));
     }
 }
+bool Service::PowerCapabilitiesPending() {
+    touch();
+    return model.powerCapabilities()->discoveryPending();
+}
 bool Service::Run(const QString &key) {
     touch();
     try {

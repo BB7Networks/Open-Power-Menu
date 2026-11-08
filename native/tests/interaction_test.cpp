@@ -4,6 +4,8 @@
 #include <QJsonDocument>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <algorithm>
+#include <utility>
 using namespace Opm;
 class InteractionTests : public QObject {
     Q_OBJECT
@@ -81,6 +83,90 @@ class InteractionTests : public QObject {
         QVERIFY(editor.save());
         const auto loaded=storage.load(); QCOMPARE(loaded,editor.configuration());
         QCOMPARE(loaded["menu"].toArray()[0].toObject()["future"].toInt(),123);
+    }
+  private:
+    struct PendingPower {
+        bool system;
+        QDBusMessage request;
+        PowerReply reply;
+    };
+    static void answer(QList<PendingPower> requests, bool allowed = true) {
+        // Deliberately reverse arrival order.
+        std::reverse(requests.begin(), requests.end());
+        for (auto &call : requests)
+            call.reply(call.request.createReply(call.request.member() == "HasInhibit" ? QVariant(false)
+                : call.system ? QVariant(allowed ? "yes" : "no") : QVariant(allowed)));
+    }
+  private slots:
+    void asynchronousPowerCacheAndRecovery() {
+        qint64 now = 0;
+        QList<PendingPower> requests;
+        auto manager = cachedPowerManager([&](bool system, const QDBusMessage &request, PowerReply done) {
+            requests.append({system, request, std::move(done)});
+        }, [&] { return now; });
+        QVERIFY(!manager->capability("sleep").available);
+        QVERIFY(manager->discoveryPending());
+        QCOMPARE(requests.size(), 5);
+        for (int i = 0; i < 100; ++i) QVERIFY(!manager->capability("hibernate").available);
+        QCOMPARE(requests.size(), 5); // one shared, coalesced generation
+        answer(std::exchange(requests, {}));
+        QVERIFY(manager->capability("sleep").available);
+        QVERIFY(manager->capability("hibernate").available);
+        now = 4999; QVERIFY(manager->capability("sleep").available);
+        QVERIFY(requests.isEmpty());
+        now = 5000; QVERIFY(!manager->capability("sleep").available); // stale fails closed
+        QCOMPARE(requests.size(), 5);
+        const auto stale = std::exchange(requests, {});
+        manager->invalidate();
+        QVERIFY(!manager->capability("sleep").available);
+        QCOMPARE(requests.size(), 5);
+        answer(stale); // late success cannot grant permission in the new epoch
+        QVERIFY(!manager->capability("sleep").available);
+        answer(std::exchange(requests, {}), false);
+        QVERIFY(!manager->capability("hibernate").available);
+        manager->invalidate(); // service recovery
+        QVERIFY(!manager->capability("sleep").available);
+        answer(std::exchange(requests, {}));
+        QVERIFY(manager->capability("sleep").available);
+        manager.reset();
+        answer(stale); // no callbacks into a destroyed owner
+    }
+    void asynchronousPowerTimeoutAndMalformedReply() {
+        QList<PendingPower> requests;
+        auto manager = cachedPowerManager([&](bool system, const QDBusMessage &request, PowerReply done) {
+            requests.append({system, request, std::move(done)});
+        }, [] { return 0; });
+        QVERIFY(!manager->capability("sleep").available);
+        QSignalSpy changed(manager.get(), &PowerManager::changed);
+        QTRY_COMPARE_WITH_TIMEOUT(changed.size(), 1, 2500);
+        QVERIFY(!manager->discoveryPending());
+        QVERIFY(manager->capability("sleep").reason.contains("timed out"));
+        answer(std::exchange(requests, {})); // ignore replies after deadline
+        QVERIFY(!manager->capability("sleep").available);
+        manager->invalidate();
+        QVERIFY(!manager->capability("sleep").available);
+        for (auto &call : requests) call.reply(call.request.createReply(QVariant(1)));
+        QVERIFY(!manager->capability("sleep").available); // integer is not a bool/string
+        requests.clear();
+        manager->invalidate();
+        QVERIFY(!manager->capability("sleep").available);
+        for (auto &call : requests)
+            call.reply(call.request.createErrorReply("org.test.Failure", "Service failed"));
+        QVERIFY(manager->capability("hibernate").reason.contains("org.test.Failure"));
+    }
+    void asynchronousPowerNeverDispatchesCachedPermission() {
+        QList<PendingPower> requests;
+        int dispatches = 0;
+        auto manager = cachedPowerManager([&](bool system, const QDBusMessage &request, PowerReply done) {
+            requests.append({system, request, std::move(done)});
+        }, [] { return 0; }, [&](bool, const QDBusMessage &request) {
+            if (request.member().endsWith("WithFlags")) ++dispatches;
+            return request.createErrorReply("org.test.Denied", "Fresh check failed");
+        });
+        manager->capability("sleep"); answer(requests);
+        QVERIFY(manager->capability("sleep").available);
+        QVERIFY_EXCEPTION_THROWN(manager->execute("sleep"), Error);
+        QCOMPARE(dispatches, 0);
     }
     void powerPolicy_data() {
         QTest::addColumn<QString>("permission"); QTest::addColumn<bool>("inhibited"); QTest::addColumn<bool>("supported"); QTest::addColumn<bool>("expected");

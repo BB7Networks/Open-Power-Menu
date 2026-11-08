@@ -39,8 +39,15 @@ Kirigami.ApplicationWindow {
             parentId = "";
         const selected = layoutDraft ? layoutDraft.selectedId : "";
         const rows = Draft.children(update.entries, parentId) || [];
+        const views = Object.assign({}, layoutDraft ? layoutDraft.views : {});
+        // Removed submenus must not leave an unbounded collection of viewport
+        // records behind during a long editing session.
+        Object.keys(views).forEach(id => {
+            if (id && !Draft.find(update.entries, id)) delete views[id];
+        });
         layoutDraft = Object.assign({}, layoutDraft || Draft.start(update), {
             entries: update.entries,
+            views: views,
             parentId: parentId,
             selectedId: Draft.find(update.entries, selected) ? selected : (rows.length ? rows[0].id : "")
         });

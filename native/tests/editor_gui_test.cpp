@@ -11,6 +11,9 @@
 #include <QTemporaryDir>
 #include <QtTest>
 #include <algorithm>
+#if defined(__GLIBC__)
+#include <malloc.h>
+#endif
 
 using namespace Opm;
 class EditorGuiTests : public QObject {
@@ -49,7 +52,111 @@ class EditorGuiTests : public QObject {
         QCoreApplication::processEvents();
         return true;
     }
+  public:
+    int profileMemory(const QString &output) {
+        // Explicit developer mode, never an ordinary CTest assertion or a
+        // threshold claim. The normal GUI suite still verifies correctness.
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        auto config = defaults();
+        store.save(config, {});
+        QFile backup(temp.filePath("menu.json.bak-profile"));
+        if (!backup.open(QIODevice::WriteOnly)) qFatal("Cannot write memory fixture");
+        backup.write(QJsonDocument(config).toJson()); backup.close();
+        EditorSession session(store);
+        EditorCatalog catalog; catalog.refresh();
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        if (engine.rootObjects().isEmpty()) qFatal("Cannot load memory profile window");
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        if (!window || !QTest::qWaitForWindowExposed(window)) qFatal("Memory profile window not exposed");
+        QJsonArray samples;
+        const auto sample = [&](const QString &phase) {
+            QTest::qWait(300);
+            QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+            QFile smaps("/proc/self/smaps_rollup");
+            if (!smaps.open(QIODevice::ReadOnly)) qFatal("Cannot read process memory");
+            QJsonObject row{{"phase", phase}, {"qml_objects", window->findChildren<QObject *>().size()}};
+            const auto bytes = smaps.readAll();
+            for (const auto &line : bytes.split('\n')) {
+                const auto parts = line.simplified().split(' ');
+                if (parts.size() > 1 && (parts[0] == "Pss:" || parts[0] == "Rss:"))
+                    row[QString::fromLatin1(parts[0].chopped(1)) + "_KiB"] = parts[1].toInt();
+            }
+            samples.append(row);
+        };
+        QTest::qWait(1700); sample("startup_general_2s");
+        if (!click(window, "layoutTab")) qFatal("Cannot open Layout"); sample("layout");
+        if (!click(window, "backupsTab")) qFatal("Cannot open Backups");
+        session.refreshBackups(); session.selectBackup("menu.json.bak-profile"); sample("backups_preview");
+        const auto id = QJsonDocument::fromJson(session.layoutJson().toUtf8()).object()["entries"].toArray()[0].toObject()["id"].toString();
+        auto *dialog = window->findChild<QObject *>("entryDialog");
+        if (!dialog) qFatal("Missing profile entry dialog");
+        for (int batch = 0; batch < 5; ++batch) {
+            if (!click(window, "layoutTab")) qFatal("Cannot open Layout");
+            for (int edit = 0; edit < 100; ++edit) {
+                if (!session.editItem(id, QString::fromUtf8(QJsonDocument(QJsonObject{{"label", QString("Edit %1/%2").arg(batch).arg(edit)}}).toJson())))
+                    qFatal("Profile edit failed");
+                QCoreApplication::processEvents();
+            }
+            for (int edit = 0; edit < 50; ++edit) session.undo();
+            for (int edit = 0; edit < 50; ++edit) session.redo();
+            for (int cycle = 0; cycle < 10; ++cycle) {
+                if (!QMetaObject::invokeMethod(dialog, "begin", Q_ARG(QVariant, "command"), Q_ARG(QVariant, id), Q_ARG(QVariant, "")))
+                    qFatal("Cannot open profile dialog");
+                QTest::qWait(170);
+                QMetaObject::invokeMethod(dialog, "reject");
+                QTest::qWait(170);
+            }
+            if (!click(window, "backupsTab")) qFatal("Cannot open Backups");
+            for (int cycle = 0; cycle < 20; ++cycle) {
+                session.refreshBackups(); session.selectBackup("menu.json.bak-profile");
+                QCoreApplication::processEvents();
+            }
+            sample(QString("after_%1_edits_%2_dialog_cycles").arg((batch + 1) * 100).arg((batch + 1) * 10));
+        }
+        session.reload(true); engine.collectGarbage();
+        if (!click(window, "generalTab")) qFatal("Cannot reopen General");
+        QTest::qWait(1700); sample("reloaded_idle_2s");
+#if defined(__GLIBC__)
+        // Diagnostic only: distinguish retained allocator pages from live QML
+        // objects. Never trim the production application's allocator.
+        malloc_trim(0); sample("diagnostic_allocator_trim");
+#endif
+        QFile report(output);
+        if (!report.open(QIODevice::WriteOnly)) qFatal("Cannot write memory profile");
+        report.write(QJsonDocument(QJsonObject{{"qt", qVersion()}, {"samples", samples}}).toJson());
+        return 0;
+    }
   private slots:
+    void removedSubmenuViewportStateIsReleased() {
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        auto config = defaults();
+        config["menu"] = QJsonArray{QJsonObject{{"submenu", "Group"}, {"items", QJsonArray{}}}};
+        store.save(config, {});
+        EditorSession session(store); EditorCatalog catalog;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = engine.rootObjects().first();
+        const auto id = QJsonDocument::fromJson(session.layoutJson().toUtf8()).object()["entries"].toArray()[0].toObject()["id"].toString();
+        // Exercise the real QML draft update and the native removal/Undo path.
+        engine.globalObject().setProperty("profileWindow", engine.newQObject(window));
+        engine.globalObject().setProperty("profileGroup", id);
+        auto result = engine.evaluate("profileWindow.syncLayout(); profileWindow.layoutDraft.views = {'': {contentY: 10}}; profileWindow.layoutDraft.views[profileGroup] = {contentY: 20}; Object.keys(profileWindow.layoutDraft.views).length");
+        QCOMPARE(result.toInt(), 2);
+        QVERIFY(session.removeItem(id));
+        QCOMPARE(engine.evaluate("Object.keys(profileWindow.layoutDraft.views).length").toInt(), 1);
+        QCOMPARE(engine.evaluate("profileWindow.layoutDraft.views[''].contentY").toInt(), 10);
+        session.undo();
+        QCOMPARE(engine.evaluate("Object.keys(profileWindow.layoutDraft.views).length").toInt(), 1);
+    }
+
     void actualWindowEditsUndoesAndSaves() {
         QTemporaryDir temp;
         Storage store(temp.filePath("menu.json"));
@@ -272,6 +379,8 @@ int main(int argc, char **argv) {
           "fixture\nExec=/bin/true\nTryExec=opm-no-such-program\n");
     QGuiApplication app(argc, argv);
     EditorGuiTests tests;
+    if (argc == 3 && QString::fromLocal8Bit(argv[1]) == "--profile-memory")
+        return tests.profileMemory(QString::fromLocal8Bit(argv[2]));
     return QTest::qExec(&tests, argc, argv);
 }
 #include "editor_gui_test.moc"

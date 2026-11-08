@@ -20,6 +20,7 @@ class Service : public QObject {
   public slots:
     QString Ping();
     QString GetMenu();
+    bool PowerCapabilitiesPending();
     QString GetIntegration();
     bool Run(const QString &key);
     QString LastError();

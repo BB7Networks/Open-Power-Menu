@@ -15,6 +15,7 @@
 #include <QImage>
 #include <QDir>
 #include <QIcon>
+#include <utility>
 
 using namespace Opm;
 static QJsonObject command(const QString &label = "Command", const QJsonArray &args = {"/bin/true"}) {
@@ -55,6 +56,61 @@ static int openWithTimeout(Standalone &menu) {
 class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
+
+    void powerOnlyMenuWaitsWithoutBlockingInput() {
+        QList<std::pair<QDBusMessage, PowerReply>> requests;
+        auto power = cachedPowerManager([&](bool, const QDBusMessage &message, PowerReply done) {
+            requests.append({message, std::move(done)});
+        }, [] { return 0; });
+        auto cfg = configuration(); cfg["show_unavailable"] = false;
+        cfg["menu"] = QJsonArray{QJsonObject{{"action", "sleep"}}};
+        Standalone menu(cfg, {}, false, power);
+        QCOMPARE(menu.actions().size(), 1);
+        QVERIFY(!menu.actions().first()->isEnabled());
+        QTimer::singleShot(20, &menu, [&] {
+            QVERIFY(menu.isVisible()); // event loop and input are available while pending
+            for (const auto &request : requests)
+                request.second(request.first.createErrorReply("org.test.Unavailable", "No service"));
+        });
+        QCOMPARE(openWithTimeout(menu), 1);
+        QVERIFY(menu.actions().isEmpty());
+    }
+    void powerRepliesUpdateLiveMenusSafely() {
+        struct Request { bool system; QDBusMessage message; PowerReply done; };
+        QList<Request> requests;
+        auto power = cachedPowerManager([&](bool system, const QDBusMessage &message, PowerReply done) {
+            requests.append({system, message, std::move(done)});
+        }, [] { return 0; });
+        auto cfg = configuration();
+        cfg["menu"] = QJsonArray{QJsonObject{{"submenu", "Power"}, {"access_key", "U"},
+            {"items", QJsonArray{command("Harmless"), QJsonObject{{"action", "sleep"}}}}}, command("Last")};
+        Standalone menu(cfg, {}, false, power);
+        auto *child = menu.actions()[0]->menu();
+        auto *first = child->actions()[0];
+        QVERIFY(!child->actions()[1]->isEnabled());
+        QTimer::singleShot(50, &menu, [&] {
+            child->popup(menu.mapToGlobal(menu.actionGeometry(menu.actions()[0]).topRight()));
+            child->setActiveAction(first);
+            const auto round = std::exchange(requests, {});
+            for (const auto &request : round)
+                request.done(request.message.createReply(request.message.member() == "HasInhibit" ? QVariant(false)
+                    : request.system ? QVariant("yes") : QVariant(true)));
+            QCOMPARE(menu.actions()[0]->menu(), child);
+            QCOMPARE(child->actions()[0], first);
+            QCOMPARE(child->activeAction(), first);
+            QVERIFY(child->actions()[1]->isEnabled());
+            QVERIFY(menu.executeSelection(first)); // harmless action still maps correctly
+            menu.close();
+        });
+        QCOMPARE(openWithTimeout(menu), 0);
+        power->invalidate();
+        QVERIFY(!child->actions()[1]->isEnabled());
+        // No menu receiver remains after destruction while requests are in flight.
+        auto *temporary = new Standalone(cfg, {}, false, power);
+        delete temporary;
+        for (const auto &request : requests)
+            request.done(request.message.createErrorReply("org.test.Missing", "Service stopped"));
+    }
     void accessKeySequenceUsesNormalSelection() {
         auto cfg = configuration();
         cfg["menu"] = QJsonArray{QJsonObject{{"submenu","Power"},{"access_key","U"},

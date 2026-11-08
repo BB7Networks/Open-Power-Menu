@@ -658,7 +658,14 @@ PlasmoidItem {
             Qt.callLater(() => root.activateSelectedLauncher(epoch));
         }
     }
-    function fetchMenu() {
+    property int powerRefreshAttempts: 0
+    Timer {
+        id: powerRefresh
+        interval: 250
+        onTriggered: { if (root.expanded && !root.layoutEditing && !root.layoutBusy) root.fetchMenu(true); }
+    }
+    function fetchMenu(powerOnlyRefresh = false) {
+        if (!powerOnlyRefresh) { powerRefresh.stop(); powerRefreshAttempts = 0; }
         if (layoutEditing || layoutBusy) return;
         const epoch = ++menuFetchEpoch;
         fetching = true;
@@ -684,6 +691,14 @@ PlasmoidItem {
                      }
                  }
                  rebuild();
+                 // Optional additive API: old backends can reject it harmlessly.
+                 // Bounded polling works on Plasma versions predating SignalWatcher.
+                 if (ok && expanded && powerRefreshAttempts < 8)
+                     send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+                          "PowerCapabilitiesPending", [], (stateOk, pending) => {
+                              if (epoch !== menuFetchEpoch || !expanded || layoutEditing || layoutBusy) return;
+                              if (stateOk && pending === true) { ++powerRefreshAttempts; powerRefresh.restart(); }
+                          });
              });
     }
     // The main menu always has only top-level rows. Submenus are real side

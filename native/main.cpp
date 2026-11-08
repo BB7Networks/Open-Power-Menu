@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
                     << "Open Power Menu native " OPM_NATIVE_VERSION "\nConfiguration: "
                     << storage.path() << '\n';
             QTextStream(stdout)
-                << QJsonDocument(model.publicMenu(config)).toJson(QJsonDocument::Indented);
+                << QJsonDocument(model.diagnosticMenu(config)).toJson(QJsonDocument::Indented);
         }
         return 0;
     } catch (const Opm::Error &error) {

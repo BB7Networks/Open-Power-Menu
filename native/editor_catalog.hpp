@@ -2,6 +2,7 @@
 #include <QObject>
 #include <QUrl>
 #include <QVariantList>
+#include "power.hpp"
 
 namespace Opm {
 class EditorCatalog : public QObject {
@@ -11,9 +12,10 @@ class EditorCatalog : public QObject {
     Q_PROPERTY(QVariantList applications READ applications NOTIFY refreshed)
     Q_PROPERTY(QString snapshotStatus READ snapshotStatus NOTIFY refreshed)
     QVariantList applicationRows, launcherRows;
+    std::shared_ptr<PowerManager> power = powerManager();
 
   public:
-    using QObject::QObject;
+    explicit EditorCatalog(QObject *parent = nullptr);
     QVariantList actions() const;
     QVariantList launchers() const { return launcherRows; }
     QVariantList applications() const { return applicationRows; }
@@ -25,5 +27,6 @@ class EditorCatalog : public QObject {
     Q_INVOKABLE void copy(const QString &text) const;
   signals:
     void refreshed();
+    void powerChanged();
 };
 } // namespace Opm

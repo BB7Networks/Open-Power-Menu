@@ -21,8 +21,15 @@ Controls.Dialog {
     property string problem: ""
     property string desktopFile: ""
     property var pickedCommand: []
-    property var builtin: entryKind === "builtin" && actionField.currentIndex >= 0 ? catalog.builtinDetails(catalog.actions[actionField.currentIndex].id) : ({})
+    property int powerRevision: 0
+    property var builtin: (powerRevision, entryKind === "builtin" && actionField.currentIndex >= 0 ? catalog.builtinDetails(catalog.actions[actionField.currentIndex].id) : ({}))
     signal chooseApplication
+    Connections {
+        target: dialog.catalog
+        function onPowerChanged() {
+            dialog.powerRevision++;
+        }
+    }
     function setCommand(argv) {
         programField.text = argv[0] || "";
         argumentModel.clear();

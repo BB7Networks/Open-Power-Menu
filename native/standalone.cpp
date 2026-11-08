@@ -24,8 +24,8 @@ QPoint menuPosition(const QRect &area, const QSize &size, const QPoint &cursor,
     pos.setY(std::clamp(pos.y(), area.top(), std::max(area.top(), area.bottom() - size.height() + 1)));
     return pos;
 }
-Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics)
-    : config(std::move(source)), traceEnabled(diagnostics),
+Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std::shared_ptr<PowerManager> power)
+    : config(std::move(source)), model(std::move(power)), traceEnabled(diagnostics),
       wayland(QGuiApplication::platformName().startsWith("wayland")) {
     validate(config);
     elapsed.start();
@@ -47,6 +47,18 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics)
     presentation = model.publicMenu(config);
     installEventFilter(this);
     populate(this, presentation);
+    if (presentation.isEmpty() && model.powerCapabilities()->discoveryPending()) {
+        auto *loading = addAction("Checking power availability…");
+        loading->setEnabled(false);
+    }
+    connect(model.powerCapabilities().get(), &PowerManager::changed, this, [this] {
+        const auto updated = model.publicMenu(config);
+        if (updated == presentation && !presentation.isEmpty()) return;
+        presentation = updated;
+        populate(this, presentation);
+        if (presentation.isEmpty() && !model.powerCapabilities()->discoveryPending() && isVisible()) close();
+        if (isVisible()) adjustSize();
+    });
     leaveTimer.setSingleShot(true);
     leaveTimer.setTimerType(Qt::PreciseTimer);
     leaveTimer.setInterval(pointerLeaveDelay(config));
@@ -75,36 +87,60 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics)
         }
     });
 }
+Standalone::~Standalone() {
+    // QMenu destroys child menus after derived members have been destroyed.
+    for (auto *child : findChildren<QMenu *>()) disconnect(child, nullptr, this, nullptr);
+}
 void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
+    // Reconcile rather than clear(): keep live submenu objects, focus, active
+    // actions and dismissal membership while capability replies arrive.
+    auto remaining = menu->actions();
     for (const auto &value : entries) {
         const auto entry = value.toObject();
         const auto kind = entry["kind"].toString();
-        auto title = entry["title"].toString();
-        title.replace('&', "&&"); // Labels never define implicit Qt mnemonics.
-        if (!entry["access_hint"].toString().isEmpty())
-            title += '\t' + entry["access_hint"].toString();
-        const auto icon = config["show_menu_icons"].toBool(true)
-                              ? QIcon::fromTheme(entry["icon"].toString()) : QIcon();
-        if (kind == "separator")
-            menu->addSeparator();
-        else if (kind == "submenu") {
-            auto *child = new QMenu(title, menu);
-            child->setIcon(icon);
-            child->setToolTipsVisible(true);
-            child->installEventFilter(this);
-            menu->addMenu(child);
-            accessKeys.insert(child->menuAction(), entry["access_key"].toString());
-            populate(child, entry["items"].toArray());
-        } else if (kind == "command") {
-            auto *action = menu->addAction(icon, title);
-            action->setEnabled(entry["enabled"].toBool());
-            if (!action->isEnabled())
-                action->setToolTip(entry["unavailable_reason"].toString("Application not installed or unavailable on this desktop"));
-            // Presentation never contains argv. Only our private membership map
-            // can select a command from the validated configuration snapshot.
-            selections.insert(action, entry["key"].toString());
-            accessKeys.insert(action, entry["access_key"].toString());
+        auto identity = entry;
+        for (const auto &field : {"key", "items", "enabled", "unavailable_reason"}) identity.remove(field);
+        QAction *action = nullptr;
+        for (auto *candidate : remaining) {
+            if (candidate->property("opmIdentity").toJsonObject() == identity) { action = candidate; break; }
         }
+        if (action) remaining.removeOne(action);
+        else {
+            action = new QAction(menu);
+            action->setProperty("opmIdentity", identity);
+            if (kind == "submenu") {
+                auto *child = new QMenu(menu);
+                child->setToolTipsVisible(true);
+                child->installEventFilter(this);
+                connect(child, &QObject::destroyed, this, [this, child] { inside.remove(child); });
+                action->setMenu(child);
+            }
+            menu->insertAction(remaining.isEmpty() ? nullptr : remaining.first(), action);
+        }
+        auto title = entry["title"].toString();
+        title.replace('&', "&&");
+        if (!entry["access_hint"].toString().isEmpty()) title += '\t' + entry["access_hint"].toString();
+        action->setText(title);
+        action->setIcon(config["show_menu_icons"].toBool(true) ? QIcon::fromTheme(entry["icon"].toString()) : QIcon());
+        accessKeys.insert(action, entry["access_key"].toString());
+        if (kind == "separator") action->setSeparator(true);
+        else if (kind == "submenu") populate(action->menu(), entry["items"].toArray());
+        else {
+            action->setEnabled(entry["enabled"].toBool());
+            action->setToolTip(action->isEnabled() ? QString() : entry["unavailable_reason"].toString("Application not installed or unavailable on this desktop"));
+            selections.insert(action, entry["key"].toString());
+        }
+    }
+    for (auto *action : remaining) {
+        // Remove descendant map entries before deleting their owning menus.
+        const auto forget = [this](auto &&self, QAction *item) -> void {
+            selections.remove(item); accessKeys.remove(item);
+            if (item->menu()) for (auto *child : item->menu()->actions()) self(self, child);
+        };
+        forget(forget, action);
+        delete action->menu();
+        menu->removeAction(action);
+        delete action;
     }
 }
 void Standalone::report(const QString &event) {
@@ -193,7 +229,7 @@ bool Standalone::executeSelection(QAction *action) {
     return launched;
 }
 int Standalone::open(const QString &overrideAnchor) {
-    if (presentation.isEmpty()) {
+    if (presentation.isEmpty() && !model.powerCapabilities()->discoveryPending()) {
         QTextStream(stderr) << "Open Power Menu: No configured commands are available on this system.\n";
         return 1;
     }
@@ -229,7 +265,7 @@ int Standalone::open(const QString &overrideAnchor) {
     focusTimer.stop();
     report("dismissed");
     if (!selected)
-        return 0;
+        return presentation.isEmpty() && !model.powerCapabilities()->discoveryPending() ? 1 : 0;
     if (executeSelection(selected))
         return 0;
     QTextStream(stderr) << "Open Power Menu: Could not launch selection; the application may have become unavailable.\n";
