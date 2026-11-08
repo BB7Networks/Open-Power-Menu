@@ -1,5 +1,33 @@
 # 2.1 development checkpoint — November 8, 2026
 
+## Latest engineering recovery pass
+
+Recovered the exact `2937ac6` checkpoint on the existing development branch;
+PR #10 remains draft and stable remains 1.0.1. Code commit `3fd2cd9` adds bounded
+asynchronous power discovery, safe cache invalidation/recovery, live frontend
+refresh, deleted-submenu viewport cleanup and targeted migration safeguards.
+
+- Private-bus menu round trips with 300 ms capability replies improve from about
+  1.8 seconds to about 5 ms; a silent KDE service no longer causes a three-second
+  menu wait. Discovery is bounded to 1500 ms; actual activation retains its fresh
+  checks and potentially long synchronous Polkit wait.
+- Complete native CTest: **8/8 passed**; backend-only differential/private D-Bus:
+  **12 passed**; disposable real installation/legacy upgrade/rollback: **9 passed**.
+  Pinned Python/Qt/widget regression: **455 passed, 8 existing skips**.
+  Virtual X11: **27 passed, 1 explicit focus-seat skip**.
+- Repeated editor application and three 500-edit lifecycle measurements are in
+  [the engineering review](OPM-2.1-ENGINEERING-REVIEW.md) and its raw report.
+  The memory increase remains visible; object counts and post-warmup memory
+  plateau in this workload do not certify leak freedom.
+- The focused [physical Wayland/X11 and supervised-power procedure](OPM-2.1-PHYSICAL-ACCEPTANCE.md)
+  is ready; **every physical case remains Not run**.
+
+Current distribution CI and artifact preservation status will be recorded below
+once the engineering branch workflows finish. The earlier checkpoint evidence is
+retained below with its original commit and workflow links. No merge, release,
+tag, production installation or host power action was performed.
+
+
 The user requested a stopping point after the resumed distribution-qualification
 pass. This checkpoint implements the 2.1 feature work and preserves stable **1.0.1**.
 Development remains **2.1.0-dev** and PR #10 remains draft. No merge, tag, release,
@@ -69,13 +97,14 @@ legacy source under work/; the final suite explicitly targeted tests/ and passed
 - Physical Manjaro/Plasma acceptance remains incomplete. Container checks do not
   certify live desktop integration. Build separately for each intended snapshot;
   Debian binaries are not portable Manjaro packages.
-- Review responsiveness under slow/unavailable power services: capability calls are
-  synchronous with a 1500 ms timeout per call; interactive authorization allows a
-  longer wait. Real desktop responsiveness and Polkit behavior need acceptance.
-- Broader unusual legacy encoding/integer-range migration cases remain a review
-  item. The prior editor PSS increase from **63.69 to 71.57 MiB** is retained in
+- Capability discovery responsiveness is addressed by `3fd2cd9`; see the latest
+  engineering review. Interactive activation still permits a longer synchronous
+  authorization wait. Physical responsiveness and Polkit behavior need acceptance.
+- Targeted legacy encoding/integer-range/presentation cases are covered by the
+  engineering review; this is not an exhaustive historical corpus. The prior
+  editor PSS increase from **63.69 to 71.57 MiB** is retained in
   [performance history](architecture/native-performance.md); no new benchmark in
-  this pass supersedes that result.
+  the original checkpoint superseded that result; the later review adds measurements.
 - Complete every physical Wayland/X11, launcher/AppGrid, mixed-DPI, remote-desktop,
   editor/recovery, upgrade/rollback and supervised power-policy item in
   [the acceptance checklist](OPM-2.1.md).

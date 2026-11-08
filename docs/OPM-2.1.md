@@ -91,6 +91,9 @@ binaries as universally portable. Publish only builds whose gates have passed.
 The Store widget remains separate and requires the matching native backend. Its
 missing-backend explanation and Retry connection behavior are retained.
 
+See the [engineering review](OPM-2.1-ENGINEERING-REVIEW.md) for asynchronous capability discovery, cache limits and remaining activation waits.
+The [focused physical procedure](OPM-2.1-PHYSICAL-ACCEPTANCE.md) provides execution steps and a result sheet.
+
 ## Physical acceptance checklist — release blocking
 
 Record distro/snapshot, CPU, Plasma/Qt/KF6 versions, session type and result for each

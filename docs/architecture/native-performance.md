@@ -186,3 +186,14 @@ dbus-run-session -- xvfb-run -a python3 native/tests/standalone_benchmark.py \
   --native-revision de763de \
   --output "$PWD/build/standalone-measurements.json"
 ```
+
+## 2.1 responsiveness and editor follow-up
+
+The [November 8 engineering review](../OPM-2.1-ENGINEERING-REVIEW.md) records
+private-bus healthy/slow/missing/unresponsive power-service measurements, the
+asynchronous discovery fix, repeated editor application measurements and three
+500-edit QML lifecycle workloads. Raw observations and binary/source hashes are
+in [the follow-up artifact](measurements/2.1-engineering-review.json).
+The original measurements above remain tied to their original revisions.
+Physical Plasma, long-session editing and supervised authorization still require
+acceptance; this follow-up does not certify those gates.

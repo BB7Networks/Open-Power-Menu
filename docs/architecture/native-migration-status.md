@@ -65,9 +65,11 @@ by this milestone.
 
 Normal OPM-generated UTF-8 configurations are covered by differential tests.
 The native preview rejects non-UTF-8 JSON, integers outside signed 64-bit range
-and JSON nesting beyond 256 without rewriting the original. Unusual non-string
-legacy presentation fields still need a wider compatibility corpus. These
-remain cutover gates, not implicit schema migrations.
+and JSON nesting beyond 256 without rewriting the original. The [2.1 engineering
+review](../OPM-2.1-ENGINEERING-REVIEW.md) adds exact integer presentation and
+byte-preserving rejection of structured/decimal label and icon values, while
+retaining unknown metadata. These explicit compatibility limits are not implicit
+schema migrations or a claim to support every historical extension.
 
 Native writers use the existing `.menu.lock`; a busy lock produces a retryable
 error instead of freezing the event loop. Restoration/deletion additionally
