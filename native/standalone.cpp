@@ -4,6 +4,7 @@
 #include <QCursor>
 #include <QEvent>
 #include <QIcon>
+#include <QKeyEvent>
 #include <QJsonDocument>
 #include <QMetaEnum>
 #include <QScreen>
@@ -47,7 +48,8 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics)
     installEventFilter(this);
     populate(this, presentation);
     leaveTimer.setSingleShot(true);
-    leaveTimer.setInterval(PointerLeaveDelay);
+    leaveTimer.setTimerType(Qt::PreciseTimer);
+    leaveTimer.setInterval(pointerLeaveDelay(config));
     connect(&leaveTimer, &QTimer::timeout, this, [this] {
         updateDismissal();
         if (isVisible() && !keyboard && inside.isEmpty()) {
@@ -77,7 +79,10 @@ void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
     for (const auto &value : entries) {
         const auto entry = value.toObject();
         const auto kind = entry["kind"].toString();
-        const auto title = entry["title"].toString();
+        auto title = entry["title"].toString();
+        title.replace('&', "&&"); // Labels never define implicit Qt mnemonics.
+        if (!entry["access_hint"].toString().isEmpty())
+            title += '\t' + entry["access_hint"].toString();
         const auto icon = config["show_menu_icons"].toBool(true)
                               ? QIcon::fromTheme(entry["icon"].toString()) : QIcon();
         if (kind == "separator")
@@ -88,15 +93,17 @@ void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
             child->setToolTipsVisible(true);
             child->installEventFilter(this);
             menu->addMenu(child);
+            accessKeys.insert(child->menuAction(), entry["access_key"].toString());
             populate(child, entry["items"].toArray());
         } else if (kind == "command") {
             auto *action = menu->addAction(icon, title);
             action->setEnabled(entry["enabled"].toBool());
             if (!action->isEnabled())
-                action->setToolTip("Application not installed or unavailable on this desktop");
+                action->setToolTip(entry["unavailable_reason"].toString("Application not installed or unavailable on this desktop"));
             // Presentation never contains argv. Only our private membership map
             // can select a command from the validated configuration snapshot.
             selections.insert(action, entry["key"].toString());
+            accessKeys.insert(action, entry["access_key"].toString());
         }
     }
 }
@@ -132,7 +139,32 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
         switch (event->type()) {
         case QEvent::Enter: inside.insert(menu); entered = true; break;
         case QEvent::Leave: case QEvent::Hide: inside.remove(menu); break;
-        case QEvent::KeyPress: keyboard = true; break;
+        case QEvent::KeyPress: {
+            keyboard = true;
+            updateDismissal();
+            const auto *key = static_cast<QKeyEvent *>(event);
+            if (!(key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
+                ((key->key() >= Qt::Key_A && key->key() <= Qt::Key_Z) ||
+                 (key->key() >= Qt::Key_0 && key->key() <= Qt::Key_9))) {
+                if (!key->isAutoRepeat() && config["access_keys_enabled"].toBool(true)) {
+                    const auto letter = QString(QChar(key->key()));
+                    QAction *match = nullptr;
+                    for (auto *action : menu->actions())
+                        if (accessKeys.value(action) == letter) {
+                            if (match) return true; // fail closed on any ambiguous presentation
+                            match = action;
+                        }
+                    if (match && match->isEnabled()) {
+                        menu->setActiveAction(match);
+                        QKeyEvent activate(QEvent::KeyPress, match->menu() ? Qt::Key_Right : Qt::Key_Return,
+                                           Qt::NoModifier);
+                        QCoreApplication::sendEvent(menu, &activate);
+                    }
+                }
+                return true;
+            }
+            break;
+        }
         case QEvent::MouseMove: keyboard = false; break;
         default: break;
         }
@@ -153,7 +185,10 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
 bool Standalone::executeSelection(QAction *action) {
     if (!action || !selections.contains(action) || !action->isEnabled())
         return false;
-    const bool launched = launchDetached(model.command(config, selections.value(action), &presentation));
+    lastError.clear();
+    bool launched = false;
+    try { launched = model.execute(config, selections.value(action), &presentation); }
+    catch (const Error &error) { lastError = QString::fromUtf8(error.what()); QTextStream(stderr) << error.what() << '\n'; }
     report(launched ? "command-launched" : "launch-failed");
     return launched;
 }

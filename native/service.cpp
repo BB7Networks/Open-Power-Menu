@@ -38,8 +38,8 @@ QString Service::Ping() {
 QString Service::GetMenu() {
     touch();
     try {
-        return QString::fromUtf8(
-            QJsonDocument(model.publicMenu(storage.load())).toJson(QJsonDocument::Compact));
+        lastMenu = model.publicMenu(storage.load());
+        return QString::fromUtf8(QJsonDocument(*lastMenu).toJson(QJsonDocument::Compact));
     } catch (const Error &error) {
         qWarning() << "Open Power Menu configuration error:" << error.what();
         return QString::fromUtf8(
@@ -63,15 +63,17 @@ QString Service::GetIntegration() {
 bool Service::Run(const QString &key) {
     touch();
     try {
-        auto args = model.command(storage.load(), key);
-        if (args.isEmpty())
-            return false;
-        return launchDetached(args);
+        lastError.clear();
+        const bool result = model.execute(storage.load(), key, lastMenu ? &*lastMenu : nullptr);
+        if (!result) lastError = "The item or its availability changed. Reopen the menu to refresh it.";
+        return result;
     } catch (const Error &error) {
+        lastError = QString::fromUtf8(error.what());
         qWarning() << "Could not resolve menu item:" << error.what();
         return false;
     }
 }
+QString Service::LastError() { touch(); return lastError; }
 bool Service::Edit() {
     touch();
     const auto editor = QCoreApplication::applicationDirPath() + "/open-power-menu-editor";

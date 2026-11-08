@@ -123,3 +123,26 @@ def test_standalone_menu_leave_policy(monkeypatch, enabled):
     assert gui.launch_menu(cfg, diagnostic=inspect) == 0
     assert checks == [True, True, True]
     assert timers and not timers[0].isActive()
+
+
+def test_delay_change_restarts_full_grace_period(policy):
+    obj, calls = policy
+    obj.setProperty('enabled', True)
+    leave(obj)
+    QTest.qWait(20)
+    obj.setProperty('delay', 100)
+    QTest.qWait(40)
+    assert calls == []
+    QTest.qWait(90)
+    assert calls == [True]
+
+
+def test_rapid_reopening_cancels_old_timer(policy):
+    obj, calls = policy
+    obj.setProperty('enabled', True)
+    for _ in range(8):
+        leave(obj)
+        obj.setProperty('menuOpen', False)
+        obj.setProperty('menuOpen', True)
+    QTest.qWait(70)
+    assert calls == []

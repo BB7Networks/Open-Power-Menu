@@ -11,6 +11,8 @@ class Service : public QObject {
     Model model;
     Layouts layouts;
     QTimer idle;
+    QString lastError;
+    std::optional<QJsonArray> lastMenu;
     void touch();
 
   public:
@@ -20,6 +22,7 @@ class Service : public QObject {
     QString GetMenu();
     QString GetIntegration();
     bool Run(const QString &key);
+    QString LastError();
     bool Edit();
     QString BeginLayoutEdit();
     QString SaveLayoutEdit(const QString &token, const QString &references);

@@ -115,6 +115,13 @@ QVariantMap EditorCatalog::builtinDetails(const QString &actionId) const {
     const auto spec = Opm::actions().value(actionId).toObject();
     if (spec.isEmpty())
         return {};
+    if (spec.contains("native_power")) {
+        const auto availability = powerManager()->capability(actionId);
+        return {{"title", spec["title"].toString()}, {"icon", spec["icon"].toString()},
+                {"native_power", true}, {"available", availability.available},
+                {"effective", availability.available ? "Available via KDE/logind" : availability.reason},
+                {"candidates", "Native power action. KDE policy, Polkit and system inhibitors are respected."}};
+    }
     const auto display = [](const QStringList &argv) {
         QStringList words;
         for (const auto &word : argv) {

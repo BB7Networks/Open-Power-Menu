@@ -60,7 +60,7 @@ Window {
         (folder / 'qmldir').write_text('\n'.join(('singleton ' if name == 'Theme' else '') + f'{name} 1.0 {name}.qml' for name in files))
         for name, content in files.items():
             (folder / (name + '.qml')).write_text(content)
-    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'LayoutDraft.js'):
+    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'LayoutDraft.js', 'AccessKeys.js'):
         shutil.copyfile(UI / name, tmp_path / name)
     engine = QQmlEngine()
     engine.addImportPath(str(tmp_path))
@@ -178,3 +178,32 @@ def test_hover_and_nested_arrows_follow_open_child(flyout):
     evaluate(flyout, 'visible=false;')
     assert child.property('activeIndex') == -1
     assert evaluate(child, 'activeChild === null') is True
+
+
+def test_access_keys_nested_and_disabled(flyout):
+    calls = []
+    flyout.triggered.connect(lambda key, close: calls.append(key))
+    evaluate(flyout, """entries = [
+        {kind:'submenu',title:'Power',access_key:'U',access_hint:'U',items:[
+            {kind:'command',title:'Unavailable',enabled:false,key:'disabled',access_key:'R'},
+            {kind:'command',title:'Harmless',key:'nested',access_key:'U',access_hint:'U'}]},
+        {kind:'command',title:'Root',key:'root',access_key:'R'}];""")
+    QTest.keyClick(flyout, Qt.Key_U)
+    QTest.qWait(30)
+    child = evaluate(flyout, 'flyoutRows.itemAt(0).childPopup')
+    assert child and child.property('visible')
+    QTest.keyClick(child, Qt.Key_R)
+    assert calls == []
+    QTest.keyClick(child, Qt.Key_U)
+    assert calls == ['nested']
+
+
+def test_access_keys_ambiguous_and_no_metadata(flyout):
+    calls = []
+    flyout.triggered.connect(lambda key, close: calls.append(key))
+    evaluate(flyout, "entries = [{kind:'command',title:'X',key:'one'}, {kind:'command',title:'X',key:'two'}];")
+    QTest.keyClick(flyout, Qt.Key_X)
+    assert calls == []
+    evaluate(flyout, "entries = [{kind:'command',title:'One',key:'one',access_key:'X'}, {kind:'command',title:'Two',key:'two',access_key:'X'}];")
+    QTest.keyClick(flyout, Qt.Key_X)
+    assert calls == []

@@ -66,6 +66,7 @@ class EditorSession : public QObject {
     Q_INVOKABLE bool duplicateItem(const QString &id);
     Q_INVOKABLE bool rearrange(const QString &json);
     Q_INVOKABLE bool resetLayout();
+    Q_INVOKABLE bool resetAccessKeys();
     Q_INVOKABLE void selectItem(const QString &id);
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();

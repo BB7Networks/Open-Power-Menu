@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Plasma 6.7-compatible right-click Start adapter: no launcher patches.
 import QtQuick
+import "AccessKeys.js" as AccessKeys
 import QtQuick.Layouts
 import QtQml
 import QtQuick.Window
@@ -78,6 +79,7 @@ PlasmoidItem {
     property string menuAppearance: "native"
     property bool showMenuIcons: true
     property bool autoCloseOnPointerLeave: false
+    property int autoCloseDelay: 1200
     property string commandError: ""
     property bool launchPending: false
     // Temporary state belongs to the applet, so closing its popup keeps the draft.
@@ -481,6 +483,7 @@ PlasmoidItem {
                      menuAppearance = cfg.appearance === "aero" ? "aero" : "native";
                      showMenuIcons = cfg.show_menu_icons !== false;
                      autoCloseOnPointerLeave = cfg.auto_close_on_pointer_leave === true;
+                     autoCloseDelay = cfg.auto_close_delay_ms === undefined ? 1200 : Number(cfg.auto_close_delay_ms);
                      synchronizeLauncherVisibility();
                  } catch (e) {
                      console.warn("Open Power Menu: invalid integration configuration", e);
@@ -771,6 +774,10 @@ PlasmoidItem {
                  if (!ok || value === false) {
                      commandError = ok ? "Could not start this item. It may be unavailable; refresh or check it in Configure."
                                        : "Backend unavailable. Run open-power-menu --check and try again.";
+                     if (ok) send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+                                  "LastError", [], (received, detail) => {
+                         if (received && detail && epoch === menuSwitchEpoch) commandError = String(detail);
+                     });
                  } else {
                      expanded = false;
                  }
@@ -831,6 +838,7 @@ PlasmoidItem {
         PointerDismissal {
             id: autoDismiss
             enabled: root.autoCloseOnPointerLeave
+            delay: root.autoCloseDelay
             menuOpen: root.expanded
             pointerInside: popupHover.hovered || flyout.pointerInside
             protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending
@@ -1144,6 +1152,16 @@ PlasmoidItem {
         Keys.onPressed: event => {
             autoDismiss.keyboardUsed();
             if (root.layoutEditing || root.layoutBusy || root.launchPending) return;
+            const index = AccessKeys.index(root.visibleEntries, event.text, event.modifiers, event.isAutoRepeat);
+            if (index >= 0) {
+                activeIndex = index;
+                const row = normalRows.itemAt(index);
+                if (!row) return;
+                if (row.entry.kind === "submenu") { showFlyout(row.entry, row); flyout.focusFirst(); }
+                else root.launchItem(row.entry.key, row.entry.close_before_run === true);
+                event.accepted = true;
+                return;
+            }
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                 flyout.visible = false;
                 activeIndex = LayoutDraft.nextIndex(root.visibleEntries, activeIndex, event.key === Qt.Key_Up ? -1 : 1, false);

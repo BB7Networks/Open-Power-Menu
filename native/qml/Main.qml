@@ -283,8 +283,33 @@ Kirigami.ApplicationWindow {
                                 checked: window.settings.auto_close_on_pointer_leave
                                 onToggled: window.preference("auto_close_on_pointer_leave", checked)
                             }
+                            RowLayout {
+                                enabled: window.settings.auto_close_on_pointer_leave
+                                Controls.Label { text: "Close delay (seconds)" }
+                                Controls.SpinBox {
+                                    objectName: "closeDelay"
+                                    from: 5; to: 50; stepSize: 1
+                                    value: window.settings.auto_close_delay_ms / 100
+                                    textFromValue: (value, locale) => Number(value / 10).toLocaleString(locale, 'f', 1)
+                                    onValueModified: window.preference("auto_close_delay_ms", value * 100)
+                                    Accessible.name: "Automatic-close delay in seconds"
+                                }
+                            }
+                            Controls.CheckBox {
+                                objectName: "accessKeysEnabled"
+                                text: "Enable menu access keys"
+                                checked: window.settings.access_keys_enabled
+                                onToggled: window.preference("access_keys_enabled", checked)
+                            }
+                            Controls.CheckBox {
+                                objectName: "accessKeyHints"
+                                text: "Show access-key hints"
+                                enabled: window.settings.access_keys_enabled
+                                checked: window.settings.show_access_key_hints
+                                onToggled: window.preference("show_access_key_hints", checked)
+                            }
                             Controls.Label {
-                                text: "Closes after 1.2 seconds outside the menu and its flyouts. Keyboard navigation and editing keep it open."
+                                text: "Delay applies outside the menu and all flyouts. Keyboard navigation and editing keep it open."
                                 wrapMode: Text.Wrap
                                 Layout.fillWidth: true
                             }
@@ -362,6 +387,12 @@ Kirigami.ApplicationWindow {
                     }
                     Item {
                         Layout.fillWidth: true
+                    }
+                    Controls.Button {
+                        text: "Reset access keys"
+                        onClicked: editorSession.resetAccessKeys()
+                        Controls.ToolTip.text: "Restore unambiguous OPM presets without changing the layout. Undo is available."
+                        Controls.ToolTip.visible: hovered
                     }
                     Controls.Button {
                         text: "Restore default layout…"

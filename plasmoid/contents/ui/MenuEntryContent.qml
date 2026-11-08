@@ -43,6 +43,14 @@ RowLayout {
         elide: Text.ElideRight
         opacity: content.entry.enabled === false ? 0.5 : 1
     }
+    PC3.Label {
+        objectName: "accessKeyHint"
+        text: content.entry.access_hint || ""
+        visible: text.length > 0
+        color: content.foreground
+        opacity: content.entry.enabled === false ? 0.4 : 0.7
+        Accessible.name: "Access key " + text
+    }
     Item {
         Layout.preferredWidth: 14
         Layout.preferredHeight: 18

@@ -77,7 +77,18 @@ class Packaging(unittest.TestCase):
         embedded=self.app/'widget-backups';embedded.mkdir(exist_ok=True);(embedded/'keep').write_text('older history')
         # Start actual legacy Python service through its installed activation file.
         subprocess.run(['busctl','--user','call','org.openpowermenu.Service','/OpenPowerMenu','org.openpowermenu.Service','Ping'],env=self.env,check=True,stdout=subprocess.DEVNULL)
-        old_pid=self.pid();self.install();self.assertNotEqual(old_pid,self.pid())
+        old_pid=self.pid();upgrade=self.install();self.assertNotEqual(old_pid,self.pid())
+        # The optional review is read-only and one-time even on an unattended upgrade.
+        state=self.data/'open-power-menu-recovery/dependency-review/native-2.1.json'
+        self.assertTrue(state.exists(), upgrade.stdout + upgrade.stderr)
+        self.assertTrue(json.loads(state.read_text())['shown'])
+        # A missing legacy runtime must stop rollback before replacing native files.
+        tools=self.root/'missing-runtime';tools.mkdir()
+        fake=tools/'python3';fake.write_text('#!/bin/sh\nexit 1\n');fake.chmod(0o700)
+        failed=self.invoke('--rollback',ok=False,extra={'PATH':str(tools)+os.pathsep+os.environ['PATH']})
+        self.assertIn('restore the runtime first',failed.stdout)
+        self.assertTrue((self.app/'bin/open-power-menu-native').exists())
+        self.assertFalse((self.data/'open-power-menu-recovery/native-installs/active.json').exists())
         self.invoke('--rollback')
         self.assertEqual((self.app/'run.py').read_bytes(),legacy_bytes)
         self.assertEqual((embedded/'keep').read_text(),'older history');self.assertEqual((recovery/'keep').read_text(),'history')

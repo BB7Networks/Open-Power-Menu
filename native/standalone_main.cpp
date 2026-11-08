@@ -66,8 +66,8 @@ int main(int argc, char **argv) {
                     "No configured commands are available on this system.");
             else
                 QMessageBox::critical(nullptr, "Open Power Menu",
-                    "Could not launch the selection. The application may have become unavailable; "
-                    "reopen the menu to refresh it.");
+                    menu.errorMessage().isEmpty() ? "Could not launch the selection. The application may have become unavailable; reopen the menu to refresh it."
+                                                  : menu.errorMessage());
         }
         return result;
     } catch (const Opm::Error &error) {

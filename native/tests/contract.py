@@ -79,13 +79,24 @@ class NativeContract(unittest.TestCase):
         with patch.dict(os.environ, self.env, clear=True):
             expected = public_menu_from_config(load_config(self.config))
         actual = json.loads(self.run_native('--widget-menu-json').stdout)
-        self.assertEqual(actual, expected)
+        def legacy_view(items):
+            return [{k: legacy_view(v) if k == 'items' else v for k, v in item.items()
+                     if k not in ('access_key', 'access_hint')} for item in items]
+        self.assertEqual(legacy_view(actual), expected)
         self.assertNotIn('command', {key for item in actual for key in item})
 
     def test_defaults_and_no_python_path(self):
         env = {**self.env, 'PATH': str(self.root / 'empty-path')}
-        self.assertEqual(json.loads(self.run_native('--default-config', env=env).stdout), DEFAULT_CONFIG)
-        self.assertEqual(json.loads(self.run_native('--dump-config', env=env).stdout), DEFAULT_CONFIG)
+        native_defaults = json.loads(self.run_native('--default-config', env=env).stdout)
+        self.assertEqual(json.loads(self.run_native('--dump-config', env=env).stdout), native_defaults)
+        self.assertTrue(native_defaults['access_keys_enabled'])
+        self.assertEqual(native_defaults['auto_close_delay_ms'], 1200)
+        self.assertFalse(native_defaults['auto_close_on_pointer_leave'])
+        def legacy_items(items):
+            return [{k: legacy_items(v) if k == 'items' else v for k, v in item.items() if k != 'access_key'}
+                    for item in items if item.get('action') not in ('sleep', 'hibernate')]
+        for key, value in DEFAULT_CONFIG.items():
+            self.assertEqual(legacy_items(native_defaults[key]) if key == 'menu' else native_defaults[key], value)
         self.assertFalse(self.config.exists())
 
     def test_builtin_and_custom_differential(self):
@@ -160,7 +171,7 @@ class NativeContract(unittest.TestCase):
     def test_dbus_protocol_and_invalid_config_fallback(self):
         self.write({'menu': [{'command': ['true']}], 'hide_original_launcher': True})
         with self.service():
-            self.assertEqual(self.call('Ping'), 'Open Power Menu v2.0.0-dev')
+            self.assertEqual(self.call('Ping'), 'Open Power Menu v2.1.0-dev')
             self.assertTrue(json.loads(self.call('GetIntegration'))['hide_original_launcher'])
             self.assertEqual(json.loads(self.call('GetMenu'))[0]['key'], '0')
             # No editor stub masquerades as successful functionality.

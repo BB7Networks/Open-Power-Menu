@@ -1,4 +1,5 @@
 #pragma once
+#include "power.hpp"
 #include <QHash>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -25,16 +26,21 @@ QString expandPart(QString value);
 struct Entry {
     QJsonObject view;
     QStringList argv;
+    QString powerAction;
     QList<Entry> children;
 };
 class Model {
   public:
+    explicit Model(std::shared_ptr<PowerManager> power = powerManager()) : power(std::move(power)) {}
+    bool execute(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation = nullptr);
     QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false);
     QJsonArray publicMenu(const QJsonObject &config);
     QStringList command(const QJsonObject &config, const QString &key,
                         const QJsonArray *expectedPresentation = nullptr);
 
   private:
+    std::shared_ptr<PowerManager> power;
+    std::optional<Entry> selection(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation);
     struct Probe {
         qint64 expires;
         QString output;

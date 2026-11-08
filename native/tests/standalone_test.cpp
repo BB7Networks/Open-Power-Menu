@@ -55,6 +55,45 @@ static int openWithTimeout(Standalone &menu) {
 class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
+    void accessKeySequenceUsesNormalSelection() {
+        auto cfg = configuration();
+        cfg["menu"] = QJsonArray{QJsonObject{{"submenu","Power"},{"access_key","U"},
+            {"items",QJsonArray{QJsonObject{{"label","Harmless"},{"access_key","U"},{"command",QJsonArray{"/bin/true"}}}}}}};
+        Standalone menu(cfg);
+        QSignalSpy spy(&menu,&Standalone::diagnostic);
+        QTimer::singleShot(50,&menu,[&]{
+            QTest::keyClick(&menu,Qt::Key_U);
+            auto *child=menu.actions()[0]->menu();
+            QTRY_VERIFY(child->isVisible());
+            QTest::keyClick(child,Qt::Key_U);
+        });
+        QCOMPARE(openWithTimeout(menu),0);
+        bool launched=false; for(const auto &event:spy) launched |= event[0].toString()=="command-launched";
+        QVERIFY(launched);
+    }
+    void disabledKeysAndHints() {
+        auto cfg=configuration();
+        cfg["menu"]=QJsonArray{QJsonObject{{"label","Literal & Label"},{"access_key","X"},{"command",QJsonArray{"/bin/true"}}}};
+        Standalone shown(cfg); QVERIFY(shown.actions()[0]->text().endsWith("\tX"));
+        cfg["show_access_key_hints"]=false; Standalone hidden(cfg); QVERIFY(!hidden.actions()[0]->text().contains('\t'));
+        cfg["access_keys_enabled"]=false; Standalone disabled(cfg);
+        QSignalSpy spy(&disabled,&Standalone::diagnostic);
+        QTimer::singleShot(50,&disabled,[&]{ QTest::keyClick(&disabled,Qt::Key_X); QVERIFY(disabled.isVisible()); disabled.close(); });
+        QCOMPARE(openWithTimeout(disabled),0);
+        for(const auto &event:spy) QVERIFY(event[0].toString()!="command-launched");
+    }
+    void configurableDelayAndReopening() {
+        auto cfg=configuration();cfg["auto_close_delay_ms"]=500;
+        Standalone menu(cfg);
+        for(int cycle=0;cycle<3;++cycle) {
+            QTimer::singleShot(20,&menu,[&]{enter(&menu);leave(&menu);QVERIFY(menu.pointerTimerActive());menu.close();});
+            QCOMPARE(openWithTimeout(menu),0);QVERIFY(!menu.pointerTimerActive());
+        }
+        QElapsedTimer elapsed;
+        QTimer::singleShot(20,&menu,[&]{enter(&menu);leave(&menu);elapsed.start();});
+        QCOMPARE(openWithTimeout(menu),0);
+        QVERIFY(elapsed.elapsed()>=450);QVERIFY(elapsed.elapsed()<2500);
+    }
     void configurationAndPresentation() {
         Standalone menu(configuration());
         QCOMPARE(menu.actions().size(), 4);

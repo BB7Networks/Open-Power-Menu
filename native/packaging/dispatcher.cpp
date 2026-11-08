@@ -16,7 +16,8 @@ int main(int argc, char **argv) {
     else if (args.contains("--widget-menu-json"))
         target = "open-power-menu-native";
     else if (args.contains("--uninstall") || args.contains("--rollback") ||
-             args.contains("--recover"))
+             args.contains("--recover") || args.contains("--review-dependencies") ||
+             args.contains("--dismiss-dependency-review"))
         target = "open-power-menu-install";
     else if (args == QStringList{"--show-launcher-button"}) {
         try {

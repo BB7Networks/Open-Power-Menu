@@ -59,6 +59,7 @@ Controls.Dialog {
             entryKind = original.kind;
         nameField.text = entryKind === "submenu" ? (original.submenu || "New submenu") : (original.label || "");
         iconField.text = original.icon || "";
+        accessKeyField.text = original.access_key || "";
         actionField.currentIndex = Math.max(0, catalog.actions.findIndex(row => row.id === (original.action || "terminal")));
         const argv = original.command || [""];
         programField.text = argv[0] || "";
@@ -103,6 +104,7 @@ Controls.Dialog {
             if (desktopFile && desktopFile !== (original.desktop_file || "") && JSON.stringify(argv) === JSON.stringify(pickedCommand))
                 changes.desktop_file = desktopFile;
         }
+        if (entryKind !== "separator") changes.access_key = accessKeyField.text.trim().toUpperCase();
         if (itemId) {
             for (const key of Object.keys(changes))
                 if (JSON.stringify(changes[key]) === JSON.stringify(original[key]))
@@ -163,6 +165,7 @@ Controls.Dialog {
             }
             Controls.Button {
                 objectName: "customizeBuiltin"
+                enabled: !dialog.builtin.native_power
                 visible: dialog.entryKind === "builtin"
                 text: "Customize this command…"
                 onClicked: dialog.customizeBuiltin()
@@ -188,6 +191,15 @@ Controls.Dialog {
                 visible: dialog.entryKind !== "separator"
                 Layout.fillWidth: true
                 Accessible.name: "Menu entry icon"
+            }
+            Controls.Label { text: "Access key (A–Z or 0–9; empty disables this entry)"; visible: dialog.entryKind !== "separator" }
+            Controls.TextField {
+                id: accessKeyField
+                objectName: "entryAccessKey"
+                visible: dialog.entryKind !== "separator"
+                maximumLength: 1
+                validator: RegularExpressionValidator { regularExpression: /[A-Za-z0-9]?/ }
+                Accessible.name: "Entry access key"
             }
             Controls.Label {
                 text: "Program"

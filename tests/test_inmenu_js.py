@@ -103,6 +103,7 @@ launchItem('0'); assert.equal(requests.length,0);
 layoutEditing=false;layoutBusy=true;launchItem('0');assert.equal(requests.length,0);
 layoutBusy=false;launchItem('0');assert.equal(requests[0].method,'Run');
 requests.shift().done(true,false);assert.equal(expanded,true);assert.match(commandError,/Could not start/);
+assert.equal(requests[0].method,'LastError');requests.shift().done(true,'Permission denied');assert.equal(commandError,'Permission denied');
 launchItem('0');requests.shift().done(true,true);assert.equal(expanded,false);
 expanded=true;launchItem('0');menuSwitchEpoch++;requests.shift().done(true,true);
 assert.equal(expanded,true); // stale launch callback cannot close a newer popup
@@ -121,7 +122,7 @@ def test_locked_popup_and_flyout_keyboard_handlers():
         start = source.rindex('Keys.onPressed: event =>')
         handlers += f'function {name}(event) ' + braced(source, source.index('{', start)) + '\n'
     code = 'const assert=require("node:assert/strict");\n'
-    code += library('LayoutDraft', 'nextIndex') + handlers + r'''
+    code += library('AccessKeys', 'index') + library('LayoutDraft', 'nextIndex') + handlers + r'''
 const Qt=Object.fromEntries(['Up','Down','Right','Left','Return','Enter','Escape'].map(k=>['Key_'+k,k]));
 let opens=0,launches=[],returned=0,childClosed=0,childFocused=0;
 let activeIndex=-1;

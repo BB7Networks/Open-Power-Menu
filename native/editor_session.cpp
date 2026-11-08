@@ -1,4 +1,5 @@
 #include "editor_session.hpp"
+#include "interaction.hpp"
 #include <QJsonDocument>
 #include <QSet>
 #include <QUuid>
@@ -53,6 +54,7 @@ QJsonObject fields(const QJsonObject &node) {
     const auto type = kind(item);
     const auto builtin = actions()[item["action"].toString()].toObject();
     QJsonObject result{{"id", node["id"]}, {"kind", type}};
+    result["access_key"] = item["access_key"].toString();
     result["label"] = item["label"].toString();
     result["icon"] = item["icon"].toString();
     result["title"] = type == "separator"                      ? QString("Separator")
@@ -256,6 +258,9 @@ bool EditorSession::preference(const QString &text) {
                                     "button_icon",
                                     "show_menu_icons",
                                     "auto_close_on_pointer_leave",
+                                    "auto_close_delay_ms",
+                                    "access_keys_enabled",
+                                    "show_access_key_hints",
                                     "backup_retention",
                                     "show_unavailable"};
         for (auto it = changes.begin(); it != changes.end(); ++it) {
@@ -289,10 +294,10 @@ bool EditorSession::editItem(const QString &id, const QString &text) {
         const auto type = kind(selectedNode["definition"].toObject());
         const auto changes = object(text);
         const QSet<QString> allowed =
-            type == "submenu" ? QSet<QString>{"submenu", "icon"}
+            type == "submenu" ? QSet<QString>{"submenu", "icon", "access_key"}
             : type == "builtin"
-                ? QSet<QString>{"action", "label", "icon", "command", "desktop_file"}
-            : type == "command" ? QSet<QString>{"label", "icon", "command", "desktop_file"}
+                ? QSet<QString>{"action", "label", "icon", "command", "desktop_file", "access_key"}
+            : type == "command" ? QSet<QString>{"label", "icon", "command", "desktop_file", "access_key"}
                                 : QSet<QString>{};
         for (const auto &key : changes.keys())
             if (!allowed.contains(key))
@@ -333,7 +338,9 @@ bool EditorSession::duplicateItem(const QString &id) {
             throw Error("Select an entry", "invalid");
         QString addedId;
         state.nodes = modify(state.nodes, id, [&](QJsonObject node) {
-            const auto added = nodes(definitions(QJsonArray{node}))[0].toObject();
+            auto copy = definitions(QJsonArray{node})[0].toObject();
+            copy["access_key"] = ""; // sibling duplicates cannot inherit a binding
+            const auto added = nodes(QJsonArray{copy})[0].toObject();
             addedId = added["id"].toString();
             return QJsonArray{node, added};
         });
@@ -392,6 +399,28 @@ bool EditorSession::resetLayout() {
         auto state = history[position];
         state.nodes = nodes(defaults()["menu"].toArray());
         state.settings["show_unavailable"] = defaults()["show_unavailable"];
+        apply(state);
+    });
+}
+bool EditorSession::resetAccessKeys() {
+    return perform([&] {
+        auto state = history[position];
+        // Keep node IDs, selection, order, unknown metadata and all other settings.
+        std::function<void(QJsonArray &, const QJsonArray &)> assign = [&](QJsonArray &tree, const QJsonArray &defs) {
+            for (qsizetype i = 0; i < tree.size(); ++i) {
+                auto node = tree[i].toObject();
+                auto definition = defs[i].toObject();
+                if (node.contains("items")) {
+                    auto children = node["items"].toArray();
+                    assign(children, definition["items"].toArray());
+                    node["items"] = children;
+                    definition.remove("items");
+                }
+                node["definition"] = definition;
+                tree[i] = node;
+            }
+        };
+        assign(state.nodes, defaultAccessKeys(definitions(state.nodes), true));
         apply(state);
     });
 }

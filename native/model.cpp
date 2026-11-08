@@ -1,4 +1,6 @@
 #include "model.hpp"
+#include "interaction.hpp"
+#include "launch.hpp"
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -27,11 +29,34 @@ static QJsonObject resource(const QString &name) {
     return QJsonDocument::fromJson(file.readAll()).object();
 }
 QJsonObject defaults() {
-    static const auto value = resource("defaults");
+    static const auto value = [] {
+        auto config = resource("defaults");
+        config["access_keys_enabled"] = true;
+        config["show_access_key_hints"] = true;
+        config["auto_close_delay_ms"] = PointerLeaveDefault;
+        auto menu = config["menu"].toArray();
+        for (qsizetype i = 0; i < menu.size(); ++i) {
+            auto item = menu[i].toObject();
+            if (defaultAccessKey(item) == "U") {
+                auto children = item["items"].toArray();
+                children.append(QJsonObject{{"action", "sleep"}});
+                children.append(QJsonObject{{"action", "hibernate"}});
+                item["items"] = children;
+                menu[i] = item;
+            }
+        }
+        config["menu"] = defaultAccessKeys(menu);
+        return config;
+    }();
     return value;
 }
 QJsonObject actions() {
-    static const auto value = resource("actions");
+    static const auto value = [] {
+        auto catalog = resource("actions");
+        catalog["sleep"] = QJsonObject{{"title", "Sleep"}, {"icon", "system-suspend"}, {"native_power", "sleep"}, {"commands", QJsonArray{}}};
+        catalog["hibernate"] = QJsonObject{{"title", "Hibernate"}, {"icon", "system-suspend-hibernate"}, {"native_power", "hibernate"}, {"commands", QJsonArray{}}};
+        return catalog;
+    }();
     return value;
 }
 
@@ -254,7 +279,12 @@ void validate(const QJsonObject &config) {
                 QFileInfo(path).suffix().toLower()))
             throw Error("Use a theme icon or absolute local image path");
     }
+    for (const auto &key : {"access_keys_enabled", "show_access_key_hints"})
+        if (config.contains(key) && !config[key].isBool())
+            throw Error(QString(key) + " must be a boolean");
+    pointerLeaveDelay(config);
     validateMenu(config["menu"]);
+    validateAccessKeys(config["menu"].toArray());
 }
 QJsonObject decode(const std::optional<QByteArray> &bytes) {
     auto result = defaults();
@@ -266,6 +296,8 @@ QJsonObject decode(const std::optional<QByteArray> &bytes) {
         for (auto it = custom.begin(); it != custom.end(); ++it)
             result[it.key()] = it.value();
     }
+    validate(result); // Reject malformed trees before applying migration defaults.
+    result["menu"] = defaultAccessKeys(result["menu"].toArray());
     validate(result);
     return result;
 }
@@ -273,7 +305,8 @@ QJsonObject integration(const QJsonObject &config) {
     QJsonObject result;
     for (const auto &key :
          {"hide_original_launcher", "launcher_applet_id", "button_icon_mode", "button_icon",
-          "appearance", "show_menu_icons", "auto_close_on_pointer_leave"})
+          "appearance", "show_menu_icons", "auto_close_on_pointer_leave",
+          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints"})
         result[key] = config[key];
     return result;
 }
@@ -421,8 +454,14 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable) {
         } else {
             const bool builtin = item.contains("action");
             const auto spec = builtin ? actions()[item["action"].toString()].toObject() : item;
-            entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]));
-            if (entry.argv.isEmpty() && !showUnavailable)
+            PowerAvailability powerState;
+            if (builtin && spec.contains("native_power")) {
+                entry.powerAction = spec["native_power"].toString();
+                powerState = power->capability(entry.powerAction);
+            } else
+                entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]));
+            const bool enabled = !entry.argv.isEmpty() || powerState.available;
+            if (!enabled && !showUnavailable)
                 continue;
             const auto title = builtin ? label(item, "label", spec["title"].toString())
                                        : (item.contains("label") ? textValue(item["label"])
@@ -431,37 +470,47 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable) {
                 {"kind", "command"},
                 {"title", title},
                 {"icon", label(item, "icon", builtin ? spec["icon"].toString() : "system-run")},
-                {"enabled", !entry.argv.isEmpty()},
+                {"enabled", enabled},
                 {"close_before_run", item["action"] == "show_desktop"}};
+            if (!entry.powerAction.isEmpty() && !powerState.available)
+                entry.view["unavailable_reason"] = powerState.reason;
         }
+        if (entry.view["kind"] != "separator" && !item["access_key"].toString().isEmpty())
+            entry.view["access_key"] = item["access_key"].toString().toUpper();
         result.append(entry);
     }
     while (!result.isEmpty() && result.last().view["kind"] == "separator")
         result.removeLast();
     return result;
 }
-static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {}) {
+static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {}, bool enabled = true, bool hints = true) {
     QJsonArray result;
     for (qsizetype i = 0; i < entries.size(); ++i) {
         auto view = entries[i].view;
         const auto key = prefix + QString::number(i);
         view["key"] = key;
+        if (!enabled)
+            view.remove("access_key");
+        if (hints && view.contains("access_key"))
+            view["access_hint"] = view.value("access_key");
         if (view["kind"] == "submenu")
-            view["items"] = present(entries[i].children, key + '.');
+            view["items"] = present(entries[i].children, key + '.', enabled, hints);
         result.append(view);
     }
     return result;
 }
 QJsonArray Model::publicMenu(const QJsonObject &config) {
-    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])));
+    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])), {},
+                   config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
 }
-QStringList Model::command(const QJsonObject &config, const QString &key,
-                           const QJsonArray *expectedPresentation) {
+std::optional<Entry> Model::selection(const QJsonObject &config, const QString &key,
+                                      const QJsonArray *expectedPresentation) {
     static const QRegularExpression pattern("^[0-9]{1,5}(?:\\.[0-9]{1,5}){0,11}$");
     if (key.size() > 128 || !pattern.match(key).hasMatch())
         return {};
     auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]));
-    if (expectedPresentation && present(tree) != *expectedPresentation)
+    if (expectedPresentation && present(tree, {}, config["access_keys_enabled"].toBool(true),
+                                        config["show_access_key_hints"].toBool(true)) != *expectedPresentation)
         return {};
     auto parts = key.split('.');
     for (qsizetype n = 0; n < parts.size(); ++n) {
@@ -470,11 +519,24 @@ QStringList Model::command(const QJsonObject &config, const QString &key,
             return {};
         const auto entry = tree[i];
         if (n == parts.size() - 1)
-            return entry.argv;
+            return entry;
         if (entry.view["kind"] != "submenu")
             return {};
         tree = entry.children;
     }
     return {};
+}
+QStringList Model::command(const QJsonObject &config, const QString &key, const QJsonArray *expected) {
+    const auto entry = selection(config, key, expected);
+    return entry ? entry->argv : QStringList{};
+}
+bool Model::execute(const QJsonObject &config, const QString &key, const QJsonArray *expected) {
+    const auto entry = selection(config, key, expected);
+    if (!entry || !entry->view["enabled"].toBool()) return false;
+    if (!entry->powerAction.isEmpty()) {
+        power->execute(entry->powerAction);
+        return true;
+    }
+    return launchDetached(entry->argv);
 }
 } // namespace Opm

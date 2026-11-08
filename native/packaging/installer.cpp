@@ -1,4 +1,5 @@
 #include "safe_fs.hpp"
+#include "dependency_review.hpp"
 #include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
@@ -324,6 +325,10 @@ int main(int argc, char **argv) {
         }
         if (getuid() == 0)
             throw Error("Run as your desktop user without sudo");
+        if (args.size() == 2 && (args[1] == "--review-dependencies" || args[1] == "--dismiss-dependency-review")) {
+            reviewDependencies(dataRoot(), args[1] == "--dismiss-dependency-review");
+            return 0;
+        }
         const bool install = args.size() == 3 && args[1] == "--install";
         if (!install && !(args.size() == 2 &&
                           QStringList{"--uninstall", "--rollback", "--recover"}.contains(args[1])))
@@ -368,6 +373,7 @@ int main(int argc, char **argv) {
         if (args[1] == "--recover")
             return 0;
         identity(cs, recovery);
+        const bool upgradedLegacy = install && QFileInfo::exists(appPath + "/run.py");
         auto owner = serviceOwner(appPath); // refuse unrelated owner before preparing a transaction
         QJsonObject previousReceipt;
         if (exists(recovery, "receipt.json"))
@@ -464,6 +470,14 @@ int main(int argc, char **argv) {
                     copy(old, n, staged, n);
             }
             j["rollbackReceipt"] = oldJournal["receipt"];
+            if (exists(staged, "0")) {
+                auto oldApp = child(staged, "0");
+                if (exists(oldApp, "run.py")) {
+                    QTextStream(stdout) << "Restoring OPM 1.0.1 requires Python/PySide6. If removed, restore the runtime first: "
+                        "Arch/Manjaro: sudo pacman -S pyside6; Debian: sudo apt install python3-pyside6.qtwidgets python3-pyside6.qtdbus.\n";
+                    run("python3", {"-c", "from PySide6 import QtCore, QtDBus, QtWidgets"});
+                }
+            }
         } else {
             if (QFileInfo::exists(configRoot())) {
                 auto configDirectory = directory(configRoot());
@@ -560,6 +574,7 @@ int main(int argc, char **argv) {
             }
             throw;
         }
+        if (install) offerDependencyReview(dataRoot(), upgradedLegacy);
         return 0;
     } catch (const Error &e) {
         QTextStream(stderr) << "Open Power Menu install: " << e.what() << '\n';

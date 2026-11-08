@@ -3,6 +3,7 @@
 // Anchor to a one-pixel proxy positioned from the active menu row, keeping
 // right/left adaptive selection and a bottom-aligned, screen-clamped flyout.
 import QtQuick
+import "AccessKeys.js" as AccessKeys
 import QtQuick.Layouts
 import QtQuick.Window
 import QtQuick.Controls as QQC2
@@ -145,6 +146,16 @@ PlasmaCore.PopupPlasmaWindow {
         }
         Keys.onPressed: event => {
             flyout.keyboardUsed();
+            const index = AccessKeys.index(flyout.entries, event.text, event.modifiers, event.isAutoRepeat);
+            if (index >= 0) {
+                flyout.activeIndex = index;
+                const row = flyoutRows.itemAt(index);
+                if (!row) return;
+                if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
+                else { flyout.triggered(row.entry.key, row.entry.close_before_run === true); flyout.visible = false; }
+                event.accepted = true;
+                return;
+            }
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                 flyout.closeChild();
                 flyout.activeIndex = LayoutDraft.nextIndex(flyout.entries, flyout.activeIndex, event.key === Qt.Key_Up ? -1 : 1, false);

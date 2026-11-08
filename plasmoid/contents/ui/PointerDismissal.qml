@@ -21,6 +21,7 @@ QtObject {
     }
     function keyboardUsed() { keyboardMode = true; update(); }
     function pointerMoved() { keyboardMode = false; update(); }
+    onDelayChanged: { deadline.stop(); update(); }
     onEnabledChanged: update()
     onProtectedInteractionChanged: update()
     onPointerInsideChanged: {

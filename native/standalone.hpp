@@ -1,5 +1,6 @@
 #pragma once
 #include "model.hpp"
+#include "interaction.hpp"
 #include <QElapsedTimer>
 #include <QMenu>
 #include <QSet>
@@ -17,16 +18,18 @@ class Standalone : public QMenu {
     bool executeSelection(QAction *action);
     bool pointerTimerActive() const { return leaveTimer.isActive(); }
     bool keyboardNavigation() const { return keyboard; }
-    static constexpr int PointerLeaveDelay = 1200;
+    QString errorMessage() const { return lastError; }
+    static constexpr int PointerLeaveDelay = PointerLeaveDefault;
   signals:
     void diagnostic(const QString &event);
   protected:
     bool eventFilter(QObject *object, QEvent *event) override;
   private:
     const QJsonObject config;
+    QString lastError;
     Model model;
     QJsonArray presentation;
-    QHash<QAction *, QString> selections;
+    QHash<QAction *, QString> selections, accessKeys;
     QSet<QMenu *> inside;
     QTimer leaveTimer, focusTimer;
     QElapsedTimer elapsed;
