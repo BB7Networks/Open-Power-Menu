@@ -37,8 +37,10 @@ QString Service::Ping() {
 }
 QString Service::GetMenu() {
     touch();
+    lastMenuPowerPending = false;
     try {
         lastMenu = model.publicMenu(storage.load());
+        lastMenuPowerPending = model.powerCapabilities()->discoveryPending();
         return QString::fromUtf8(QJsonDocument(*lastMenu).toJson(QJsonDocument::Compact));
     } catch (const Error &error) {
         qWarning() << "Open Power Menu configuration error:" << error.what();
@@ -62,7 +64,9 @@ QString Service::GetIntegration() {
 }
 bool Service::PowerCapabilitiesPending() {
     touch();
-    return model.powerCapabilities()->discoveryPending();
+    // A fast reply can settle discovery between GetMenu and this call. Still
+    // refresh a presentation built while pending, so the widget cannot miss it.
+    return lastMenuPowerPending || model.powerCapabilities()->discoveryPending();
 }
 bool Service::Run(const QString &key) {
     touch();

@@ -13,6 +13,7 @@ class Service : public QObject {
     QTimer idle;
     QString lastError;
     std::optional<QJsonArray> lastMenu;
+    bool lastMenuPowerPending = false;
     void touch();
 
   public:

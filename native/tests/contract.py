@@ -212,6 +212,17 @@ class NativeContract(unittest.TestCase):
     def call(self, method, *parameters):
         return self.run_native('--call', method, '--', *parameters).stdout.strip()
 
+    def test_pending_presentation_cannot_miss_fast_capability_completion(self):
+        self.write({'show_unavailable': True, 'menu': [{'action': 'sleep'}]})
+        with self.service():
+            first = json.loads(self.call('GetMenu'))
+            self.assertFalse(first[0]['enabled'])
+            time.sleep(1.7)  # allow the private bus's absent services/deadline to settle
+            self.assertEqual(self.call('PowerCapabilitiesPending'), 'true')
+            refreshed = json.loads(self.call('GetMenu'))
+            self.assertFalse(refreshed[0]['enabled'])
+            self.assertEqual(self.call('PowerCapabilitiesPending'), 'false')
+
     def test_dbus_protocol_and_invalid_config_fallback(self):
         self.write({'menu': [{'command': ['true']}], 'hide_original_launcher': True})
         with self.service():
