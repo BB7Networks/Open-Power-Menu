@@ -3,7 +3,8 @@
 ## Current feature qualification
 
 The November 8 resumed pass starts at `4d672c2`, whose PR/push workflows both
-passed all eight jobs. Targeted GUI, rendering and import feedback corrections,
+passed all eight jobs. Final implementation is `462a351`, including Aero icon contrast and visible narrow-editor keyboard focus.
+Targeted GUI, rendering and import feedback corrections,
 current local evidence and remaining gates are in
 [feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md). Earlier counts below
 remain historical. PR #10 remains draft; physical acceptance is not performed.

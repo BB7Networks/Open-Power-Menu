@@ -3,7 +3,7 @@
 ## Resumed qualification
 
 Resumed from exact `4d672c2cc5f0eb51ac469e9fba5094556316e1fa` on the existing
-development branch; PR #10 remains draft. Both checkpoint workflows passed all
+development branch; implementation is now `462a351`. PR #10 remains draft. Both checkpoint workflows passed all
 eight jobs. Current corrections and verification are recorded in
 [feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md). Physical Plasma and
 supervised power acceptance remain unperformed.

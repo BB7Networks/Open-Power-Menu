@@ -29,7 +29,9 @@ No frontend rewrite or self-contained Store claim is part of this release.
 
 The current feature checkpoint adds configurable submenu hover delay, density/width/
 icon presets and portable JSON import/export to the existing native architecture.
-Implementation and focused tests are saved; full qualification is still pending.
+Automated implementation and feature verification are recorded in
+[the resumed qualification report](../OPM-2.1-FEATURE-QUALIFICATION.md). Physical
+Manjaro acceptance and downloaded-candidate inventory verification remain pending.
 See [feature checkpoint and next steps](../OPM-2.1-FEATURE-CHECKPOINT.md).
 A self-contained Store edition remains outside this pass.
 

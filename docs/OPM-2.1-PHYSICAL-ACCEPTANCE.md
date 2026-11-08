@@ -6,12 +6,12 @@ complete any physical row below. Stable 1.0.1 remains the public release.
 
 ## Obtain and verify the controlled development candidate
 
-Intermediate candidate, preceding the Aero contrast correction (final workflow
-identity is recorded in the qualification report): [Manjaro artifact 13634726564](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42524169511/artifacts/13634726564),
-source `389ecb8ee953d7f50d7040b515656e2568f84bd6`, PR workflow 42524169511
-(all eight jobs passed). GitHub reports outer ZIP SHA-256
-`705ef64734136fa49878ea6edefe1a2aaf6c164fc142d4fd1e2aad6d57153493`;
+Final code-qualified candidate: [Manjaro artifact 13635987400](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42527140249/artifacts/13635987400),
+source `8f6cb93712cf2f402d4faef5892c297c90f1f53e`, PR workflow 42527140249
+(all eight jobs passed; implementation `462a351`). GitHub reports outer ZIP SHA-256
+`3aaac6cf3c80e28afe20ccf514644cc804efe4971e26871ffcf29f7c95463fd2`;
 Cloud could not download it to verify those bytes. It expires November 15, 2026.
+Earlier `4d0ec86`/`69409d7` artifacts lack the final narrow-editor focus correction.
 
 Use the exact Manjaro artifact linked in the latest
 [feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md), after its corrected-source
