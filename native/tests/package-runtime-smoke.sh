@@ -27,11 +27,14 @@ fi
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software
 bundle=${OPM_TEST_BUNDLE:-/opt/opm-bundle}
 installer="$bundle/app/bin/open-power-menu-install"
+# Packaged executables must have crash-injection hooks compiled out.
+export OPM_INSTALL_CRASH_AFTER=0 OPM_INSTALL_FAIL_AFTER=0
 if [ -n "${OPM_TEST_SETUP:-}" ]; then
     "$OPM_TEST_SETUP"
 else
     sh "$bundle/install.sh"
 fi
+unset OPM_INSTALL_CRASH_AFTER OPM_INSTALL_FAIL_AFTER
 "$XDG_BIN_HOME/open-power-menu" --version
 "$XDG_BIN_HOME/open-power-menu" --check
 "$XDG_BIN_HOME/open-power-menu" --edit --smoke-test

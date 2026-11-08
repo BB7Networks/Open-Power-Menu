@@ -1,5 +1,6 @@
 #include "safe_fs.hpp"
 #include "dependency_review.hpp"
+#include "platform_plugins.hpp"
 #include <QCoreApplication>
 #include <QDBusConnection>
 #include <QDBusConnectionInterface>
@@ -8,7 +9,6 @@
 #include <QElapsedTimer>
 #include <QFileInfo>
 #include <QLibraryInfo>
-#include <QPluginLoader>
 #include <QProcess>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
@@ -443,14 +443,7 @@ int main(int argc, char **argv) {
                 dataRoot() + "/open-power-menu-recovery/native-installs/" + id + "/new/0/bin/";
             for (const auto &n : {"open-power-menu-native", "open-power-menu-standalone"})
                 run(stagedBin + n, {"--version"});
-            for (const auto &platform : {"libqxcb.so", "libqwayland-generic.so"}) {
-                QPluginLoader plugin(QLibraryInfo::path(QLibraryInfo::PluginsPath) + "/platforms/" +
-                                     platform);
-                if (!plugin.load())
-                    throw Error("Required Qt platform plugin unavailable: " + QString(platform) +
-                                ": " + plugin.errorString());
-                plugin.unload();
-            }
+            validatePlatformPlugins(QLibraryInfo::path(QLibraryInfo::PluginsPath) + "/platforms");
             QTemporaryDir testProfile;
             run(stagedBin + "open-power-menu-editor",
                 {"--config", testProfile.path() + "/menu.json", "--smoke-test"}, true);
