@@ -57,6 +57,47 @@ static int openWithTimeout(Standalone &menu) {
 class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
+    void aeroIconContrastPreservesArtworkAndDpi() {
+        QTemporaryDir dir;
+        QDir().mkpath(dir.filePath("contrast/32x32/apps"));
+        QFile index(dir.filePath("contrast/index.theme"));
+        QVERIFY(index.open(QIODevice::WriteOnly));
+        index.write("[Icon Theme]\nName=Contrast\nDirectories=32x32/apps\n[32x32/apps]\nSize=32\nType=Fixed\nContext=Applications\n"); index.close();
+        for (const auto &name : {"flat", "colored", "multitone", "bright"}) {
+            QImage image(32, 32, QImage::Format_ARGB32); image.fill(Qt::transparent);
+            for (int y = 4; y < 28; ++y)
+                for (int x = 4; x < 28; ++x) {
+                    const auto color = QString(name) == "colored" ? QColor(180,30,50) : QString(name) == "bright" ? QColor(Qt::white) :
+                        QString(name) == "multitone" ? QColor(x < 16 ? "#202020" : "#808080") : QColor("#232629");
+                    image.setPixelColor(x, y, color);
+                }
+            image.setPixelColor(4,16,QColor(35,38,41,128));
+            QVERIFY(image.save(dir.filePath(QString("contrast/32x32/apps/%1.png").arg(name))));
+        }
+        const auto paths=QIcon::themeSearchPaths(); const auto theme=QIcon::themeName();
+        QIcon::setThemeSearchPaths({dir.path()}); QIcon::setThemeName("contrast");
+        const auto reset=qScopeGuard([&] { QIcon::setThemeSearchPaths(paths); QIcon::setThemeName(theme); });
+        for (const auto &appearance : {"native", "aero", "override"}) {
+            auto cfg=configuration(); cfg["appearance"]=QString(appearance)=="aero" ? "aero" : "native";
+            QJsonArray entries;
+            for (const auto &name : {"flat", "colored", "multitone", "bright"}) {
+                auto item=command(name); item["icon"]=name; entries.append(item);
+            }
+            cfg["menu"]=entries;
+            Standalone menu(cfg, QString(appearance)=="override" ? "aero" : "");
+            const auto flat=menu.actions()[0]->icon();
+            const auto image=flat.pixmap(QSize(32,32)).toImage();
+            QVERIFY(!image.isNull());
+            QCOMPARE(image.pixelColor(8,16), QColor(QString(appearance)=="native" ? "#232629" : "#e4ebf2"));
+            QCOMPARE(image.pixelColor(4,16).alpha(),128);
+            const auto scaled=flat.pixmap(QSize(16,16),2.0);
+            QCOMPARE(scaled.devicePixelRatio(),2.0);
+            QCOMPARE(scaled.toImage().pixelColor(8,16),image.pixelColor(8,16));
+            QCOMPARE(menu.actions()[1]->icon().pixmap(32,32).toImage().pixelColor(8,16),QColor(180,30,50));
+            QCOMPARE(menu.actions()[2]->icon().pixmap(32,32).toImage().pixelColor(24,16),QColor("#808080"));
+            QCOMPARE(menu.actions()[3]->icon().pixmap(32,32).toImage().pixelColor(8,16),QColor(Qt::white));
+        }
+    }
     void renderedIconPresets_data() {
         QTest::addColumn<QString>("appearance");
         QTest::newRow("native") << QString("native");

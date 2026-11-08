@@ -37,6 +37,7 @@ class Standalone : public QMenu {
     QElapsedTimer elapsed;
     bool keyboard = false, entered = false, wasActive = false;
     bool traceEnabled, wayland;
+    const bool darkAero;
     void populate(QMenu *menu, const QJsonArray &entries);
     void updateDismissal();
     void report(const QString &event);

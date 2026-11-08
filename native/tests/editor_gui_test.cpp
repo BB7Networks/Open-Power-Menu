@@ -12,6 +12,7 @@
 #include <QTemporaryDir>
 #include <QtTest>
 #include <QAccessible>
+#include <QCursor>
 #include <algorithm>
 #if defined(__GLIBC__)
 #include <malloc.h>
@@ -66,8 +67,13 @@ class EditorGuiTests : public QObject {
             auto *window = qobject_cast<QQuickWindow *>(top);
             if (!window || !window->isVisible() || (scope && window != scope)) continue;
             if (auto *item = find(find, window->contentItem())) {
+                const QPointF center(item->width()/2, item->height()/2);
+                // Native popup grabs consult the platform pointer position.
+                // Synthetic clicks alone can leave it over a closed picker.
+                QCursor::setPos(item->mapToGlobal(center).toPoint());
+                QTest::qWait(10);
                 QTest::mouseClick(item->window(), Qt::LeftButton, Qt::NoModifier,
-                    item->mapToScene(QPointF(item->width()/2, item->height()/2)).toPoint());
+                    item->mapToScene(center).toPoint());
                 QCoreApplication::processEvents();
                 return true;
             }
@@ -309,14 +315,14 @@ class EditorGuiTests : public QObject {
         incoming["menu_width"] = "wide";
         QVERIFY(file.open(QIODevice::WriteOnly)); file.write(QJsonDocument(incoming).toJson()); file.close();
         QVERIFY(clickText("Apply"));
-        QCOMPARE(applied.count(), 1);
+        QTRY_COMPARE(applied.count(), 1);
         QTRY_VERIFY(!preview->property("visible").toBool());
         QCOMPARE(session.errorCode(), "conflict");
         QCOMPARE(store.load(), original);
         QVERIFY(openImport());
         QTRY_VERIFY(preview->property("opened").toBool());
         QVERIFY(clickText("Apply"));
-        QCOMPARE(applied.count(), 2);
+        QTRY_COMPARE(applied.count(), 2);
         QTRY_VERIFY(!preview->property("visible").toBool());
         QCOMPARE(store.load()["menu"], incoming["menu"]);
         QCOMPARE(store.backups().size(), 1);

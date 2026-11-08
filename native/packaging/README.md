@@ -68,7 +68,10 @@ qt6-wayland, qml6-module-org-kde-kirigami, qml6-module-qtquick-controls,
 qml6-module-qtquick-dialogs, qml6-module-qtquick-layouts,
 qml6-module-qtquick-window, qml6-module-qtqml-workerscript, and their distro
 library/font dependencies. Plasma 6 and its QML/KPackage modules are required
-for the widget. The bundle uses system styles/icons/platform plugins.
+for the widget. The bundle uses system styles/icons/platform plugins. SVG-based icon themes such as
+Breeze also need the system Qt SVG image/icon plugins (Debian: `qt6-svg-plugins`),
+normally supplied by the desktop. PNG-only minimal runtime smoke does not qualify
+SVG artwork; the separate visual matrix uses the actual Breeze SVG assets.
 Qt >=6.6 and KF6 Service/Config are required for a complete source build;
 Debian artifacts use Qt 6.8.2, KF6 6.13, glibc 2.41 and x86-64. Other distributions
 and CPU architectures require matching builds and qualification. No Python,

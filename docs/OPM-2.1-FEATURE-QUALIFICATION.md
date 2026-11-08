@@ -3,7 +3,8 @@
 Starting commit: `4d672c2cc5f0eb51ac469e9fba5094556316e1fa`.
 Continue `feature/native-architecture-v1.1` and draft
 [PR #10](https://github.com/BB7Networks/Open-Power-Menu/pull/10).
-The commit introducing this report identifies the corrected source. Stable remains
+First correction checkpoint: `4d0ec86788a1df2b9621e985a5cca1a11c965a47`.
+The subsequent Aero contrast correction is identified by the commit updating this report. Stable remains
 1.0.1, development 2.1.0-dev, next public release 2.1.0. Physical acceptance is
 **Not run**; this report does not qualify a release candidate.
 
@@ -20,7 +21,14 @@ Manjaro mirror timeout was not treated as an application defect.
 
 Baseline PR artifacts identify merge checkout
 `7237ebd85e2a3b2fab0e199536d192468c4c8f0f`, distinct from branch HEAD `4d672c2`.
-Current distribution CI must run on the corrections before using its new artifact.
+Corrected-source workflows are [PR 42524169511](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42524169511)
+and [push 42524165643](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42524165643).
+The PR workflow passed **all eight jobs** on the corrected source. Its artifact
+source is merge checkout `389ecb8ee953d7f50d7040b515656e2568f84bd6`; a fetched
+comparison confirms its native/widget code matches branch `4d0ec86`. The push
+workflow initially passed seven jobs and failed its Manjaro build attempt. The
+failure log is blocked; its cause is unconfirmed. The unchanged-source retry passed; both workflows now have all eight jobs green.
+A subsequent Aero contrast correction requires its own workflows and candidate. This is distinct from the older resolved mirror failure.
 
 ## Demonstrated corrections
 
@@ -29,6 +37,10 @@ Current distribution CI must run on the corrections before using its new artifac
   configured metrics differed. The local menu stylesheet now also sizes the icon
   subcontrol for nonstandard presets. Native/Aero, Fusion/Breeze and hidden-icon
   checks pass; QApplication's style remains unchanged.
+- Actual Breeze SVG screenshots also exposed flat light-theme icons disappearing
+  against Aero. A local icon engine now brightens only flat dark monochrome artwork
+  on Aero, preserving alpha/DPI, colored and multitone images and Native appearance.
+  Regression checks cover those distinctions and the explicit Aero theme override.
 - A fresh profile's import preview promised to preserve a nonexistent active file.
   It now explicitly says there is no previous file to back up. Existing-file
   imports still create protected recovery copies, including retention zero.
@@ -58,6 +70,7 @@ private profiles/buses; runtime and GUI test containers have networking disabled
 | Standalone virtual KWin | 42 passed |
 | KWin, two outputs, scale 1.25 | 42 passed |
 | Breeze, 640x720 virtual screen, 144 font DPI, scale 1.25 | 10 appearance/rendering cases passed |
+| Real Kirigami widget-row/flyout icon painting, Native/Aero | 2 passed; narrow-screen/144-DPI/125% matrix 4 passed |
 | Complete Debian package and independent runtime image | Build and installation/activation/editor/reinstall/removal/rollback smoke passed |
 
 The focused QML checks are included in the Python total. The new rendered-icon
@@ -90,12 +103,26 @@ Xvfb, the offscreen fallback explicitly skips the new file-dialog interaction ca
 and cannot qualify it. The retained passing local CTest used X11 and skipped no
 editor cases. No CI failure was hidden by changing an expected result.
 
+A later repeated GUI run exposed a synthetic-pointer race: native popup grabs
+could consult the cursor left over a closed picker. The test now moves the actual
+virtual pointer before clicking and waits for the Apply signal. This corrects test
+input delivery without bypassing any dialog operation.
+
 An initial dependency-notice test correctly refused directories created with the
 container's inherited `umask 0000`. The final local run uses `umask 077`; no secure
 filesystem checks were weakened. The Kirigami platform-plugin warning for Fusion
 is retained; the actual QML editor loads and its interaction checks pass.
 
 ### Menus and hover
+
+An additional 108-combination scratch matrix uses actual installed Breeze SVG
+icons across Native/Aero, all densities/widths/sizes and visible/hidden icons on
+a 640x720, 144-font-DPI, 125% virtual display. Geometry and application-style
+assertions pass; representative screenshots were inspected. The review image
+initially lacked Debian's separate Qt SVG plugins. Installing that desktop-theme
+support in the disposable image enabled the actual assets; no new C++/runtime
+link dependency was introduced. The minimal runtime image checks PNG-capable
+operation, not SVG theme artwork.
 
 Real painted pixels verify increasing icon sizes and complete hiding in Native
 and Aero; screenshots were visually inspected. Existing density/width tests cover
@@ -110,7 +137,10 @@ return-to-child cancellation, sibling replacement and parent selection restorati
 Its offscreen Plasma-window stub needs an explicit cross-window Leave event;
 that is an input-fixture limitation, not physical compositor evidence. Mirroring,
 nested configuration propagation, fast/held access-key filtering and pending-timer
-destruction remain covered by the existing suites. Actual Plasma popup placement,
+destruction remain covered by the existing suites. Additional scratch checks paint the shipped row/flyout QML with real Kirigami icons
+(instead of the icon stub), including hiding, all sizes, Native/Aero and a 640x720
+virtual screen at 144 font DPI and 125% scale. These passed and screenshots were
+inspected. Their Plasma window primitives are still stubbed. Actual Plasma popup placement,
 root widget integration, remote desktop and physical mixed-DPI remain separate gates.
 
 ### Import safety and compatibility
@@ -142,7 +172,10 @@ still needs its original runtime for rollback. No system package was removed.
 
 Local Arch/Manjaro packages were not built: these use the existing separate GitHub
 CI distribution jobs. Baseline `4d672c2` passed both distribution jobs and Debian;
-corrected-source workflow results must be recorded after push. Do not substitute
+the corrected-source PR passed all three distribution jobs, including installed
+runtime and legacy upgrade/rollback checks. The first push Manjaro attempt failed; its unchanged-source retry also passed all
+eight jobs. These are the first correction checkpoint results, preceding the Aero
+contrast correction. Do not substitute
 the locally built Debian archive for a Manjaro package.
 
 Local Debian archive SHA-256:
@@ -150,6 +183,30 @@ Local Debian archive SHA-256:
 This identifies the local runtime payload, not a Manjaro development candidate.
 
 ## Artifact availability and handoff
+
+The first corrected Manjaro candidate (superseded by the subsequent Aero contrast
+correction; do not use it as the final candidate) is
+[artifact 13634726564](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42524169511/artifacts/13634726564),
+`opm-2.1-dev-Manjaro-389ecb8ee953d7f50d7040b515656e2568f84bd6`.
+GitHub reports the outer ZIP SHA-256 as
+`705ef64734136fa49878ea6edefe1a2aaf6c164fc142d4fd1e2aad6d57153493`;
+this is remote metadata, **not an independently verified download**.
+It expires November 15, 2026. The corresponding
+[Arch artifact 13634103715](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42524169511/artifacts/13634103715)
+reports ZIP SHA-256
+`a62fc512165a1635f091e41834e1fa2c1d526dd6b25e6ef95f9651b04841db16`.
+Both include packages, native bundles, widget and recorded inventories per CI.
+
+Downloading the new Manjaro candidate was also refused after redirect to
+`productionresultssa13.blob.core.windows.net`; zero archive bytes were retrieved.
+The failed push-job log redirects to that same blocked host. An official,
+unapplied environment-settings draft preserves the existing domains and proposes
+only the two observed Azure hosts (`productionresultssa13` and `productionresultssa17`
+under `blob.core.windows.net`). The environment configuration tool requires review,
+save and publication; the draft alone does not change running network access.
+No alternative network path was used. Current package checksums and exact Manjaro
+Qt/KF6/Plasma/glibc inventory remain **blocked**, not inferred from historical data.
+
 
 Baseline [Manjaro artifact 13625672800](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42501949225/artifacts/13625672800)
 and [Arch artifact 13625961943](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42501949225/artifacts/13625961943)
@@ -167,7 +224,10 @@ candidate procedure in [physical acceptance](OPM-2.1-PHYSICAL-ACCEPTANCE.md).
 
 ## Remaining gates
 
-Record the corrected-source CI results and candidate artifact before installation.
+The final Aero-corrected workflow/candidate must supersede the intermediate
+`4d0ec86` artifact above; verify its downloaded bytes and
+inventories before installation. The parallel push retry does not replace that
+artifact identity.
 Then the user performs the existing physical Manjaro Wayland-first, X11-second
 procedure: backup/upgrade/recovery, harmless editor/menu/access-key/appearance and
 launcher tests, monitor/scaling and remote-desktop checks, then rollback. All

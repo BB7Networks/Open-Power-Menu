@@ -4,6 +4,9 @@
 #include <QCursor>
 #include <QEvent>
 #include <QIcon>
+#include <QIconEngine>
+#include <QImage>
+#include <QPainter>
 #include <QKeyEvent>
 #include <QJsonDocument>
 #include <QMetaEnum>
@@ -15,6 +18,49 @@
 #include <algorithm>
 
 namespace Opm {
+// A light desktop's flat symbolic icons otherwise disappear on Aero's dark
+// surface. Keep the original engine's sizes, DPI and colored/multitone artwork.
+class AeroIconEngine final : public QIconEngine {
+    const QIcon source;
+    static QPixmap readable(QPixmap pixmap, QIcon::Mode mode) {
+        if (pixmap.isNull()) return pixmap;
+        auto image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
+        int low = 255, high = 0;
+        bool seen = false;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x) {
+                const auto pixel = image.pixel(x, y);
+                if (qAlpha(pixel) < 32) continue;
+                const int minimum = std::min({qRed(pixel), qGreen(pixel), qBlue(pixel)});
+                const int maximum = std::max({qRed(pixel), qGreen(pixel), qBlue(pixel)});
+                if (maximum - minimum > 16) return pixmap;
+                low = std::min(low, minimum); high = std::max(high, maximum); seen = true;
+            }
+        if (!seen || high > 112 || high - low > 16) return pixmap;
+        const QColor foreground = mode == QIcon::Disabled ? QColor("#89939c") : QColor("#e4ebf2");
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+                image.setPixel(x, y, qRgba(foreground.red(), foreground.green(), foreground.blue(), qAlpha(image.pixel(x, y))));
+        auto result = QPixmap::fromImage(image);
+        result.setDevicePixelRatio(pixmap.devicePixelRatio());
+        return result;
+    }
+  public:
+    explicit AeroIconEngine(QIcon icon) : source(std::move(icon)) {}
+    QIconEngine *clone() const override { return new AeroIconEngine(source); }
+    QSize actualSize(const QSize &size, QIcon::Mode mode, QIcon::State state) override {
+        return source.actualSize(size, mode, state);
+    }
+    QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) override {
+        return readable(source.pixmap(size, mode, state), mode);
+    }
+    QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State state, qreal scale) override {
+        return readable(source.pixmap(size, scale, mode, state), mode);
+    }
+    void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override {
+        painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, painter->device()->devicePixelRatioF()));
+    }
+};
 // Local to each OPM menu. Never replace QApplication's desktop style.
 class MenuStyle final : public QProxyStyle {
     const QJsonObject config;
@@ -62,7 +108,8 @@ QPoint menuPosition(const QRect &area, const QSize &size, const QPoint &cursor,
 }
 Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std::shared_ptr<PowerManager> power)
     : config(std::move(source)), model(std::move(power)), traceEnabled(diagnostics),
-      wayland(QGuiApplication::platformName().startsWith("wayland")) {
+      wayland(QGuiApplication::platformName().startsWith("wayland")),
+      darkAero((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero") {
     validate(config);
     elapsed.start();
     setObjectName("OpenPowerMenu");
@@ -74,7 +121,7 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
     if (wayland)
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     setStyleSheet("QMenu { menu-scrollable: 1; }");
-    if ((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero")
+    if (darkAero)
         setStyleSheet(QStringLiteral(
             "QMenu { menu-scrollable:1; background-color:#242A31; color:#E4EBF2; border:1px solid #5E7D94; padding:5px 3px; }"
             "QMenu::item { padding:%1px 25px %1px 13px; border-radius:2px; }"
@@ -166,7 +213,9 @@ void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
         title.replace('&', "&&");
         if (!entry["access_hint"].toString().isEmpty()) title += '\t' + entry["access_hint"].toString();
         action->setText(title);
-        action->setIcon(config["show_menu_icons"].toBool(true) ? QIcon::fromTheme(entry["icon"].toString()) : QIcon());
+        QIcon icon = config["show_menu_icons"].toBool(true) ? QIcon::fromTheme(entry["icon"].toString()) : QIcon();
+        if (darkAero && !icon.isNull()) icon = QIcon(new AeroIconEngine(icon));
+        action->setIcon(icon);
         accessKeys.insert(action, entry["access_key"].toString());
         if (kind == "separator") action->setSeparator(true);
         else if (kind == "submenu") populate(action->menu(), entry["items"].toArray());
