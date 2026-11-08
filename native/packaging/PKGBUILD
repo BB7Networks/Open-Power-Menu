@@ -12,7 +12,9 @@ makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules')
 optdepends=('plasma-desktop: Plasma 6 widget and launcher integration')
 # Place the reviewed git archive beside this recipe. No remote branch is fetched.
 source=('open-power-menu-source.tar.gz')
-sha256sums=('SKIP') # Local reviewed source; release packaging must pin the archive hash.
+sha256sums=('SOURCE_SHA256') # Filled by prepare-pacman.sh from the exact source archive.
+# makepkg must not mutate sealed bundle binaries after package().
+options=('!strip' '!debug')
 
 build() {
     cmake -S "$srcdir/Open-Power-Menu" -B "$srcdir/build" -G Ninja \
@@ -23,7 +25,7 @@ check() {
     QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ctest --test-dir "$srcdir/build" --output-on-failure
 }
 package() {
-    cmake --build "$srcdir/build" --target native-bundle
+    cmake --build "$srcdir/build" --target native-package
     install -d "$pkgdir/usr/lib/open-power-menu-native" "$pkgdir/usr/bin" "$pkgdir/usr/share/licenses/$pkgname"
     cp -a "$srcdir/build/native-bundle" "$pkgdir/usr/lib/open-power-menu-native/bundle"
     printf '%s\n' '#!/bin/sh' 'exec /usr/lib/open-power-menu-native/bundle/install.sh "$@"' > "$pkgdir/usr/bin/open-power-menu-native-setup"

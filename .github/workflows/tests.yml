@@ -4,15 +4,41 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  native-arch:
-    name: Native Arch rolling build (Manjaro qualification separate)
+  native-pacman:
+    name: Native ${{ matrix.distro }} package and upgrades
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Arch
+            image: archlinux:base
+            runtime_python: absent
+          - distro: Manjaro
+            image: manjarolinux/base:latest
+            runtime_python: distro
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test against the current Arch Qt and KDE libraries
-        run: docker build -f native/tests/arch.Dockerfile -t opm-native-arch:test .
-      - name: Repeat native tests without network access
-        run: docker run --rm --network none opm-native-arch:test
+      - name: Prepare checksum-pinned native source and released upgrade baseline
+        run: |
+          sh native/packaging/prepare-pacman.sh . work/pacman-source
+          git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
+          mkdir -p work/package-legacy
+          git archive FETCH_HEAD | tar -x -C work/package-legacy
+      - name: Build pacman package and test legacy upgrades on the target distro
+        run: docker build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} -f native/tests/pacman.Dockerfile -t opm-native-pacman:test .
+      - name: Install sealed package, activate and roll back without PySide6 or a compiler
+        run: docker run --rm --network none opm-native-pacman:test
+      - name: Collect development artifacts and distribution snapshot
+        run: |
+          container=$(docker create --network none opm-native-pacman:test)
+          docker cp "$container:/opt/opm-artifacts" work/qualified-dev
+          docker rm "$container"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1-dev-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualified-dev/
+          retention-days: 7
   native-packaging:
     name: Native packaging and upgrades
     runs-on: ubuntu-24.04
