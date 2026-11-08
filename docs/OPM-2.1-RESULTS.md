@@ -3,7 +3,7 @@
 ## Latest engineering recovery pass
 
 Recovered the exact `2937ac6` checkpoint on the existing development branch;
-PR #10 remains draft and stable remains 1.0.1. Code commit `3fd2cd9` adds bounded
+PR #10 remains draft and stable remains 1.0.1. Code commits `3fd2cd9` and `5976e8b` add bounded
 asynchronous power discovery, safe cache invalidation/recovery, live frontend
 refresh, deleted-submenu viewport cleanup and targeted migration safeguards.
 
@@ -22,10 +22,29 @@ refresh, deleted-submenu viewport cleanup and targeted migration safeguards.
 - The focused [physical Wayland/X11 and supervised-power procedure](OPM-2.1-PHYSICAL-ACCEPTANCE.md)
   is ready; **every physical case remains Not run**.
 
-Current distribution CI and artifact preservation status will be recorded below
-once the engineering branch workflows finish. The earlier checkpoint evidence is
-retained below with its original commit and workflow links. No merge, release,
-tag, production installation or host power action was performed.
+Both workflows for `fe9a3673573fca69fa9b86bd4dda495f52b4c094` passed **all eight
+jobs**: [PR 42499437023](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42499437023)
+and [push 42499432292](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42499432292).
+This includes independent Debian, Arch and Manjaro packaging/upgrades and virtual
+X11/Weston/KWin standalone checks. Later checkpoint-only edits do not change the
+code tested by these runs. No external native runtime dependency was added.
+
+Existing and current artifact metadata is preserved locally. Downloading the
+November 8 checkpoint archives redirects to
+`productionresultssa1.blob.core.windows.net`; current job logs redirect to
+`productionresultssa32.blob.core.windows.net`. The applied environment policy
+still excludes these hosts. Archive/checksum and current package-inventory
+retrieval therefore remain blocked; metadata is not a substitute for preserving
+the actual packages. The original artifacts expire **November 15, 2026**. The
+user offered to add the download host; no applied policy change was observed at
+this checkpoint. No network restriction was bypassed. CI's package/hash/runtime
+gates passed, but the current inventories were not independently downloaded here.
+
+Ready to begin controlled physical acceptance of the development candidate.
+This does **not** make it a qualified release candidate or authorize production
+replacement. The earlier checkpoint evidence remains below with its original
+commit and workflow links. No merge, release, tag, production installation or
+host power action was performed.
 
 
 The user requested a stopping point after the resumed distribution-qualification

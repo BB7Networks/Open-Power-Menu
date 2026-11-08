@@ -1,6 +1,7 @@
 # 2.1 engineering review — November 8, 2026
 
 Starting checkpoint: `2937ac646200ef7884b9c6c4fa7c568e2fbb0b3a`.
+Engineering code commits: `3fd2cd9` and the pending-presentation race fix `5976e8b`.
 Branch: `feature/native-architecture-v1.1`; existing PR #10 remains draft.
 The initial workspace was a clean stable 1.0.1 checkout (`34058480`); the fetched
 development branch exactly matched the handoff. No unexpected work was discarded.
@@ -37,6 +38,10 @@ Release/GCC 14.2, Linux 6.18.57, shared cloud CPU, warm filesystem caches:
 
 Small sample sizes establish the multi-second defect and its removal under these
 fixtures; they are not physical first-pixel benchmarks or statistical speed claims.
+These measurements isolate power reads. Existing non-power executable/KCM/shortcut
+probes still use `QProcess::waitForFinished(2000)` plus a bounded kill/reap wait,
+with a 30-second cache; this is not a claim that all command discovery is
+asynchronous. Physical end-to-end opening latency still needs measurement.
 The fixture asserts healthy/slow results eventually enable both actions and
 missing/unresponsive results leave both unavailable. No power operation executes.
 Reproduce with `python3 native/tests/power_benchmark.py --binary <native-backend>
@@ -151,7 +156,8 @@ Local results: all eight native CTest targets pass; the expanded backend-only
 private D-Bus/differential suite passes 12 tests; nine real disposable transaction/
 legacy-upgrade cases pass. The pinned PySide6 6.10.2 regression suite passes 455
 with eight existing historical-source skips. Native X11 checks run on Xvfb;
-Wayland/KWin and distribution packaging are qualified by the existing GitHub jobs.
+Wayland/KWin and distribution packaging passed all eight jobs in both workflows
+for `fe9a367`; this includes independent Debian, Arch and Manjaro builds.
 Final run links and exact tested commits belong in [checkpoint results](OPM-2.1-RESULTS.md).
 
 Initial local failures were toolchain/setup findings: missing Git/ZIP, the distro
@@ -169,8 +175,8 @@ fractional scaling, dismissal, configuration/recovery, 1.0.1 upgrade/rollback,
 read-only dependency review and diagnostics. Actual power actions require separate
 explicit permission, local console access and recovery preparation.
 
-Engineering evidence supports controlled, supervised acceptance of a development
-candidate after current distribution CI passes. It does not establish a qualified
+Engineering evidence and passing distribution CI support controlled, supervised
+physical acceptance of the development candidate. It does not establish a qualified
 release candidate or authorize a production replacement, merge, tag or publication.
 Remaining blockers are physical integration, supervised power/authorization/wake
 behavior, longer editor sessions and final distribution-snapshot verification.
