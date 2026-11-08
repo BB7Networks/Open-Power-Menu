@@ -1,5 +1,19 @@
 # Open Power Menu changelog
 
+## 2.1.0-dev — unreleased
+
+The native rewrite and usability improvements share one public target: **2.1.0**,
+directly after stable **1.0.1**. `2.0.0-dev` was an internal milestone; there is no
+public 2.0.0 release. Historical migration and performance evidence is retained.
+
+- Shared entry access keys, Windows-inspired presets, nested navigation and optional hints in the widget and native standalone menu.
+- Native editor assignment/collision feedback, independent binding reset, master enable and hint preferences, with Undo/Redo.
+- Configurable pointer-leave delay from 0.5 to 5.0 seconds in 0.1-second steps; the existing disabled default remains unchanged.
+- Native Sleep/Hibernate capability checks through KDE and logind, Polkit authorization and inhibitor enforcement. Existing KDE shutdown/restart/logout confirmation calls are preserved.
+- Optional, read-only PySide6 review after a successful legacy upgrade; keep is recommended, notice state is separate, and the installer never removes packages.
+- Arch build qualification recipe and CI; physical Manjaro/Plasma acceptance remains a release gate.
+
+
 ## 1.0.1 - first public release
 
 - Add Desktop to new/default top-level menus using KDE’s registered Show Desktop

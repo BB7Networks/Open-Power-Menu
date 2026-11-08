@@ -1,5 +1,11 @@
 # Open Power Menu
 
+Native development targets **2.1.0-dev**, combining the C++/Qt rewrite and usability
+features in the next public **2.1.0** release directly from **1.0.1**. Stable remains
+1.0.1. The internal `2.0.0-dev` milestone will not be published. See the
+[2.1 roadmap and acceptance gates](docs/OPM-2.1.md) and
+[optional PySide6 review](docs/DEPENDENCY-CLEANUP.md).
+
 **One launcher button. Two useful menus.**
 
 The Windows right-click Start / Win+X menu is a good idea. Microsoft has made
@@ -161,7 +167,7 @@ Contributors can start with [contributing](docs/CONTRIBUTING.md),
 [shortcut troubleshooting](docs/NATIVE-SHORTCUT-CASCADE.md) and
 [release preparation](docs/PUBLISHING.md).
 
-The v2.0 development branch introduces a [native Qt backend, configuration editor and standalone menu](native/README.md).
+The v2.1 development branch introduces a [native Qt backend, configuration editor and standalone menu](native/README.md).
 See the [architecture and dependency review](docs/architecture/0001-native-runtime.md)
 and [migration status](docs/architecture/native-migration-status.md) for completed
 work, physical desktop gates and the remaining installation milestone. The

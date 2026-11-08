@@ -1,6 +1,6 @@
 # KDE Store and complete native distribution
 
-OPM 2.0 development has two distinct distribution paths. The released 1.0.1
+OPM 2.1 development has two distinct distribution paths. The released 1.0.1
 installer remains available; no native package or Store listing has been
 published by this milestone.
 
@@ -31,7 +31,7 @@ cmake --build build/package --target native-package --parallel 2
 ```
 
 This creates a labelled native tar.gz and checksum, plus
-`org.openpowermenu.start-2.0.0-dev.plasmoid` with `metadata.json` and `contents/`
+`org.openpowermenu.start-2.1.0-dev.plasmoid` with `metadata.json` and `contents/`
 at the ZIP root. The legacy `scripts/build-release.sh` and widget helper remain
 1.0.1 release tooling; use the native CMake target for native development bundles.
 
@@ -43,7 +43,7 @@ limited launcher-only widget. It cannot provide user-configured system/power
 commands or recovery by itself. Implementing those in QML would duplicate the
 native configuration/availability model or require a new trusted executor.
 No executable-engine dependency, duplicate catalog, auto-install mechanism or
-reduced command mode is enabled in 2.0. A broader self-contained Store mode needs
+reduced command mode is enabled in 2.1. A broader self-contained Store mode needs
 a separate architecture decision and is deferred.
 
 ## Publication gate

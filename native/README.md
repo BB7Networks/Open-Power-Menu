@@ -1,9 +1,9 @@
-# Native v2.0 development preview
+# Native v2.1 development preview
 
 The native backend, recovery operations and Qt Quick/Kirigami configuration
 editor and an optional Qt Widgets standalone frontend are implemented.
 The normal installer and production standalone entry point still use Python/PySide6 and remain at **1.0.1**. This preview identifies itself as
-**2.0.0-dev**; it is not a complete native replacement installation.
+**2.1.0-dev**; it is not a complete native replacement installation.
 
 See the [architecture and dependency inventory](../docs/architecture/0001-native-runtime.md),
 [migration status](../docs/architecture/native-migration-status.md) and
@@ -191,7 +191,7 @@ resolve against the validated opening snapshot, never action data or supplied
 argv. If availability changes the normalized tree before selection, execution
 is refused; reopen to refresh it. Detached applications survive the menu process.
 The existing power catalog retains KDE's normal confirmations. Pointer dismissal
-uses the existing preference and fixed 1200 ms delay across all submenus;
+uses the existing preference and configurable 500–5000 ms delay (1200 ms default) across all submenus;
 keyboard navigation suspends it until mouse movement resumes.
 
 Wayland uses a frameless root toplevel and a single activation request. The

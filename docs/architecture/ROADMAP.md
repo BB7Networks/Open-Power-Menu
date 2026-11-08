@@ -1,48 +1,36 @@
-# Native architecture roadmap
+# Native architecture and 2.1 roadmap
 
-Stable release: **1.0.1**. Development target: **2.0.0-dev**.
-Continue on `feature/native-architecture-v1.1` and draft PR #10; the historical
-branch name does not define the new release version. Existing release tags and
-the working legacy installer remain unchanged until production cutover.
+Stable release: **1.0.1**. Development: **2.1.0-dev**. Next public release:
+**2.1.0**, directly from 1.0.1. Continue branch `feature/native-architecture-v1.1`
+and draft PR #10 without rewriting history. `2.0.0-dev` was an internal architecture
+milestone, not a public release; do not publish 2.0.0 or reserve a 2.0.1 release.
 
-## 2.0.0 — Native architecture
+The 2.1 target combines the implemented Core/DBus backend, Qt Quick/Kirigami editor,
+Qt Widgets standalone menu, guarded storage/recovery, complete native packaging and
+reversible upgrades with:
 
-1. Native Core/DBus backend, safe storage and layout transactions (implemented).
-2. Native recovery and Qt Quick/Kirigami General/Layout/Backups editor (implemented).
-3. Native standalone menu (implemented; virtual navigation/focus/flyout/dismissal
-   checks pass; physical desktop acceptance remains).
-4. Complete native installation and upgrade snapshots/rollback (implemented
-   for the Debian 13 amd64 development bundle). Qualify physical Plasma and
-   additional distribution/CPU baselines before release.
-5. Legacy configuration and integration validation, measured performance, and
-   physical Plasma acceptance on Wayland and X11.
+1. Shared configurable entry access keys, nested sequences and optional hints in
+   both menus; master enable and independent default-key reset in the editor.
+2. Configurable pointer-leave delay, 0.5–5.0 seconds in 0.1-second increments,
+   default 1.2 seconds. Preserve the saved toggle and disabled default.
+3. Native Sleep/Hibernate with dynamic KDE/logind capability and policy checks,
+   Polkit authorization and inhibitors, retaining existing KDE confirmation prompts.
+4. Optional, read-only PySide6 dependency review after successful legacy upgrade;
+   default Keep, separate one-time notice state and unchanged rollback protection.
+5. Matching distribution builds, prioritizing Manjaro/Arch alongside Debian 13;
+   safe direct 1.0.1 upgrades and no Python/compiler requirement for native installs.
+6. Regression CI and explicit physical Plasma Wayland/X11 acceptance before release.
 
-The complete normal installation must require neither Python/PySide6 nor a
-compiler. Test tooling may still use Python. Keep the legacy app available
-until all replacements meet their acceptance gates; never remove system Python
-or PySide6 packages, restart Plasma automatically, or change existing launchers
-without authorization. A passing backend test does not make 2.0 release-ready.
+See [2.1 configuration and physical gates](../OPM-2.1.md),
+[current development-pass results](../OPM-2.1-RESULTS.md), and
+[historical native migration/performance evidence](native-migration-status.md).
+The Store widget continues to require a separately installed native backend.
+No frontend rewrite or self-contained Store claim is part of this release.
 
-## 2.0.1 — Maintenance, if needed
+Optional future work (outside this pass): configurable submenu hover delay,
+portable import/export and a separately evaluated self-contained Store edition.
 
-Reserve for corrective updates after 2.0.0. Do not create an empty release.
-
-## 2.1.0 — Features and customization
-
-Implement only after 2.0 functional parity and acceptance:
-
-- Windows-inspired access keys after Meta+X, configurable per entry/submenu,
-  with duplicate detection within a level, visibility preferences, and binding
-  reset independent of layout. Root preset: P Applications, O Power Options,
-  V Logs, Y System Information, M Hardware, W Network, K Disks, I Terminal,
-  T Task Manager, N Settings, E Files, R Run, U power submenu, D Desktop.
-- Power submenu sequences U/U Shutdown, U/R Restart, U/S Sleep, U/H Hibernate,
-  U/I Sign out and U/L Lock; preserve KDE permissions, inhibitors and prompts.
-- Configurable pointer-leave closing: disabled by default, 0.5–5.0 seconds in
-  0.1-second steps, default 1.2 seconds. Preserve flyout crossing, re-entry,
-  keyboard navigation and editing safeguards in both frontends.
-- Evaluate submenu hover delay, portable configuration import/export,
-  individual binding reset, clearer tooltips and accessibility improvements.
-
-No 2.1 settings or power commands are added during the architecture migration.
-See [migration status and release gates](native-migration-status.md).
+No merge, tagging, release publication, KDE Store update or active-desktop changes
+are authorized by development preparation. Stable remains 1.0.1 until explicit
+release approval, even if automated tests pass. Physical acceptance and supervised
+power-action tests cannot be substituted with virtual compositor results.

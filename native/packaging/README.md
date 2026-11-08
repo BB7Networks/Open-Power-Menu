@@ -1,6 +1,6 @@
 # Complete native development bundle
 
-This is a development installation, not a published 2.0 release. Back up your
+This is a development installation, not a published 2.1 release. Back up your
 personal configuration and complete the physical Plasma release gates first.
 Never run the installer as root. It does not install system dependencies.
 
@@ -72,3 +72,20 @@ A kernel supporting pidfds (Linux 5.3+) is needed to retire a running service.
 
 The Store widget requires the native backend separately. It does not download or
 run an installer. See docs/KDE-STORE.md and docs/TESTING.md in the source repository.
+
+
+## 2.1 optional cleanup and rolling distributions
+
+After a verified legacy upgrade, the optional PySide6 notice defaults to **Keep**.
+`open-power-menu --review-dependencies` performs read-only package discovery;
+`--dismiss-dependency-review` suppresses reminders. No removal command is run.
+See [cleanup guidance](../../docs/DEPENDENCY-CLEANUP.md), including restoring the
+old runtime before legacy rollback.
+
+For Arch/Manjaro, use the target distribution's own Qt/KDE packages and build on
+that distribution. `PKGBUILD` stages a native bundle and explicit setup launcher,
+with no install hooks that change Plasma. Create a reviewed local source archive
+with `git archive --prefix=Open-Power-Menu/ -o open-power-menu-source.tar.gz HEAD`,
+place it beside PKGBUILD, and run makepkg in a disposable target-system builder.
+Pin the source checksum before release. Arch CI does not qualify Manjaro or physical
+Plasma. Keep distribution/version/CPU, hash, ELF, plugin and activation checks intact.

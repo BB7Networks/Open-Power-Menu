@@ -1,7 +1,7 @@
 # Native migration status
 
 Current milestone: **complete native packaging and reversible user-local upgrades implemented**.
-The development executables report `2.0.0-dev`. The normal application and EZ
+The development executables report `2.1.0-dev`. `2.0.0-dev` was an internal architecture milestone, never a public release. The next public target is 2.1.0 directly from 1.0.1. The normal application and EZ
 installer remain at 1.0.1. The existing `feature/native-architecture-v1.1`
 branch and draft PR #10 retain their development history.
 
@@ -34,7 +34,7 @@ branch and draft PR #10 retain their development history.
 
 - Optional `open-power-menu-standalone` Qt Widgets executable: native/Aero menus,
   nested hover flyouts, keyboard/mouse selection, themed optional icons, disabled
-  entries, scrolling, anchored placement and fixed 1200 ms pointer dismissal.
+  entries, scrolling, anchored placement and configurable pointer dismissal (1200 ms default).
   Shared native resolution and detached launch; presentation contains no argv.
   Configuration is read-only and availability changes fail closed at selection.
 - Dedicated standalone CI job, staged no-Python runtime and X11/Weston/KWin tests.
@@ -57,7 +57,7 @@ branch and draft PR #10 retain their development history.
    remote-desktop operation or physical standalone behavior.
 
 Access keys, configurable timing, Sleep/Hibernate and other new usability
-features remain reserved for **2.1** after 2.0 acceptance. See the
+features now share the **2.1.0** release gate with the native rewrite. See the
 [version roadmap](ROADMAP.md). No release has been merged, tagged or published
 by this milestone.
 
@@ -82,7 +82,9 @@ probes and KDE confirmations. No power action is run during tests. Native
 launcher discovery is read-only; runtime/installer cutover must still preserve
 the user's authorization boundary for panel changes.
 
-## Validation of this milestone
+## Historical architectural milestone validation
+
+For the current 2.1 pass, see [2.1 results](../OPM-2.1-RESULTS.md). The evidence below is retained from the prior migration.
 
 Local native builds use Debian 13, Qt 6.8.2 and KDE Frameworks 6.13. Legacy Qt
 regressions use the existing PySide6 6.10.2 environment.

@@ -20,3 +20,6 @@ menu.json
 *.bak
 *.bak-*
 widget-backups/
+
+# Disposable build/test profiles and handoff scratch data.
+/work/

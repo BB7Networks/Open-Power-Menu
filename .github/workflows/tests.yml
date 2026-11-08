@@ -4,6 +4,15 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
+  native-arch:
+    name: Native Arch rolling build (Manjaro qualification separate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test against the current Arch Qt and KDE libraries
+        run: docker build -f native/tests/arch.Dockerfile -t opm-native-arch:test .
+      - name: Repeat native tests without network access
+        run: docker run --rm --network none opm-native-arch:test
   native-packaging:
     name: Native packaging and upgrades
     runs-on: ubuntu-24.04

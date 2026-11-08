@@ -1,0 +1,32 @@
+# Build inside the target Arch/Manjaro snapshot from a reviewed source checkout.
+# This package stages a matching native bundle; setup is an explicit user action.
+pkgname=open-power-menu-native-dev
+pkgver=2.1.0.dev
+pkgrel=1
+pkgdesc='Native Open Power Menu development bundle with reversible per-user setup'
+arch=('x86_64')
+url='https://github.com/BB7Networks/Open-Power-Menu'
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'kirigami' 'kservice' 'kconfig' 'kde-cli-tools' 'dbus')
+makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules')
+optdepends=('plasma-desktop: Plasma 6 widget and launcher integration')
+# Place the reviewed git archive beside this recipe. No remote branch is fetched.
+source=('open-power-menu-source.tar.gz')
+sha256sums=('SKIP') # Local reviewed source; release packaging must pin the archive hash.
+
+build() {
+    cmake -S "$srcdir/Open-Power-Menu" -B "$srcdir/build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON -DOPM_INSTALL_TEST_HOOKS=OFF
+    cmake --build "$srcdir/build" --parallel 2
+}
+check() {
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ctest --test-dir "$srcdir/build" --output-on-failure
+}
+package() {
+    cmake --build "$srcdir/build" --target native-bundle
+    install -d "$pkgdir/usr/lib/open-power-menu-native" "$pkgdir/usr/bin" "$pkgdir/usr/share/licenses/$pkgname"
+    cp -a "$srcdir/build/native-bundle" "$pkgdir/usr/lib/open-power-menu-native/bundle"
+    printf '%s\n' '#!/bin/sh' 'exec /usr/lib/open-power-menu-native/bundle/install.sh "$@"' > "$pkgdir/usr/bin/open-power-menu-native-setup"
+    chmod 755 "$pkgdir/usr/bin/open-power-menu-native-setup"
+    install -m644 "$srcdir/Open-Power-Menu/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
