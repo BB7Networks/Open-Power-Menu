@@ -36,6 +36,10 @@ QJsonObject defaults() {
         config["access_keys_enabled"] = true;
         config["show_access_key_hints"] = true;
         config["auto_close_delay_ms"] = PointerLeaveDefault;
+        config["submenu_hover_delay_ms"] = -1;
+        config["menu_density"] = "standard";
+        config["menu_width"] = "auto";
+        config["menu_icon_size"] = "standard";
         auto menu = config["menu"].toArray();
         for (qsizetype i = 0; i < menu.size(); ++i) {
             auto item = menu[i].toObject();
@@ -299,6 +303,12 @@ void validate(const QJsonObject &config) {
         if (config.contains(key) && !config[key].isBool())
             throw Error(QString(key) + " must be a boolean");
     pointerLeaveDelay(config);
+    submenuHoverDelay(config);
+    for (const auto &key : {"menu_density", "menu_width", "menu_icon_size"}) {
+        const QStringList choices = QString(key) == "menu_density" ? QStringList{"compact", "standard", "comfortable"}
+            : QString(key) == "menu_width" ? QStringList{"auto", "narrow", "wide"} : QStringList{"small", "standard", "large"};
+        if (config.contains(key) && !choices.contains(config[key].toString())) throw Error(QString("Invalid ") + key);
+    }
     validateMenu(config["menu"]);
     validateAccessKeys(config["menu"].toArray());
 }
@@ -322,7 +332,8 @@ QJsonObject integration(const QJsonObject &config) {
     for (const auto &key :
          {"hide_original_launcher", "launcher_applet_id", "button_icon_mode", "button_icon",
           "appearance", "show_menu_icons", "auto_close_on_pointer_leave",
-          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints"})
+          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints",
+          "submenu_hover_delay_ms", "menu_density", "menu_width", "menu_icon_size"})
         result[key] = config[key];
     return result;
 }

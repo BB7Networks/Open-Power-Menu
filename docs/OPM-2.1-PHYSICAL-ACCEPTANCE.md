@@ -101,6 +101,25 @@ Create a result sheet with one row per case and per session:
    plateaus; allocator retention after editing is not by itself a leak. Compare
    with [the controlled measurements](architecture/native-performance.md).
 
+## New customization and portability cases — Not run
+
+- Compare widget/standalone default, immediate, 100/300/600 ms hover; leave/re-enter,
+  switch siblings rapidly, cross to child, use keys/click before expiry, close/reopen.
+- Exercise compact/standard/comfortable, auto/narrow/wide and each icon size with
+  icons enabled/disabled, Native/Aero and light/dark desktop themes. Include long
+  labels, hints, large fonts, fractional scaling and opposite screen edges.
+- Check keyboard focus, fast U/U sequences, held keys and disabled entries with a
+  harmless command fixture. Text fields must never activate menu access keys.
+- Export a customized nested test configuration; inspect sensitive paths/arguments.
+  Import on a second test profile, review warnings and cancel before applying once.
+  Verify launcher selection, button icon, shortcuts and panels remain local.
+- Apply with retention zero, restore the protected pre-import copy, and reject a
+  malformed/unsupported file. Modify source or active config after preview and
+  confirm refusal without losing the active file or a later editor draft.
+
+Do not begin this physical phase until the feature checkpoint's automated and
+Debian/Arch/Manjaro qualification tasks have completed.
+
 ## Direct 1.0.1 upgrade and rollback
 
 On the disposable test account, first install the exact released 1.0.1 and make a

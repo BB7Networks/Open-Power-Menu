@@ -38,6 +38,83 @@ static QString json(const QJsonArray &items) {
 class EditorTests : public QObject {
     Q_OBJECT
   private slots:
+    void portableRoundTripAndProtectedImport() {
+        QTemporaryDir dir;
+        Storage store(dir.filePath("menu.json"));
+        auto original = fixture();
+        original["launcher_applet_id"] = 987;
+        store.save(original, {});
+        EditorSession editor(store);
+        QVERIFY(editor.preference(R"({"menu_density":"comfortable","menu_width":"wide","menu_icon_size":"large","submenu_hover_delay_ms":600})"));
+        const auto exported = QUrl::fromLocalFile(dir.filePath("portable.json"));
+        QVERIFY(editor.exportConfiguration(exported));
+        QFile file(exported.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly));
+        const auto bytes = file.readAll();
+        const auto portable = parseJson(bytes).object();
+        QVERIFY(!portable.contains("launcher_applet_id"));
+        QVERIFY(!portable.contains("backup_retention"));
+        QCOMPARE(portable["menu"], editor.configuration()["menu"]);
+        QCOMPARE(portable["unknown"], original["unknown"]);
+        QVERIFY(!editor.exportConfiguration(exported)); // exclusive, no overwrite
+        QVERIFY(editor.previewImport(exported).isEmpty()); // dirty draft
+        QVERIFY(editor.reload(true));
+        const auto preview = editor.previewImport(exported);
+        QVERIFY(preview.contains("missing-app"));
+        QVERIFY(preview.contains("No command has been executed"));
+        QVERIFY(editor.applyImport());
+        QCOMPARE(store.load()["menu_density"].toString(), "comfortable");
+        QCOMPARE(store.load()["launcher_applet_id"].toInt(), 987);
+        QCOMPARE(store.load()["backup_retention"].toInt(), 0);
+        QCOMPARE(store.load()["unknown"], original["unknown"]);
+        QCOMPARE(store.backups().size(), 1);
+        QVERIFY(store.backups()[0].protectedCopy);
+        QVERIFY(store.backups()[0].name.contains(".pre-import-"));
+        QVERIFY(editor.selectBackup(store.backups()[0].name));
+        QVERIFY(editor.restoreBackup());
+        QCOMPARE(store.load(), original);
+    }
+    void importRejectsInvalidStaleAndChangedDraft() {
+        QTemporaryDir dir; Storage store(dir.filePath("menu.json"));
+        store.save(fixture(), {}); EditorSession editor(store);
+        const auto baseline = store.revision();
+        const auto path = dir.filePath("input.json"); const auto url = QUrl::fromLocalFile(path);
+        for (const QByteArray bytes : {QByteArray("{"), QByteArray("[]"), QByteArray(R"({"version":99,"menu":[]})"),
+                QByteArray(R"({"menu":[{"command":"unsafe string"}]})"), QByteArray(R"({"menu_density":"huge"})")}) {
+            put(path, bytes); QVERIFY(editor.previewImport(url).isEmpty()); QVERIFY(!editor.applyImport());
+            QCOMPARE(store.revision(), baseline);
+        }
+        put(path, QJsonDocument(defaults()).toJson());
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        put(path, QJsonDocument(fixture()).toJson());
+        QVERIFY(!editor.applyImport()); QCOMPARE(editor.errorCode(), "conflict");
+        QCOMPARE(store.revision(), baseline);
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        QVERIFY(editor.preference(R"({"menu_density":"compact"})"));
+        QVERIFY(!editor.applyImport()); QCOMPARE(editor.errorCode(), "unsaved");
+        QCOMPARE(store.revision(), baseline); editor.undo();
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        auto changed = fixture(); changed["menu_width"] = "wide"; store.save(changed, baseline);
+        QVERIFY(!editor.applyImport()); QCOMPARE(editor.errorCode(), "conflict");
+        QCOMPARE(store.load(), changed);
+    }
+    void importNeverExecutesAndRefusesLinks() {
+        QTemporaryDir dir; Storage store(dir.filePath("menu.json"));
+        store.save(fixture(), {}); EditorSession editor(store);
+        const auto marker = dir.filePath("executed");
+        const auto source = dir.filePath("input.json");
+        auto cfg = defaults();
+        cfg["menu"] = QJsonArray{QJsonObject{{"command", QJsonArray{"/usr/bin/touch", marker}}}};
+        put(source, QJsonDocument(cfg).toJson());
+        const auto url = QUrl::fromLocalFile(source);
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        QVERIFY(editor.applyImport()); QVERIFY(!QFile::exists(marker));
+        const auto link = dir.filePath("link.json"); QVERIFY(QFile::link(source, link));
+        QVERIFY(editor.previewImport(QUrl::fromLocalFile(link)).isEmpty());
+        QVERIFY(!editor.exportConfiguration(QUrl::fromLocalFile(link)));
+        QVERIFY(editor.previewImport(QUrl("https://example.org/menu.json")).isEmpty());
+        QVERIFY(editor.previewImport(QUrl::fromLocalFile(source)).size() > 0);
+        editor.cancelImport(); QVERIFY(!editor.applyImport());
+    }
     void metadataAndAlternativeCommandsSurviveEditing() {
         QTemporaryDir dir;
         Storage store(dir.filePath("menu.json"));

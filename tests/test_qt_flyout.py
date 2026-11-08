@@ -60,7 +60,7 @@ Window {
         (folder / 'qmldir').write_text('\n'.join(('singleton ' if name == 'Theme' else '') + f'{name} 1.0 {name}.qml' for name in files))
         for name, content in files.items():
             (folder / (name + '.qml')).write_text(content)
-    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'LayoutDraft.js', 'AccessKeys.js'):
+    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'LayoutDraft.js', 'AccessKeys.js', 'MenuMetrics.js', 'HoverOpen.qml'):
         shutil.copyfile(UI / name, tmp_path / name)
     engine = QQmlEngine()
     engine.addImportPath(str(tmp_path))
@@ -207,3 +207,56 @@ def test_access_keys_ambiguous_and_no_metadata(flyout):
     evaluate(flyout, "entries = [{kind:'command',title:'One',key:'one',access_key:'X'}, {kind:'command',title:'Two',key:'two',access_key:'X'}];")
     QTest.keyClick(flyout, Qt.Key_X)
     assert calls == []
+
+
+@pytest.mark.parametrize('delay', [-1, 0, 100, 600])
+def test_configured_hover_cancel_keyboard_and_nested(flyout, delay):
+    from PySide6.QtCore import QPoint
+    evaluate(flyout, f'submenuHoverDelay={delay};')
+    QTest.mouseMove(flyout, QPoint(100, 55))
+    QTest.mouseMove(flyout, QPoint(100, 15))
+    if delay > 0:
+        QTest.qWait(30)
+        assert evaluate(flyout, 'activeChild === null')
+    QTest.qWait(max(delay, 0) + 80)
+    assert evaluate(flyout, 'activeChild !== null && activeChild.visible')
+    assert evaluate(flyout, 'activeChild.submenuHoverDelay') == delay
+    evaluate(flyout, 'closeChild();')
+    QTest.mouseMove(flyout, QPoint(100, 55))
+    QTest.mouseMove(flyout, QPoint(100, 15))
+    QTest.mouseMove(flyout, QPoint(100, 55))
+    QTest.qWait(max(delay, 0) + 80)
+    assert evaluate(flyout, 'activeChild === null')
+    evaluate(flyout, 'activeIndex=0; flyoutSurface.forceActiveFocus(); requestActivate();')
+    QTest.qWait(10)
+    QTest.keyClick(flyout, Qt.Key_Right)
+    assert evaluate(flyout, 'activeChild !== null && activeChild.visible'), evaluate(flyout, '[activeIndex, keyboardMode, flyoutSurface.activeFocus, visible]')
+    evaluate(flyout, 'visible=false;')
+    QTest.qWait(max(delay, 0) + 80)
+    assert evaluate(flyout, 'activeChild === null')
+
+
+@pytest.mark.parametrize('appearance', ['native', 'aero'])
+def test_appearance_metrics_and_screen_bound(flyout, appearance):
+    evaluate(flyout, f'appearance="{appearance}";')
+    heights=[]
+    for density in ['compact', 'standard', 'comfortable']:
+        evaluate(flyout, f'menuDensity="{density}";')
+        heights.append(evaluate(flyout, 'flyoutRows.itemAt(0).height'))
+    assert heights[0] < heights[1] < heights[2]
+    widths=[]
+    for width in ['narrow', 'auto', 'wide']:
+        evaluate(flyout, f'menuWidth="{width}";')
+        widths.append(flyout.width())
+    assert widths[0] < widths[1] < widths[2]
+    sizes=[]
+    for size in ['small', 'standard', 'large']:
+        evaluate(flyout, f'menuIconSize="{size}";')
+        sizes.append(flyout.property('entryIconSize'))
+    assert sizes[0] < sizes[1] < sizes[2]
+    evaluate(flyout, 'screenRect=Qt.rect(0,0,200,500);')
+    assert flyout.width() <= 200
+    evaluate(flyout, 'flyoutRows.itemAt(0).openChild();')
+    assert evaluate(flyout, 'activeChild.menuDensity') == 'comfortable'
+    assert evaluate(flyout, 'activeChild.menuWidth') == 'wide'
+    assert evaluate(flyout, 'activeChild.menuIconSize') == 'large'

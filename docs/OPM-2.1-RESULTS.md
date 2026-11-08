@@ -1,6 +1,18 @@
 # 2.1 development checkpoint — November 8, 2026
 
-## Latest engineering recovery pass
+## Current feature work — paused at user request
+
+The next pass starts at `cdeb2c0` and adds hover timing, menu appearance presets and
+portable import/export. It is not yet fully qualified. Current evidence and precise
+resume steps are in [the feature checkpoint](OPM-2.1-FEATURE-CHECKPOINT.md).
+The engineering-pass counts below are historical and do not certify these additions.
+
+The `cdeb2c0` PR workflow completed seven of eight jobs. The Manjaro failure occurred
+before compilation: downloading `debugedit`'s package signature from the Berkeley
+mirror timed out. Connected GitHub log access works even though shell downloads are
+blocked; no environment-variable change is needed to investigate current CI.
+
+## Previous engineering recovery pass
 
 Recovered the exact `2937ac6` checkpoint on the existing development branch;
 PR #10 remains draft and stable remains 1.0.1. Code commits `3fd2cd9` and `5976e8b` add bounded

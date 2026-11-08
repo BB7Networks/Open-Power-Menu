@@ -10,9 +10,45 @@
 #include <QScreen>
 #include <QTextStream>
 #include <QWindow>
+#include <QProxyStyle>
+#include <QStyleOptionMenuItem>
 #include <algorithm>
 
 namespace Opm {
+// Local to each OPM menu. Never replace QApplication's desktop style.
+class MenuStyle final : public QProxyStyle {
+    const QJsonObject config;
+  public:
+    MenuStyle(const QJsonObject &cfg, QMenu *menu) : config(cfg) { setParent(menu); }
+    int styleHint(StyleHint hint, const QStyleOption *option = nullptr, const QWidget *widget = nullptr,
+                  QStyleHintReturn *data = nullptr) const override {
+        if (hint == SH_Menu_SubMenuPopupDelay && submenuHoverDelay(config) >= 0)
+            return submenuHoverDelay(config);
+        return QProxyStyle::styleHint(hint, option, widget, data);
+    }
+    int pixelMetric(PixelMetric metric, const QStyleOption *option = nullptr, const QWidget *widget = nullptr) const override {
+        if (metric == PM_SmallIconSize && config["menu_icon_size"].toString("standard") != "standard") {
+            const int height = widget ? widget->fontMetrics().height() : 18;
+            return qRound((config["menu_icon_size"] == "small" ? 14 : 24) * std::max(1., height / 18.));
+        }
+        return QProxyStyle::pixelMetric(metric, option, widget);
+    }
+    QSize sizeFromContents(ContentsType type, const QStyleOption *option, const QSize &contents,
+                           const QWidget *widget = nullptr) const override {
+        auto result = QProxyStyle::sizeFromContents(type, option, contents, widget);
+        const auto *item = qstyleoption_cast<const QStyleOptionMenuItem *>(option);
+        if (type == CT_MenuItem && item && item->menuItemType != QStyleOptionMenuItem::Separator) {
+            const auto density = config["menu_density"].toString("standard");
+            const int icon = item->icon.isNull() ? 0 : pixelMetric(PM_SmallIconSize, option, widget);
+            const int minimum = std::max(item->fontMetrics.height(), icon);
+            if (density != "standard") result.setHeight(minimum + (density == "compact" ? 6 : 16));
+            else result.setHeight(std::max(result.height(), minimum + 4));
+            const auto width = config["menu_width"].toString("auto");
+            if (width != "auto") result.setWidth(std::max(result.width(), qRound((width == "narrow" ? 240 : 394) * std::max(1., item->fontMetrics.height() / 18.))));
+        }
+        return result;
+    }
+};
 QPoint menuPosition(const QRect &area, const QSize &size, const QPoint &cursor,
                     const QString &anchor) {
     QPoint pos = cursor;
@@ -32,18 +68,20 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
     setObjectName("OpenPowerMenu");
     setWindowTitle("Open Power Menu");
     setToolTipsVisible(true);
-    setMinimumWidth(292);
+    setStyle(new MenuStyle(config, this));
+    setMinimumWidth(config["menu_width"].toString("auto") == "auto" ? 292 :
+                    qRound((config["menu_width"] == "narrow" ? 240 : 394) * std::max(1., fontMetrics().height() / 18.)));
     if (wayland)
         setWindowFlags(Qt::Window | Qt::FramelessWindowHint);
     setStyleSheet("QMenu { menu-scrollable: 1; }");
     if ((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero")
         setStyleSheet(QStringLiteral(
             "QMenu { menu-scrollable:1; background-color:#242A31; color:#E4EBF2; border:1px solid #5E7D94; padding:5px 3px; }"
-            "QMenu::item { padding:6px 25px 6px 13px; border-radius:2px; }"
+            "QMenu::item { padding:%1px 25px %1px 13px; border-radius:2px; }"
             "QMenu::item:selected { background-color:#355B76; color:#FFFFFF; }"
             "QMenu::item:disabled { color:#89939C; }"
             "QMenu::separator { height:1px; background:#445463; margin:5px 10px; }"
-            "QMenu::icon { padding-left:5px; }"));
+            "QMenu::icon { padding-left:5px; }").arg(config["menu_density"] == "compact" ? 3 : config["menu_density"] == "comfortable" ? 8 : 6));
     presentation = model.publicMenu(config);
     installEventFilter(this);
     populate(this, presentation);
@@ -110,6 +148,7 @@ void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
             action->setProperty("opmIdentity", identity);
             if (kind == "submenu") {
                 auto *child = new QMenu(menu);
+                child->setStyle(new MenuStyle(config, child));
                 child->setToolTipsVisible(true);
                 child->installEventFilter(this);
                 connect(child, &QObject::destroyed, this, [this, child] { inside.remove(child); });
@@ -170,6 +209,11 @@ void Standalone::updateDismissal() {
 bool Standalone::eventFilter(QObject *object, QEvent *event) {
     auto *menu = qobject_cast<QMenu *>(object);
     if (menu) {
+        if (event->type() == QEvent::Show && menu->screen()) {
+            const int available = menu->screen()->availableGeometry().width();
+            menu->setMinimumWidth(std::min(menu->minimumWidth(), available));
+            menu->setMaximumWidth(available);
+        }
         if (menu == this && event->type() == QEvent::Show && windowHandle())
             windowHandle()->installEventFilter(this);
         switch (event->type()) {

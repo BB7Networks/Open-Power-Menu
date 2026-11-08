@@ -187,11 +187,13 @@ Fd writerLock(int directory) {
 bool backupNameAllowed(const QByteArray &base, const QString &name) {
     return !name.isEmpty() && !name.contains('/') && !name.contains(QChar(0)) &&
            (name.startsWith(QString::fromUtf8(base) + ".bak-") ||
+            name.startsWith(QString::fromUtf8(base) + ".pre-import-") ||
             name.startsWith(QString::fromUtf8(base) + ".pre-restore-") ||
             name.startsWith(QString::fromUtf8(base) + ".pre-overwrite-"));
 }
 bool protectedBackup(const QByteArray &base, const QString &name) {
-    return name.startsWith(QString::fromUtf8(base) + ".pre-restore-") ||
+    return name.startsWith(QString::fromUtf8(base) + ".pre-import-") ||
+           name.startsWith(QString::fromUtf8(base) + ".pre-restore-") ||
            name.startsWith(QString::fromUtf8(base) + ".pre-overwrite-");
 }
 struct BackupRead {
@@ -342,6 +344,35 @@ Revision Storage::save(const QJsonObject &config, const Revision &expected,
     const auto lock = writerLock(directory);
     return writeAt(directory, QFile::encodeName(QFileInfo(target).fileName()), config, expected,
                    reason == SaveReason::Overwrite ? QByteArray(".pre-overwrite-") : QByteArray());
+}
+void Storage::exportFile(const QString &path, const QByteArray &bytes) {
+    if (bytes.size() > MaxConfigBytes) throw Error("Export exceeds the 4 MiB limit", "too-large");
+    const auto target = QFileInfo(path).absoluteFilePath();
+    auto directory = parent(target, false);
+    if (directory < 0) throw Error("Export directory does not exist");
+    const auto name = QFile::encodeName(QFileInfo(target).fileName());
+    const auto temporary = ".opm-export-" + QUuid::createUuid().toString(QUuid::Id128).toLatin1();
+    writeNew(directory, temporary, bytes);
+    // Atomic, exclusive publication: even a racing new file or symlink cannot
+    // be overwritten. Export never changes an existing file or active config.
+    if (::linkat(directory, temporary.constData(), directory, name.constData(), 0)) {
+        ::unlinkat(directory, temporary.constData(), 0);
+        throw Error("Export destination exists or cannot be created; choose a new filename", "conflict");
+    }
+    ::unlinkat(directory, temporary.constData(), 0);
+    if (::fsync(directory)) qWarning("Export saved; directory sync failed");
+}
+Revision Storage::importConfiguration(const QJsonObject &config, const Revision &expected,
+                                      const QString &sourcePath, const Revision &source) const {
+    auto directory = parent(target, true);
+    const auto lock = writerLock(directory);
+    const auto unchanged = [&] {
+        if (Storage(sourcePath).revision() != source)
+            throw Error("Import source changed since preview; preview it again", "conflict");
+    };
+    unchanged();
+    return writeAt(directory, QFile::encodeName(QFileInfo(target).fileName()), config, expected,
+                   ".pre-import-", {}, unchanged);
 }
 bool BackupSnapshot::operator==(const BackupSnapshot &other) const {
     return std::tie(name, directoryDevice, directoryInode, device, inode, size, modifiedNs,

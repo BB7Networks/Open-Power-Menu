@@ -72,6 +72,15 @@ void validateAccessKeys(const QJsonArray &items) {
             validateAccessKeys(item["items"].toArray());
     }
 }
+int submenuHoverDelay(const QJsonObject &config) {
+    const auto value = config.value("submenu_hover_delay_ms");
+    if (value.isUndefined()) return -1;
+    const double n = value.toDouble(-2);
+    if (!value.isDouble() || !std::isfinite(n) || std::floor(n) != n ||
+        (n != -1 && (n < 0 || n > 600 || int(n) % 100)))
+        throw Error("Submenu hover delay must be -1 (system), 0, or 100–600 ms in 100 ms steps", "invalid");
+    return int(n);
+}
 int pointerLeaveDelay(const QJsonObject &config) {
     const auto value = config.value("auto_close_delay_ms");
     if (value.isUndefined())

@@ -10,5 +10,6 @@ constexpr int PointerLeaveDefault = 1200;
 QString defaultAccessKey(const QJsonObject &item);
 QJsonArray defaultAccessKeys(const QJsonArray &items, bool reset = false);
 void validateAccessKeys(const QJsonArray &items);
+int submenuHoverDelay(const QJsonObject &config);
 int pointerLeaveDelay(const QJsonObject &config);
 }

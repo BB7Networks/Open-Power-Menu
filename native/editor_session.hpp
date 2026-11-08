@@ -1,6 +1,7 @@
 #pragma once
 #include "storage.hpp"
 #include <QObject>
+#include <QUrl>
 #include <functional>
 
 namespace Opm {
@@ -25,6 +26,8 @@ class EditorSession : public QObject {
         QJsonArray nodes;
         QString selection;
     };
+    struct ImportPreview { QString path; Revision source, active; QJsonObject config; };
+    std::optional<ImportPreview> imported;
     Storage storage;
     Revision baseline;
     QJsonObject savedConfig;
@@ -70,6 +73,10 @@ class EditorSession : public QObject {
     Q_INVOKABLE void selectItem(const QString &id);
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
+    Q_INVOKABLE bool exportConfiguration(const QUrl &file);
+    Q_INVOKABLE QString previewImport(const QUrl &file);
+    Q_INVOKABLE bool applyImport();
+    Q_INVOKABLE void cancelImport() { imported.reset(); }
     Q_INVOKABLE bool save();
     Q_INVOKABLE bool reload(bool discard = false);
     Q_INVOKABLE bool checkExternal();

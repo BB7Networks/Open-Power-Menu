@@ -1,4 +1,6 @@
 #include "editor_session.hpp"
+#include <QStandardPaths>
+#include <QFileInfo>
 #include "interaction.hpp"
 #include <QJsonDocument>
 #include <QSet>
@@ -190,6 +192,7 @@ bool EditorSession::dirty() const {
 void EditorSession::reset(const QJsonObject &config, const Revision &revision) {
     auto settings = config;
     settings.remove("menu");
+    imported.reset();
     history = {{settings, nodes(config["menu"].toArray()), {}}};
     position = 0;
     baseline = revision;
@@ -250,7 +253,7 @@ bool EditorSession::preference(const QString &text) {
     return perform([&] {
         const auto changes = object(text);
         auto state = history[position];
-        const QSet<QString> allowed{"appearance",
+        const QSet<QString> allowed{"appearance", "menu_density", "menu_width", "menu_icon_size", "submenu_hover_delay_ms",
                                     "anchor",
                                     "hide_original_launcher",
                                     "launcher_applet_id",
@@ -452,6 +455,77 @@ void EditorSession::saved(const Revision &revision) {
     overwritePreview.reset();
     emit changed();
     refreshBackups();
+}
+namespace {
+const QStringList localPreferences{"launcher_applet_id", "hide_original_launcher", "button_icon_mode", "button_icon", "backup_retention"};
+QString localPath(const QUrl &url) {
+    if (!url.isLocalFile() || !url.host().isEmpty() || url.hasQuery() || url.hasFragment())
+        throw Error("Choose a local JSON file", "invalid");
+    return url.toLocalFile();
+}
+QJsonObject portable(QJsonObject config) {
+    for (const auto &key : localPreferences) config.remove(key);
+    return config;
+}
+QString importWarnings(const QJsonArray &items) {
+    QStringList warnings;
+    for (const auto &value : items) {
+        const auto item = value.toObject();
+        if (item.contains("submenu")) warnings.append(importWarnings(item["items"].toArray()));
+        const auto candidates = item.contains("command") ? QJsonArray{item["command"]} : item["commands"].toArray();
+        for (const auto &candidate : candidates) {
+            const auto args = candidate.isObject() ? candidate.toObject()["argv"].toArray() : candidate.toArray();
+            const auto program = args.first().toString();
+            if (!program.isEmpty() && QStandardPaths::findExecutable(program).isEmpty())
+                warnings.append("Unavailable or unresolved command: " + program);
+        }
+    }
+    warnings.removeAll(QString()); warnings.removeDuplicates();
+    return warnings.join('\n');
+}
+}
+bool EditorSession::exportConfiguration(const QUrl &file) {
+    return perform([&] {
+        validate(configuration());
+        Storage::exportFile(localPath(file), QJsonDocument(portable(configuration())).toJson(QJsonDocument::Indented));
+    });
+}
+QString EditorSession::previewImport(const QUrl &file) {
+    imported.reset();
+    QString result;
+    perform([&] {
+        if (dirty()) throw Error("Save or discard your draft before importing", "unsaved");
+        const auto active = storage.revision();
+        if (active != baseline) throw Error("Active configuration changed; reload before importing", "conflict");
+        const auto path = localPath(file);
+        const auto source = Storage(path).revision();
+        if (!source.content) throw Error("Import file does not exist", "invalid");
+        const auto document = parseJson(*source.content);
+        if (!document.isObject() || (document.object().contains("version") && document.object()["version"] != QJsonValue(1)))
+            throw Error("Import requires OPM JSON schema version 1", "invalid");
+        auto candidate = decode(source.content);
+        const auto current = configuration();
+        for (const auto &key : localPreferences) candidate[key] = current[key];
+        validate(candidate);
+        result = "Import replaces menu and portable preferences after confirmation. The current file will be kept as a protected recovery copy.\n"
+                 "This workstation's launcher, button icon, backup retention and global shortcuts are preserved.\n"
+                 "Custom commands, arguments, icons, local paths and extension metadata may contain sensitive or machine-specific information. Review them before applying. No command has been executed. Built-in/power availability is checked when opening the menu.\n\n";
+        const auto warnings = importWarnings(candidate["menu"].toArray());
+        if (!warnings.isEmpty()) result += warnings + "\n\n";
+        result += summary(candidate) + "\n\n" + QString::fromUtf8(QJsonDocument(portable(candidate)).toJson(QJsonDocument::Indented));
+        imported = ImportPreview{path, source, active, candidate};
+    });
+    return result;
+}
+bool EditorSession::applyImport() {
+    return perform([&] {
+        if (!imported) throw Error("Preview an import first", "invalid");
+        if (dirty()) throw Error("Draft changed after preview; save or discard and preview again", "unsaved");
+        const auto preview = *imported;
+        const auto revision = storage.importConfiguration(preview.config, preview.active, preview.path, preview.source);
+        reset(preview.config, revision);
+        imported.reset(); refreshBackups();
+    });
 }
 bool EditorSession::save() {
     return perform([&] {

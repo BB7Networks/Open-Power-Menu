@@ -45,6 +45,9 @@ class Storage {
     QJsonObject load() const { return decode(revision().content); }
     Revision save(const QJsonObject &config, const Revision &expected,
                   SaveReason reason = SaveReason::Normal) const;
+    static void exportFile(const QString &path, const QByteArray &bytes);
+    Revision importConfiguration(const QJsonObject &config, const Revision &expected,
+                                 const QString &sourcePath, const Revision &source) const;
     QList<Backup> backups() const;
     Backup preview(const QString &name) const;
     Revision restore(const BackupSnapshot &source, const Revision &expected) const;

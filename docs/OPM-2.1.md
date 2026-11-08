@@ -15,6 +15,10 @@ The JSON schema remains version 1 and unknown metadata is retained. New settings
 | `access_keys_enabled` | `true` | Local menu access keys, independent of Meta+X |
 | `show_access_key_hints` | `true` | Separate visual-hint preference |
 | `auto_close_delay_ms` | `1200` | Integer 500–5000 inclusive, in steps of 100 |
+| `submenu_hover_delay_ms` | `-1` | Existing/system; `0` immediate; 100–600 ms in steps of 100 |
+| `menu_density` | `"standard"` | `compact`, `standard`, `comfortable` |
+| `menu_width` | `"auto"` | `auto`, `narrow`, `wide`; preferred, screen bounded |
+| `menu_icon_size` | `"standard"` | `small`, `standard`, `large`; independent of icon visibility |
 | Entry `access_key` | OPM preset when unambiguous | A–Z or 0–9, case-insensitive; empty explicitly disables |
 
 `auto_close_on_pointer_leave` stays **false** by default; saved values are preserved.
@@ -40,6 +44,42 @@ entries cannot execute. Widget layout editing and keyboard navigation suspend po
 dismissal. Root/child flyouts share the timer. Pointer re-entry cancels it, reopening
 resets it, and a changed delay starts a full new grace period. Standalone timers are
 owned by their menu and stopped on hide/return.
+
+## Menu customization and portable JSON (feature checkpoint)
+
+The General tab adds density, width, icon size and independent submenu hover timing.
+The default preserves each frontend's existing policy: immediate hover in the widget,
+Qt's desktop style delay in standalone. Keyboard and click activation remain immediate.
+Widget timers cancel on exit, hide, keyboard navigation and destruction. Standalone
+uses per-menu Qt style hints and native QMenu timers; no application-wide style is
+replaced. Native and Aero retain their colors and fonts. Width is a preference;
+long labels can require more space and menus remain bounded by screen geometry.
+The defaults preserve existing dimensions at ordinary font sizes; larger system
+fonts expand rows to avoid clipping. Physical scaling/theme acceptance is pending.
+
+Backups adds explicit **Export JSON** and **Import JSON**. Export includes the current
+draft, menu tree, action references, literal command arguments, icons, labels, entry
+keys, appearance, timings and compatible unknown metadata. It excludes local launcher
+selection/hiding, Start button icon and backup retention. It does not read backup
+history, panel configuration, transaction journals or global shortcuts. Commands,
+paths and extension metadata may contain sensitive information: review before sharing.
+Exports use private permissions and atomic exclusive creation; choose a new filename.
+
+Import requires a saved or discarded draft, a local regular JSON file (at most 4 MiB),
+schema version 1 or a compatible legacy file without a version, and normal menu/schema
+validation. The preview contains the normalized JSON and unresolved-program warnings.
+No command is run, and preview does not query a command's own capabilities. Local paths
+are explicitly warned about and retained for review; unavailable built-ins and power
+policy are resolved when opening the menu. Compatible unknown metadata is retained.
+Applying rechecks both the source file and active configuration, preserves local
+launcher/button/retention settings and uses the existing locked atomic storage path.
+The previous active file gets a protected `.pre-import-` copy even at retention zero;
+normal automatic pruning cannot remove it. Preview cancellation and invalid/stale
+imports leave the active configuration unchanged. Successful import starts a clean
+editor history; recovery uses the protected backup. No shortcut assignment changes.
+
+This feature checkpoint is **not yet fully qualified**. See
+[the resume checklist](OPM-2.1-FEATURE-CHECKPOINT.md) before physical acceptance.
 
 ## Native power behavior
 

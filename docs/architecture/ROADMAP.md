@@ -27,8 +27,11 @@ See [2.1 configuration and physical gates](../OPM-2.1.md),
 The Store widget continues to require a separately installed native backend.
 No frontend rewrite or self-contained Store claim is part of this release.
 
-Optional future work (outside this pass): configurable submenu hover delay,
-portable import/export and a separately evaluated self-contained Store edition.
+The current feature checkpoint adds configurable submenu hover delay, density/width/
+icon presets and portable JSON import/export to the existing native architecture.
+Implementation and focused tests are saved; full qualification is still pending.
+See [feature checkpoint and next steps](../OPM-2.1-FEATURE-CHECKPOINT.md).
+A self-contained Store edition remains outside this pass.
 
 No merge, tagging, release publication, KDE Store update or active-desktop changes
 are authorized by development preparation. Stable remains 1.0.1 until explicit

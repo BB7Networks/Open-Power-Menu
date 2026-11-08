@@ -2,6 +2,7 @@
 // Plasma 6.7-compatible right-click Start adapter: no launcher patches.
 import QtQuick
 import "AccessKeys.js" as AccessKeys
+import "MenuMetrics.js" as Metrics
 import QtQuick.Layouts
 import QtQml
 import QtQuick.Window
@@ -80,6 +81,10 @@ PlasmoidItem {
     property bool showMenuIcons: true
     property bool autoCloseOnPointerLeave: false
     property int autoCloseDelay: 1200
+    property int submenuHoverDelay: -1
+    property string menuDensity: "standard"
+    property string menuWidth: "auto"
+    property string menuIconSize: "standard"
     property string commandError: ""
     property bool launchPending: false
     // Temporary state belongs to the applet, so closing its popup keeps the draft.
@@ -484,6 +489,10 @@ PlasmoidItem {
                      showMenuIcons = cfg.show_menu_icons !== false;
                      autoCloseOnPointerLeave = cfg.auto_close_on_pointer_leave === true;
                      autoCloseDelay = cfg.auto_close_delay_ms === undefined ? 1200 : Number(cfg.auto_close_delay_ms);
+                     submenuHoverDelay = cfg.submenu_hover_delay_ms === undefined ? -1 : Number(cfg.submenu_hover_delay_ms);
+                     menuDensity = cfg.menu_density || "standard";
+                     menuWidth = cfg.menu_width || "auto";
+                     menuIconSize = cfg.menu_icon_size || "standard";
                      synchronizeLauncherVisibility();
                  } catch (e) {
                      console.warn("Open Power Menu: invalid integration configuration", e);
@@ -850,6 +859,9 @@ PlasmoidItem {
         id: popup
         focus: true
         property int activeIndex: -1
+        FontMetrics { id: menuFont; font: Qt.application.font }
+        readonly property int entryIconSize: Metrics.iconSize(root.menuIconSize, menuFont.height)
+        readonly property int entryHeight: Metrics.rowHeight(root.menuDensity, menuFont.height, root.showMenuIcons ? entryIconSize : 0)
         PointerDismissal {
             id: autoDismiss
             enabled: root.autoCloseOnPointerLeave
@@ -903,6 +915,10 @@ PlasmoidItem {
             id: flyout
             appearance: root.menuAppearance
             showMenuIcons: root.showMenuIcons
+            menuDensity: root.menuDensity
+            menuWidth: root.menuWidth
+            menuIconSize: root.menuIconSize
+            submenuHoverDelay: root.submenuHoverDelay
             onReturnToParent: {
                 if (!root.expanded) return;
                 if (popup.Window.window) popup.Window.window.requestActivate();
@@ -964,9 +980,9 @@ PlasmoidItem {
 
         // The unlocked layout editor stays in this single Plasma popup.
         // Spring-loaded submenu navigation does not create native child windows.
-        Layout.preferredWidth: 328
+        Layout.preferredWidth: Metrics.menuWidth(root.menuWidth, 328, menuFont.height, Screen.desktopAvailableWidth)
         Layout.preferredHeight: Math.max(76, Math.min(heightCap, naturalHeight))
-        Layout.minimumWidth: 285
+        Layout.minimumWidth: Math.min(285, Layout.preferredWidth)
         Layout.minimumHeight: 76
 
         ColumnLayout {
@@ -1082,7 +1098,7 @@ PlasmoidItem {
                                 Screen.virtualX, Screen.virtualY,
                                 Screen.width, Screen.height)
                             width: menuColumn.width
-                            height: entry.kind === "separator" ? 13 : 34
+                            height: entry.kind === "separator" ? 13 : popup.entryHeight
                             Kirigami.Separator {
                                 anchors.centerIn: parent
                                 width: parent.width - 24
@@ -1103,9 +1119,17 @@ PlasmoidItem {
                                 anchors.rightMargin: 8
                                 entry: menuRow.entry
                                 showIcons: root.showMenuIcons
+                                iconSize: popup.entryIconSize
                                 foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
                                 opensLeft: (flyout.visible && popup.activeFlyoutKey === menuRow.entry.key
                                     ? flyout.indicatorDirection : flyout.chooseSide(menuRow, menuRow.menuScreen)) === Qt.LeftEdge
+                            }
+                            HoverOpen {
+                                id: hoverOpen
+                                delay: root.submenuHoverDelay
+                                enabled: root.expanded && !root.layoutEditing && !root.layoutBusy && !autoDismiss.keyboardMode && menuRow.entry.kind === "submenu"
+                                hovered: rowMouse.containsMouse
+                                onOpenRequested: popup.showFlyout(menuRow.entry, menuRow)
                             }
                             MouseArea {
                                 id: rowMouse
@@ -1116,13 +1140,10 @@ PlasmoidItem {
                                 // panel edge. Plasma flips left if necessary.
                                 onEntered: {
                                     popup.activeIndex = menuRow.index;
-                                    if (menuRow.entry.kind === "submenu") {
-                                        popup.showFlyout(menuRow.entry, menuRow);
-                                    } else {
-                                        flyout.visible = false;
-                                    }
+                                    if (menuRow.entry.kind !== "submenu") flyout.visible = false;
                                 }
                                 onClicked: {
+                                    hoverOpen.cancel();
                                     if (menuRow.entry.kind === "submenu") {
                                         popup.showFlyout(menuRow.entry, menuRow);
                                     } else {

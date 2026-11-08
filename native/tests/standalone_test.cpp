@@ -57,6 +57,68 @@ class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
 
+    void appearancePresets_data() {
+        QTest::addColumn<QString>("appearance"); QTest::addColumn<QString>("icons");
+        for (const auto &theme : {"native", "aero"})
+            for (const auto &size : {"small", "standard", "large"})
+                QTest::newRow(qPrintable(QString(theme) + "-" + size)) << QString(theme) << QString(size);
+    }
+    void appearancePresets() {
+        QFETCH(QString, appearance); QFETCH(QString, icons);
+        auto cfg = configuration(); cfg["appearance"] = appearance; cfg["menu_icon_size"] = icons;
+        QStyle *applicationStyle = QApplication::style();
+        QList<int> heights, widths;
+        for (const auto &density : {"compact", "standard", "comfortable"}) {
+            cfg["menu_density"] = density; Standalone menu(cfg);
+            menu.popup(QPoint(10, 10)); QTest::qWait(10);
+            heights << menu.actionGeometry(menu.actions().first()).height(); menu.close();
+        }
+        QVERIFY2(heights[0] < heights[1] && heights[1] < heights[2], qPrintable(QString("heights %1 %2 %3").arg(heights[0]).arg(heights[1]).arg(heights[2])));
+        for (const auto &width : {"narrow", "auto", "wide"}) {
+            cfg["menu_width"] = width; Standalone menu(cfg);
+            menu.popup(QPoint(10, 10)); QTest::qWait(10); widths << menu.width();
+            QVERIFY(menu.width() <= menu.screen()->availableGeometry().width()); menu.close();
+        }
+        QVERIFY2(widths[0] < widths[1] && widths[1] < widths[2], qPrintable(QString("widths %1 %2 %3").arg(widths[0]).arg(widths[1]).arg(widths[2])));
+        QCOMPARE(QApplication::style(), applicationStyle);
+        cfg["menu_width"] = "wide";
+        cfg["menu"] = QJsonArray{command(QString(300, QChar('W')))};
+        Standalone longMenu(cfg); auto font = longMenu.font(); font.setPointSizeF(font.pointSizeF() * 1.25); longMenu.setFont(font);
+        longMenu.popup(QPoint(10,10)); QTest::qWait(10);
+        QVERIFY(longMenu.width() <= longMenu.screen()->availableGeometry().width());
+        QVERIFY(longMenu.actionGeometry(longMenu.actions().first()).height() >= longMenu.fontMetrics().height());
+        longMenu.close();
+    }
+    void hoverTimingAndKeyboardOverride_data() {
+        QTest::addColumn<int>("delay");
+        for (int delay : {-1, 0, 100, 600}) QTest::newRow(qPrintable(QString::number(delay))) << delay;
+    }
+    void hoverTimingAndKeyboardOverride() {
+        QFETCH(int, delay);
+        auto cfg = configuration(); cfg["submenu_hover_delay_ms"] = delay;
+        Standalone menu(cfg); auto *child = menu.actions()[2]->menu();
+        const int expected = delay < 0 ? QApplication::style()->styleHint(QStyle::SH_Menu_SubMenuPopupDelay) : delay;
+        QCOMPARE(menu.style()->styleHint(QStyle::SH_Menu_SubMenuPopupDelay, nullptr, &menu), expected);
+        menu.popup(QPoint(40,40)); QTest::qWait(20);
+        enter(&menu);
+        moveTo(&menu, menu.actionGeometry(menu.actions()[0]).center());
+        for (int i = 0; i < 10; ++i)
+            moveTo(&menu, menu.actionGeometry(menu.actions()[2]).center() + QPoint(i % 2, 0));
+        if (expected > 50) { QTest::qWait(40); QVERIFY(!child->isVisible()); }
+        QTRY_VERIFY_WITH_TIMEOUT(child->isVisible(), expected + 600);
+        // Reopen through QMenu's lifecycle; manually hiding a submenu bypasses
+        // Qt's active-popup/sloppy-pointer cleanup and is not a user transition.
+        QTest::keyClick(child, Qt::Key_Escape);
+        menu.close(); menu.popup(QPoint(40,40)); QTest::qWait(20); enter(&menu);
+        for (int i = 0; i < 10; ++i)
+            moveTo(&menu, menu.actionGeometry(menu.actions()[2]).center() + QPoint(i % 2, 0));
+        moveTo(&menu, menu.actionGeometry(menu.actions()[0]).center());
+        QTest::qWait(expected + 80); QVERIFY(!child->isVisible());
+        menu.setActiveAction(menu.actions()[2]); QTest::keyClick(&menu, Qt::Key_Right);
+        QVERIFY(child->isVisible()); // explicit activation does not wait
+        menu.close(); QTest::qWait(expected + 80); QVERIFY(!child->isVisible());
+    }
+
     void powerOnlyMenuWaitsWithoutBlockingInput() {
         QList<std::pair<QDBusMessage, PowerReply>> requests;
         auto power = cachedPowerManager([&](bool, const QDBusMessage &message, PowerReply done) {

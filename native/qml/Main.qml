@@ -280,6 +280,42 @@ Kirigami.ApplicationWindow {
                                 currentIndex: window.settings.appearance === "aero" ? 1 : 0
                                 onActivated: index => window.preference("appearance", index === 1 ? "aero" : "native")
                             }
+                            RowLayout {
+                                Controls.Label { text: "Menu density" }
+                                Controls.ComboBox {
+                                    objectName: "menu_density"
+                                    Accessible.name: "Menu density"
+                                    Layout.fillWidth: true
+
+                                    model: ["Compact", "Standard", "Comfortable"]
+                                    currentIndex: ["compact", "standard", "comfortable"].indexOf(window.settings.menu_density)
+                                    onActivated: index => window.preference("menu_density", ["compact", "standard", "comfortable"][index])
+                                }
+                            }
+                            RowLayout {
+                                Controls.Label { text: "Menu width" }
+                                Controls.ComboBox {
+                                    objectName: "menu_width"
+                                    Accessible.name: "Menu width"
+                                    Layout.fillWidth: true
+
+                                    model: ["Automatic", "Narrow", "Wide"]
+                                    currentIndex: ["auto", "narrow", "wide"].indexOf(window.settings.menu_width)
+                                    onActivated: index => window.preference("menu_width", ["auto", "narrow", "wide"][index])
+                                }
+                            }
+                            RowLayout {
+                                Controls.Label { text: "Icon size" }
+                                Controls.ComboBox {
+                                    objectName: "menu_icon_size"
+                                    Accessible.name: "Icon size"
+                                    Layout.fillWidth: true
+                                    enabled: window.settings.show_menu_icons
+                                    model: ["Small", "Standard", "Large"]
+                                    currentIndex: ["small", "standard", "large"].indexOf(window.settings.menu_icon_size)
+                                    onActivated: index => window.preference("menu_icon_size", ["small", "standard", "large"][index])
+                                }
+                            }
                             Controls.CheckBox {
                                 text: "Show icons in Power User Menu"
                                 checked: window.settings.show_menu_icons
@@ -300,6 +336,25 @@ Kirigami.ApplicationWindow {
                                     textFromValue: (value, locale) => Number(value / 10).toLocaleString(locale, 'f', 1)
                                     onValueModified: window.preference("auto_close_delay_ms", value * 100)
                                     Accessible.name: "Automatic-close delay in seconds"
+                                }
+                            }
+                            RowLayout {
+                                Controls.Label { text: "Open submenu on hover" }
+                                Controls.ComboBox {
+                                    objectName: "hoverMode"
+                                    Accessible.name: "Submenu hover behavior"
+                                    model: ["Existing / system", "Immediate", "Delayed"]
+                                    currentIndex: window.settings.submenu_hover_delay_ms < 0 ? 0 : window.settings.submenu_hover_delay_ms === 0 ? 1 : 2
+                                    onActivated: index => window.preference("submenu_hover_delay_ms", index === 0 ? -1 : index === 1 ? 0 : 300)
+                                }
+                                Controls.SpinBox {
+                                    objectName: "hoverDelay"
+                                    Accessible.name: "Submenu hover delay in milliseconds"
+                                    enabled: window.settings.submenu_hover_delay_ms > 0
+                                    from: 100; to: 600; stepSize: 100
+                                    value: Math.max(100, window.settings.submenu_hover_delay_ms)
+                                    textFromValue: value => value + " ms"
+                                    onValueModified: window.preference("submenu_hover_delay_ms", value)
                                 }
                             }
                             Controls.CheckBox {
@@ -432,10 +487,34 @@ Kirigami.ApplicationWindow {
                     }
                 }
                 Controls.Label {
-                    text: "Zero disables new automatic backups. Restore and explicit overwrite still keep protected recovery copies."
+                    text: "Zero disables new automatic backups. Import, restore and explicit overwrite still keep protected recovery copies."
                     wrapMode: Text.Wrap
                     Layout.fillWidth: true
                 }
+                RowLayout {
+                    Controls.Button {
+                        objectName: "exportConfiguration"
+                        text: "Export JSON…"
+                        onClicked: exportPicker.open()
+                    }
+                    Controls.Button {
+                        objectName: "importConfiguration"
+                        text: "Import JSON…"
+                        enabled: !editorSession.dirty
+                        onClicked: importPicker.open()
+                    }
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.Wrap
+                        text: editorSession.dirty ? "Save or discard your draft before importing. Export includes your draft." : "Import previews changes before applying."
+                    }
+                }
+                Controls.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                    text: "Portable JSON can contain sensitive commands, arguments and local paths. Review before sharing. Choose a new export filename; existing files are protected."
+                }
+                Controls.Label { id: portableStatus; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0 }
                 Controls.SplitView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -519,6 +598,53 @@ Kirigami.ApplicationWindow {
         title: "Choose Start button image"
         nameFilters: ["Images (*.png *.svg *.svgz *.jpg *.jpeg *.webp *.ico)"]
         onAccepted: window.preference("button_icon", selectedFile.toString())
+    }
+    FileDialog {
+        id: exportPicker
+        title: "Export portable configuration to a new file"
+        fileMode: FileDialog.SaveFile
+        defaultSuffix: "json"
+        nameFilters: ["OPM configuration (*.json)"]
+        onAccepted: if (editorSession.exportConfiguration(selectedFile)) portableStatus.text = "Exported to " + selectedFile.toString()
+    }
+    FileDialog {
+        id: importPicker
+        title: "Import portable configuration"
+        fileMode: FileDialog.OpenFile
+        nameFilters: ["OPM configuration (*.json)", "All files (*)"]
+        onAccepted: {
+            importText.text = editorSession.previewImport(selectedFile);
+            if (importText.text) importPreview.open();
+        }
+    }
+    Controls.Dialog {
+        id: importPreview
+        objectName: "importPreview"
+        title: "Review configuration import"
+        parent: Controls.Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(window.width - 32, 760)
+        height: Math.min(window.height - 48, 580)
+        modal: true
+        standardButtons: Controls.Dialog.Apply | Controls.Dialog.Cancel
+        contentItem: Controls.ScrollView {
+            clip: true
+            Controls.TextArea {
+                id: importText
+                objectName: "importPreviewText"
+                readOnly: true
+                selectByMouse: true
+                wrapMode: TextEdit.Wrap
+                Accessible.name: "Configuration import preview and warnings"
+            }
+        }
+        onApplied: {
+            if (editorSession.applyImport()) {
+                portableStatus.text = "Imported configuration; previous settings kept as a protected recovery copy.";
+                close();
+            } else { close(); }
+        }
+        onRejected: editorSession.cancelImport()
     }
     EntryDialog {
         id: entryDialog

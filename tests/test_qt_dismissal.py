@@ -146,3 +146,32 @@ def test_rapid_reopening_cancels_old_timer(policy):
         obj.setProperty('menuOpen', True)
     QTest.qWait(70)
     assert calls == []
+
+
+@pytest.mark.parametrize('cancel', ['exit', 'disabled', 'destroyed'])
+def test_hover_timer_cancellation_and_destruction(cancel):
+    app=QApplication.instance() or QApplication([])
+    engine=QQmlEngine()
+    source=Path(__file__).resolve().parents[1]/'plasmoid/contents/ui/HoverOpen.qml'
+    component=QQmlComponent(engine,QUrl.fromLocalFile(str(source)))
+    obj=component.create()
+    assert obj, [str(e) for e in component.errors()]
+    calls=[]
+    obj.openRequested.connect(lambda: calls.append(True))
+    obj.setProperty('delay',100)
+    obj.setProperty('hovered',True)
+    QTest.qWait(20)
+    if cancel=='exit': obj.setProperty('hovered',False)
+    elif cancel=='disabled': obj.setProperty('enabled',False)
+    else:
+        from PySide6.QtCore import QCoreApplication, QEvent
+        obj.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QTest.qWait(150)
+    assert not calls
+    if cancel != 'destroyed':
+        obj.setProperty('enabled',True)
+        obj.setProperty('hovered',True)
+        QTest.qWait(150)
+        assert calls == [True]
+        obj.deleteLater(); app.processEvents()

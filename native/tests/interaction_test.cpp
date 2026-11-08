@@ -10,6 +10,27 @@ using namespace Opm;
 class InteractionTests : public QObject {
     Q_OBJECT
   private slots:
+    void appearanceAndHoverValidation() {
+        const auto legacy = decode(QByteArray(R"({"menu":[{"action":"files"}],"future":true})"));
+        QCOMPARE(submenuHoverDelay(legacy), -1);
+        QCOMPARE(legacy["menu_density"].toString(), "standard");
+        QCOMPARE(legacy["menu_width"].toString(), "auto");
+        QCOMPARE(legacy["menu_icon_size"].toString(), "standard");
+        for (int delay : {-1, 0, 100, 200, 300, 400, 500, 600}) {
+            auto cfg = legacy; cfg["submenu_hover_delay_ms"] = delay;
+            validate(cfg); QCOMPARE(submenuHoverDelay(cfg), delay);
+            QCOMPARE(integration(cfg)["submenu_hover_delay_ms"].toInt(), delay);
+        }
+        for (const auto value : {QJsonValue(-2), QJsonValue(1), QJsonValue(150), QJsonValue(601), QJsonValue(100.5), QJsonValue("100"), QJsonValue(true)}) {
+            auto cfg = legacy; cfg["submenu_hover_delay_ms"] = value;
+            QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
+        }
+        for (const auto &key : {"menu_density", "menu_width", "menu_icon_size"}) {
+            auto cfg = legacy; cfg[key] = "invalid";
+            QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
+            cfg[key] = false; QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
+        }
+    }
     void migrateWithoutReplacingLayout() {
         const auto cfg = decode(QByteArray(R"({"auto_close_on_pointer_leave":false,"menu":[{"action":"files","label":"My files","icon":"custom"},{"action":"terminal"},{"action":"terminal"},{"label":"Custom","command":["true"],"access_key":"e"}]})"));
         const auto menu = cfg["menu"].toArray();

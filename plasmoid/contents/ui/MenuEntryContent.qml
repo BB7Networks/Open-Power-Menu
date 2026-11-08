@@ -7,6 +7,7 @@ import org.kde.plasma.components as PC3
 RowLayout {
     id: content
     property var entry: ({})
+    property real iconSize: 18
     property bool showIcons: true
     property bool opensLeft: false
     property color foreground: Kirigami.Theme.textColor
@@ -28,8 +29,8 @@ RowLayout {
     }
     Kirigami.Icon {
         objectName: "entryIcon"
-        Layout.preferredWidth: 18
-        Layout.preferredHeight: 18
+        Layout.preferredWidth: content.iconSize
+        Layout.preferredHeight: content.iconSize
         source: content.entry.icon || "application-x-executable"
         color: content.foreground
         visible: content.showIcons
