@@ -4,6 +4,84 @@ Status: **not performed**. Use with [2.1 behavior](OPM-2.1.md) and
 [the current engineering checkpoint](OPM-2.1-RESULTS.md). Passing CI does not
 complete any physical row below. Stable 1.0.1 remains the public release.
 
+## Obtain and verify the controlled development candidate
+
+Use the exact Manjaro artifact linked in the latest
+[feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md), after its corrected-source
+workflow has passed all eight jobs. Download through authenticated GitHub, unpack
+into an otherwise empty directory, and retain the complete download. The baseline
+November 8 artifacts expire November 15; a baseline artifact does not contain the
+later Breeze/import-feedback corrections. Cloud artifact downloads were blocked;
+the report must distinguish remote metadata from downloaded, verified bytes.
+
+From the unpacked artifact directory, before installation:
+
+```sh
+cat SOURCE-COMMIT os-release
+sha256sum -c PACKAGE.sha256
+sha256sum -c OpenPowerMenu-*.tar.gz.sha256
+pacman -Q manjaro-release glibc qt6-base qt6-declarative qt6-wayland kirigami kservice kconfig plasma-workspace
+uname -m
+plasmashell --version
+```
+
+Compare those installed versions with `packages.txt` and `runtime-packages.txt`.
+Record the exact tested snapshot from this candidate; older engineering inventory
+versions are historical, not certification of the current package. Require Manjaro
+x86-64, Plasma 6 and matching Qt/KF6/plugin compatibility. A newer rolling Qt/KF6 or
+glibc snapshot needs a matching rebuild and qualification; do not force installation
+or bypass the installer's OS/ELF/library/plugin checks. Preserve checksum outputs
+and inventory files in the acceptance record. The source checksum may refer to a
+source archive not included in the artifact; `SOURCE-COMMIT` identifies the source.
+
+After explicit authorization to install in the test account, back up its state:
+
+```sh
+backup_dir="$HOME/opm-2.1-acceptance-$(date +%Y%m%d-%H%M%S)"
+mkdir -m 700 "$backup_dir"
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+for name in open-power-menu kglobalshortcutsrc plasma-org.kde.plasma.desktop-appletsrc; do
+    if test -e "$config_root/$name"; then cp -a "$config_root/$name" "$backup_dir/"; fi
+done
+tar -xzf OpenPowerMenu-*.tar.gz -C "$backup_dir"
+sudo pacman -U ./open-power-menu-native-dev-*.pkg.tar.zst
+open-power-menu-native-setup
+open-power-menu --check
+open-power-menu --edit
+```
+
+Run setup as the ordinary desktop user. The pacman operation stages the package;
+setup explicitly installs/activates the per-user native components. It does not
+restart Plasma or rewrite panels/shortcuts. Retain released 1.0.1 and its existing
+Python/PySide6 runtime. The verified direct upgrade preserves personal menu bytes,
+launcher/shortcut choices and backups, and records the complete old component set.
+Default-only new entries are not inserted into an existing custom layout.
+
+Verify the rollback path before testing, while retaining both the pacman package
+and the extracted bundle. On the user's authorized test system, the tested commands
+are `open-power-menu --rollback` or the retained bundle command:
+
+```sh
+"$backup_dir/native-bundle/app/bin/open-power-menu-install" --rollback
+```
+
+Use `--recover` through that same retained installer for an interrupted transaction;
+retain snapshots under the recovery directory. Rollback to 1.0.1 requires its
+Python/PySide6 runtime. Do not remove system packages to manufacture that failure.
+Do not restore a whole Plasma panel configuration as routine rollback.
+
+Recommended order: capture versions/backups; upgrade/check/editor; General/Layout/
+Backups and JSON Cancel/Apply/recovery; harmless standalone and widget navigation;
+Native/Aero/Breeze icon sizes and hover delays; launcher/Meta+X; monitor/scaling and
+remote-desktop checks with recovery access; rollback/re-upgrade. Only afterward
+consider the separately authorized supervised power cases below.
+
+For a failure, record time/case, stderr and read-only `open-power-menu --check`,
+`pacman -Q` versions and `journalctl --user -b --since "10 minutes ago"` relevant OPM
+lines. `open-power-menu --diagnose-launch` opens a menu: cancel it without selecting
+a power action. Keep diagnostics private until paths/arguments and unrelated journal
+entries are reviewed. The detailed result sheet and cases below remain **Not run**.
+
 ## Prepare a recoverable test system
 
 Prefer a disposable Manjaro Plasma 6 machine, VM with a real input seat, or a

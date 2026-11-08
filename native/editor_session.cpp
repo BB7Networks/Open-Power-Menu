@@ -507,7 +507,10 @@ QString EditorSession::previewImport(const QUrl &file) {
         const auto current = configuration();
         for (const auto &key : localPreferences) candidate[key] = current[key];
         validate(candidate);
-        result = "Import replaces menu and portable preferences after confirmation. The current file will be kept as a protected recovery copy.\n"
+        result = "Import replaces menu and portable preferences after confirmation. ";
+        result += active.content ? "The current file will be kept as a protected recovery copy.\n"
+                                 : "No active configuration file exists; there is no previous file to back up.\n";
+        result +=
                  "This workstation's launcher, button icon, backup retention and global shortcuts are preserved.\n"
                  "Custom commands, arguments, icons, local paths and extension metadata may contain sensitive or machine-specific information. Review them before applying. No command has been executed. Built-in/power availability is checked when opening the menu.\n\n";
         const auto warnings = importWarnings(candidate["menu"].toArray());

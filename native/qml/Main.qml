@@ -178,6 +178,7 @@ Kirigami.ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Controls.ScrollView {
+                objectName: "generalPreferences"
                 Controls.ScrollBar.vertical.policy: Controls.ScrollBar.AsNeeded
                 Controls.ScrollBar.horizontal.policy: Controls.ScrollBar.AlwaysOff
                 clip: true
@@ -317,6 +318,7 @@ Kirigami.ApplicationWindow {
                                 }
                             }
                             Controls.CheckBox {
+                                objectName: "showMenuIcons"
                                 text: "Show icons in Power User Menu"
                                 checked: window.settings.show_menu_icons
                                 onToggled: window.preference("show_menu_icons", checked)
@@ -514,7 +516,7 @@ Kirigami.ApplicationWindow {
                     wrapMode: Text.Wrap
                     text: "Portable JSON can contain sensitive commands, arguments and local paths. Review before sharing. Choose a new export filename; existing files are protected."
                 }
-                Controls.Label { id: portableStatus; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0 }
+                Controls.Label { id: portableStatus; objectName: "portableStatus"; Layout.fillWidth: true; wrapMode: Text.Wrap; visible: text.length > 0 }
                 Controls.SplitView {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -601,18 +603,21 @@ Kirigami.ApplicationWindow {
     }
     FileDialog {
         id: exportPicker
+        objectName: "exportPicker"
         title: "Export portable configuration to a new file"
         fileMode: FileDialog.SaveFile
         defaultSuffix: "json"
         nameFilters: ["OPM configuration (*.json)"]
-        onAccepted: if (editorSession.exportConfiguration(selectedFile)) portableStatus.text = "Exported to " + selectedFile.toString()
+        onAccepted: portableStatus.text = editorSession.exportConfiguration(selectedFile) ? "Exported to " + selectedFile.toString() : ""
     }
     FileDialog {
         id: importPicker
+        objectName: "importPicker"
         title: "Import portable configuration"
         fileMode: FileDialog.OpenFile
         nameFilters: ["OPM configuration (*.json)", "All files (*)"]
         onAccepted: {
+            portableStatus.text = "";
             importText.text = editorSession.previewImport(selectedFile);
             if (importText.text) importPreview.open();
         }

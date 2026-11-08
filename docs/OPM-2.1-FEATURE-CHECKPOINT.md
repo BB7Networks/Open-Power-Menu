@@ -1,5 +1,17 @@
 # OPM 2.1 feature checkpoint — November 8, 2026
 
+## Resumed qualification
+
+Resumed from exact `4d672c2cc5f0eb51ac469e9fba5094556316e1fa` on the existing
+development branch; PR #10 remains draft. Both checkpoint workflows passed all
+eight jobs. Current corrections and verification are recorded in
+[feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md). Physical Plasma and
+supervised power acceptance remain unperformed.
+
+The following is the retained original checkpoint, not current CI status.
+
+## Original feature checkpoint
+
 Paused at the user's request before full qualification. Start: `cdeb2c0ee425fc85ca2f090291fc757d2d241b44`.
 Continue `feature/native-architecture-v1.1` and draft [PR #10](https://github.com/BB7Networks/Open-Power-Menu/pull/10).
 The checkpoint commit is the commit introducing this document. Stable remains 1.0.1;

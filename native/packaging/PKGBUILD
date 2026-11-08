@@ -9,6 +9,7 @@ url='https://github.com/BB7Networks/Open-Power-Menu'
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-wayland' 'kirigami' 'kservice' 'kconfig' 'kde-cli-tools' 'dbus')
 makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules')
+checkdepends=('xorg-server-xvfb' 'xorg-xauth')
 optdepends=('plasma-desktop: Plasma 6 widget and launcher integration')
 # Place the reviewed git archive beside this recipe. No remote branch is fetched.
 source=('open-power-menu-source.tar.gz')

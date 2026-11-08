@@ -1,6 +1,6 @@
 # Rolling distro qualification, not a claim that Arch binaries run on Manjaro.
 FROM archlinux:base-devel
-RUN pacman -Syu --noconfirm --needed cmake ninja qt6-base qt6-declarative qt6-wayland kirigami kservice kconfig kde-cli-tools dbus python && \
+RUN pacman -Syu --noconfirm --needed cmake ninja qt6-base qt6-declarative qt6-wayland kirigami kservice kconfig kde-cli-tools dbus python xorg-server-xvfb xorg-xauth && \
     useradd --uid 1000 --create-home builder
 WORKDIR /src
 COPY --chown=1000:1000 . /src

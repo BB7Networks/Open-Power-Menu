@@ -2,6 +2,7 @@
 #include "editor_session.hpp"
 #include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QGuiApplication>
 #include <QJsonDocument>
 #include <QQmlApplicationEngine>
@@ -10,6 +11,7 @@
 #include <QQuickWindow>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <QAccessible>
 #include <algorithm>
 #if defined(__GLIBC__)
 #include <malloc.h>
@@ -51,6 +53,26 @@ class EditorGuiTests : public QObject {
             item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
         QCoreApplication::processEvents();
         return true;
+    }
+    bool clickText(const QString &text, QQuickWindow *scope = nullptr) {
+        const auto find = [&](auto &&self, QQuickItem *root) -> QQuickItem * {
+            const auto children = root->childItems();
+            for (auto it = children.crbegin(); it != children.crend(); ++it)
+                if (auto *item = self(self, *it)) return item;
+            if (clickable(root) && (root->property("text").toString().remove('&') == text || root->property("fileName").toString() == text)) return root;
+            return nullptr;
+        };
+        for (auto *top : QGuiApplication::topLevelWindows()) {
+            auto *window = qobject_cast<QQuickWindow *>(top);
+            if (!window || !window->isVisible() || (scope && window != scope)) continue;
+            if (auto *item = find(find, window->contentItem())) {
+                QTest::mouseClick(item->window(), Qt::LeftButton, Qt::NoModifier,
+                    item->mapToScene(QPointF(item->width()/2, item->height()/2)).toPoint());
+                QCoreApplication::processEvents();
+                return true;
+            }
+        }
+        return false;
     }
   public:
     int profileMemory(const QString &output) {
@@ -131,6 +153,191 @@ class EditorGuiTests : public QObject {
         return 0;
     }
   private slots:
+    void customizationControlsPersistThroughKeyboardInput() {
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        store.save(defaults(), {});
+        EditorCatalog catalog;
+        // Recreate both session and real window to check persisted selections.
+        for (int pass = 0; pass < 2; ++pass) {
+            EditorSession session(store);
+            QQmlApplicationEngine engine;
+            engine.rootContext()->setContextProperty("editorSession", &session);
+            engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+            engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+            QVERIFY(!engine.rootObjects().isEmpty());
+            auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+            QVERIFY(QTest::qWaitForWindowExposed(window));
+            window->requestActivate();
+            window->contentItem()->forceActiveFocus();
+            window->resize(620, 480);
+            QTest::qWait(50); // Let layouts settle before coordinate input.
+            const auto control = [&](const char *name) {
+                return window->findChild<QQuickItem *>(QString::fromLatin1(name));
+            };
+            const auto chooseLast = [&](QQuickItem *item) {
+                const auto focused = [&] { return item->hasActiveFocus() || (window->activeFocusItem() && item->isAncestorOf(window->activeFocusItem())); };
+                for (int attempt = 0; attempt < 100 && !focused(); ++attempt)
+                    QTest::keyClick(window, Qt::Key_Tab);
+                if (!focused()) return false;
+                QTest::keyClick(window, Qt::Key_End);
+                return true;
+            };
+            for (const char *name : {"menu_density", "menu_width", "menu_icon_size", "hoverMode", "hoverDelay"}) {
+                auto *item = control(name);
+                QVERIFY(item);
+                auto *accessible = QAccessible::queryAccessibleInterface(item);
+                QVERIFY(accessible);
+                QVERIFY(!accessible->text(QAccessible::Name).isEmpty());
+            }
+            if (pass == 0) {
+                for (const char *name : {"menu_density", "menu_width", "menu_icon_size", "hoverMode"})
+                    QVERIFY(chooseLast(control(name)));
+                auto *delay = control("hoverDelay");
+                QVERIFY(delay->isEnabled());
+                delay->forceActiveFocus();
+                for (int i = 0; i < 3; ++i) QTest::keyClick(window, Qt::Key_Up);
+                QCOMPARE(session.configuration()["submenu_hover_delay_ms"].toInt(), 600);
+                auto *icons = control("showMenuIcons");
+                icons->forceActiveFocus(); QTest::keyClick(window, Qt::Key_Space);
+                QVERIFY(!control("menu_icon_size")->isEnabled());
+                QTest::keyClick(window, Qt::Key_Space);
+                QVERIFY(control("menu_icon_size")->isEnabled());
+                QVERIFY(click(window, "saveConfiguration"));
+                QVERIFY(!session.dirty());
+            }
+            QCOMPARE(control("menu_density")->property("currentIndex").toInt(), 2);
+            QCOMPARE(control("menu_width")->property("currentIndex").toInt(), 2);
+            QCOMPARE(control("menu_icon_size")->property("currentIndex").toInt(), 2);
+            QCOMPARE(control("hoverMode")->property("currentIndex").toInt(), 2);
+            QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
+            QVERIFY(click(window, "layoutTab"));
+            QVERIFY(click(window, "backupsTab"));
+            QVERIFY(click(window, "generalTab"));
+            QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
+            window->close();
+        }
+    }
+
+    void portableDialogsCancelApplyAndRecover() {
+        if (QGuiApplication::platformName() == "offscreen")
+            QSKIP("Native popup input requires a display seat; install xvfb/xauth to run this case through CTest");
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        auto original = defaults(); original["backup_retention"] = 0;
+        store.save(original, {});
+        EditorSession session(store); EditorCatalog catalog;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        window->requestActivate();
+        QTRY_VERIFY(QGuiApplication::focusWindow());
+        QVERIFY(click(window, "backupsTab"));
+        auto *exportPicker = window->findChild<QObject *>("exportPicker");
+        auto *importPicker = window->findChild<QObject *>("importPicker");
+        auto *preview = window->findChild<QObject *>("importPreview");
+        QVERIFY(exportPicker && importPicker && preview);
+        // Exercise the shipped fallback file picker with keyboard input. The
+        // application attribute affects this harness only, not production.
+        const auto chooseFile = [&](QObject *picker, const QString &path) {
+            picker->setProperty("currentFolder", QUrl::fromLocalFile(temp.path()));
+            QTest::qWait(200);
+            if (picker == importPicker)
+                return clickText(QFileInfo(path).fileName()) && clickText("Open");
+            QQuickItem *field = nullptr;
+            for (auto *top : QGuiApplication::topLevelWindows())
+                if (auto *quick = qobject_cast<QQuickWindow *>(top))
+                    if ((field = visualItem(quick->contentItem(), "fileNameTextField"))) break;
+            if (!field) return false;
+            field->window()->requestActivate();
+            field->forceActiveFocus();
+            QTest::keyClick(field->window(), Qt::Key_A, Qt::ControlModifier);
+            const auto filename = QFileInfo(path).fileName();
+            for (const auto character : filename) QTest::keyClick(field->window(), character.toLatin1());
+            if (field->property("text").toString() != filename) return false;
+            if (!clickText("Save", field->window())) return false;
+            QTest::qWait(150);
+            return true;
+        };
+        QVERIFY(click(window, "exportConfiguration"));
+        QTRY_VERIFY(exportPicker->property("visible").toBool());
+        QTest::qWait(200);
+        QTRY_VERIFY(QGuiApplication::focusWindow());
+        QVERIFY(clickText("Cancel"));
+        QTRY_VERIFY(!exportPicker->property("visible").toBool());
+        QCOMPARE(store.load(), original);
+        const auto path = temp.filePath("portable.json");
+        QVERIFY(click(window, "exportConfiguration"));
+        QTRY_VERIFY(exportPicker->property("visible").toBool());
+        QVERIFY(chooseFile(exportPicker, path));
+        QTRY_VERIFY(QFile::exists(path));
+        QFile exported(path); QVERIFY(exported.open(QIODevice::ReadOnly));
+        const auto exportedBytes = exported.readAll(); exported.close();
+        QVERIFY(click(window, "exportConfiguration"));
+        QTRY_VERIFY(exportPicker->property("visible").toBool());
+        QVERIFY(chooseFile(exportPicker, path));
+        QVERIFY(clickText("Yes")); // Confirm the file picker's overwrite question.
+        QTRY_VERIFY(!exportPicker->property("visible").toBool());
+        QVERIFY(!session.error().isEmpty());
+        QVERIFY(window->findChild<QObject *>("portableStatus")->property("text").toString().isEmpty());
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        QCOMPARE(exported.readAll(), exportedBytes); exported.close();
+        auto incoming = original; incoming["menu_density"] = "compact";
+        incoming["menu"] = QJsonArray{QJsonObject{{"label", "Imported"}, {"command", QJsonArray{"/opm/missing"}}}};
+        QFile file(path); QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(QJsonDocument(incoming).toJson()); file.close();
+        const auto openImport = [&] {
+            if (!click(window, "importConfiguration")) return false;
+            QTest::qWait(200);
+            return chooseFile(importPicker, path);
+        };
+        QVERIFY(openImport());
+        QTRY_VERIFY(preview->property("opened").toBool());
+        QVERIFY(window->findChild<QObject *>("importPreviewText")->property("text").toString().contains("/opm/missing"));
+        QVERIFY(clickText("Cancel"));
+        QTRY_VERIFY(!preview->property("visible").toBool());
+        QCOMPARE(store.load(), original);
+        QVERIFY(!session.applyImport()); // Cancel invalidates the preview.
+        QVERIFY(openImport());
+        QTRY_VERIFY(preview->property("opened").toBool());
+        QSignalSpy applied(preview, SIGNAL(applied()));
+        // Source changes after the visible preview must fail without data loss.
+        incoming["menu_width"] = "wide";
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write(QJsonDocument(incoming).toJson()); file.close();
+        QVERIFY(clickText("Apply"));
+        QCOMPARE(applied.count(), 1);
+        QTRY_VERIFY(!preview->property("visible").toBool());
+        QCOMPARE(session.errorCode(), "conflict");
+        QCOMPARE(store.load(), original);
+        QVERIFY(openImport());
+        QTRY_VERIFY(preview->property("opened").toBool());
+        QVERIFY(clickText("Apply"));
+        QCOMPARE(applied.count(), 2);
+        QTRY_VERIFY(!preview->property("visible").toBool());
+        QCOMPARE(store.load()["menu"], incoming["menu"]);
+        QCOMPARE(store.backups().size(), 1);
+        QVERIFY(store.backups().first().protectedCopy);
+        const auto backup = ("backupEntry:" + store.backups().first().name).toUtf8();
+        QTRY_VERIFY(click(window, backup.constData()));
+        QVERIFY(click(window, "restoreBackup"));
+        auto *confirm = window->findChild<QObject *>("confirmationDialog");
+        QTRY_VERIFY(confirm->property("opened").toBool());
+        QVERIFY(clickText("Yes"));
+        QTRY_COMPARE(store.load(), original);
+        QVERIFY(file.open(QIODevice::WriteOnly)); file.write("{"); file.close();
+        QVERIFY(openImport());
+        QVERIFY(!preview->property("visible").toBool());
+        QVERIFY(!session.error().isEmpty());
+        QCOMPARE(store.load(), original);
+        QVERIFY(session.preference(R"({"menu_density":"compact"})"));
+        QVERIFY(!window->findChild<QQuickItem *>("importConfiguration")->isEnabled());
+        QVERIFY(session.reload(true));
+        window->close();
+    }
     void removedSubmenuViewportStateIsReleased() {
         QTemporaryDir temp;
         Storage store(temp.filePath("menu.json"));
@@ -377,6 +584,7 @@ int main(int argc, char **argv) {
     write(appRoot + "/opm-unavailable-fixture.desktop",
           "[Desktop Entry]\nType=Application\nName=Unavailable "
           "fixture\nExec=/bin/true\nTryExec=opm-no-such-program\n");
+    QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QGuiApplication app(argc, argv);
     EditorGuiTests tests;
     if (argc == 3 && QString::fromLocal8Bit(argv[1]) == "--profile-memory")

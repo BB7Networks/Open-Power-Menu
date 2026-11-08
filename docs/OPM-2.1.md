@@ -50,6 +50,8 @@ owned by their menu and stopped on hide/return.
 The General tab adds density, width, icon size and independent submenu hover timing.
 The default preserves each frontend's existing policy: immediate hover in the widget,
 Qt's desktop style delay in standalone. Keyboard and click activation remain immediate.
+When hovering a different submenu, the existing child stays usable until the new
+hover delay expires; returning to the child cancels the pending replacement.
 Widget timers cancel on exit, hide, keyboard navigation and destruction. Standalone
 uses per-menu Qt style hints and native QMenu timers; no application-wide style is
 replaced. Native and Aero retain their colors and fonts. Width is a preference;

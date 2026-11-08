@@ -15,6 +15,7 @@
 #include <QImage>
 #include <QDir>
 #include <QIcon>
+#include <QScopeGuard>
 #include <utility>
 
 using namespace Opm;
@@ -56,6 +57,54 @@ static int openWithTimeout(Standalone &menu) {
 class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
+    void renderedIconPresets_data() {
+        QTest::addColumn<QString>("appearance");
+        QTest::newRow("native") << QString("native");
+        QTest::newRow("aero") << QString("aero");
+    }
+    void renderedIconPresets() {
+        QFETCH(QString, appearance);
+        QTemporaryDir dir;
+        QDir().mkpath(dir.filePath("qualification/64x64/apps"));
+        QFile index(dir.filePath("qualification/index.theme"));
+        QVERIFY(index.open(QIODevice::WriteOnly));
+        index.write("[Icon Theme]\nName=Qualification\nDirectories=64x64/apps\n[64x64/apps]\nSize=64\nType=Fixed\nContext=Applications\n"); index.close();
+        QImage icon(64, 64, QImage::Format_ARGB32); icon.fill(QColor(255, 0, 0));
+        QVERIFY(icon.save(dir.filePath("qualification/64x64/apps/opm-probe.png")));
+        const auto paths = QIcon::themeSearchPaths(); const auto theme = QIcon::themeName();
+        QIcon::setThemeSearchPaths({dir.path()}); QIcon::setThemeName("qualification");
+        const auto reset = qScopeGuard([&] { QIcon::setThemeSearchPaths(paths); QIcon::setThemeName(theme); });
+        QList<int> painted;
+        for (const auto &size : {"small", "standard", "large"}) {
+            auto cfg = configuration(); cfg["appearance"] = appearance; cfg["menu_icon_size"] = size;
+            auto item = command("Rendered icon"); item["icon"] = "opm-probe"; item["access_key"] = "R";
+            cfg["menu"] = QJsonArray{item}; cfg["show_access_key_hints"] = true;
+            for (bool visible : {true, false}) {
+                cfg["show_menu_icons"] = visible;
+                Standalone menu(cfg); menu.popup(QPoint(20, 20)); QTest::qWait(30);
+                auto image = menu.grab().toImage();
+                QRect red;
+                for (int y = 0; y < image.height(); ++y)
+                    for (int x = 0; x < image.width(); ++x) {
+                        const auto pixel = image.pixelColor(x, y);
+                        if (pixel.red() > 240 && pixel.green() < 15 && pixel.blue() < 15)
+                            red = red.united(QRect(x, y, 1, 1));
+                    }
+                if (visible) {
+                    QVERIFY2(!red.isEmpty(), "The configured icon must actually be painted");
+                    painted << qRound(red.width() / image.devicePixelRatio());
+                    QVERIFY(red.height() <= menu.actionGeometry(menu.actions().first()).height() * image.devicePixelRatio());
+                } else QVERIFY(red.isEmpty());
+                const auto output = qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
+                if (!output.isEmpty()) {
+                    QDir().mkpath(output);
+                    QVERIFY(image.save(output + "/" + QApplication::style()->objectName() + "-" + appearance + "-" + size + (visible ? "-icons.png" : "-hidden.png")));
+                }
+                menu.close();
+            }
+        }
+        QVERIFY2(painted[0] < painted[1] && painted[1] < painted[2], qPrintable(QString("Painted icon widths: %1, %2, %3").arg(painted[0]).arg(painted[1]).arg(painted[2])));
+    }
 
     void appearancePresets_data() {
         QTest::addColumn<QString>("appearance"); QTest::addColumn<QString>("icons");
@@ -91,7 +140,26 @@ class StandaloneTest : public QObject {
     }
     void hoverTimingAndKeyboardOverride_data() {
         QTest::addColumn<int>("delay");
-        for (int delay : {-1, 0, 100, 600}) QTest::newRow(qPrintable(QString::number(delay))) << delay;
+        for (int delay : {-1, 0, 100, 300, 600}) QTest::newRow(qPrintable(QString::number(delay))) << delay;
+    }
+
+    void delayedSiblingKeepsOldChildUntilReplacement() {
+        auto cfg = configuration(); cfg["submenu_hover_delay_ms"] = 300;
+        cfg["menu"] = QJsonArray{
+            QJsonObject{{"submenu", "First"}, {"items", QJsonArray{command()}}},
+            QJsonObject{{"submenu", "Second"}, {"items", QJsonArray{command()}}}};
+        Standalone menu(cfg); menu.popup(QPoint(50, 50)); QTest::qWait(30);
+        auto *first = menu.actions()[0]->menu(); auto *second = menu.actions()[1]->menu();
+        enter(&menu); menu.setActiveAction(menu.actions()[0]); QTest::keyClick(&menu, Qt::Key_Right);
+        QVERIFY(first->isVisible());
+        for (int i = 0; i < 10; ++i)
+            moveTo(&menu, menu.actionGeometry(menu.actions()[1]).center() + QPoint(i % 2, 0));
+        QTest::qWait(40);
+        QVERIFY(!second->isVisible());
+        QVERIFY(first->isVisible()); // Keep a usable path into the old child.
+        QTRY_VERIFY_WITH_TIMEOUT(second->isVisible(), 1200);
+        QVERIFY(!first->isVisible());
+        menu.close();
     }
     void hoverTimingAndKeyboardOverride() {
         QFETCH(int, delay);

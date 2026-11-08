@@ -38,6 +38,50 @@ static QString json(const QJsonArray &items) {
 class EditorTests : public QObject {
     Q_OBJECT
   private slots:
+    void importBoundsParentsAndFreshProfile() {
+        QTemporaryDir dir;
+        Storage store(dir.filePath("fresh/menu.json"));
+        EditorSession editor(store);
+        const auto path = dir.filePath("input.json");
+        const auto url = QUrl::fromLocalFile(path);
+        put(path, QByteArray(MaxConfigBytes + 1, ' '));
+        QVERIFY(editor.previewImport(url).isEmpty());
+        QCOMPARE(editor.errorCode(), "too-large");
+        QVERIFY(!store.revision().content);
+        // Both JSON extension depth and menu depth have independent bounds.
+        put(path, QByteArray("{\"extension\":") + QByteArray(260, '[') + "0" + QByteArray(260, ']') + "}");
+        QVERIFY(editor.previewImport(url).isEmpty());
+        auto nested = QJsonArray{QJsonObject{{"command", QJsonArray{"/bin/true"}}}};
+        for (int i = 0; i < 10; ++i)
+            nested = QJsonArray{QJsonObject{{"submenu", "Nested"}, {"items", nested}}};
+        put(path, QJsonDocument(QJsonObject{{"menu", nested}}).toJson());
+        QVERIFY(editor.previewImport(url).isEmpty());
+        auto config = fixture(); // Legacy schema without a version field.
+        put(path, QJsonDocument(config).toJson());
+        const auto linked = dir.filePath("linked");
+        QVERIFY(QFile::link(dir.path(), linked));
+        QVERIFY(editor.previewImport(QUrl::fromLocalFile(linked + "/input.json")).isEmpty());
+        QVERIFY(!editor.exportConfiguration(QUrl::fromLocalFile(linked + "/export.json")));
+        QVERIFY(!QFile::exists(dir.filePath("export.json")));
+        const auto preview = editor.previewImport(url);
+        QVERIFY(!preview.isEmpty());
+        QVERIFY(preview.contains("No active configuration file"));
+        QVERIFY(editor.applyImport());
+        QCOMPARE(store.load()["menu"], config["menu"]);
+        QCOMPARE(store.load()["unknown"], config["unknown"]);
+        QVERIFY(store.backups().isEmpty()); // No previous file to preserve.
+        // Replacing the source inode with identical bytes is still stale.
+        const auto active = store.revision();
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        QVERIFY(QFile::rename(path, dir.filePath("old.json")));
+        put(path, QJsonDocument(config).toJson());
+        QVERIFY(!editor.applyImport());
+        QCOMPARE(editor.errorCode(), "conflict");
+        QCOMPARE(store.revision(), active);
+        editor.cancelImport();
+        QVERIFY(!editor.previewImport(url).isEmpty());
+        QVERIFY(editor.applyImport()); // A new preview recovers after failure.
+    }
     void portableRoundTripAndProtectedImport() {
         QTemporaryDir dir;
         Storage store(dir.filePath("menu.json"));

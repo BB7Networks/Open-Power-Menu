@@ -209,7 +209,7 @@ def test_access_keys_ambiguous_and_no_metadata(flyout):
     assert calls == []
 
 
-@pytest.mark.parametrize('delay', [-1, 0, 100, 600])
+@pytest.mark.parametrize('delay', [-1, 0, 100, 300, 600])
 def test_configured_hover_cancel_keyboard_and_nested(flyout, delay):
     from PySide6.QtCore import QPoint
     evaluate(flyout, f'submenuHoverDelay={delay};')
@@ -260,3 +260,36 @@ def test_appearance_metrics_and_screen_bound(flyout, appearance):
     assert evaluate(flyout, 'activeChild.menuDensity') == 'comfortable'
     assert evaluate(flyout, 'activeChild.menuWidth') == 'wide'
     assert evaluate(flyout, 'activeChild.menuIconSize') == 'large'
+
+
+def test_delayed_sibling_replacement_and_return_to_child(flyout):
+    from PySide6.QtCore import QPoint, QEvent
+    evaluate(flyout, '''submenuHoverDelay=300; entries=[
+        {kind:'submenu',title:'First',items:[{kind:'command',title:'One',key:'one'}]},
+        {kind:'submenu',title:'Second',items:[{kind:'command',title:'Two',key:'two'}]}];''')
+    QTest.qWait(20)
+    QTest.mouseMove(flyout, QPoint(100, 15))
+    QTest.qWait(380)
+    first = evaluate(flyout, 'activeChild')
+    assert first and first.property('visible')
+    QTest.mouseMove(flyout, QPoint(100, 55))
+    QTest.qWait(50)
+    assert first.property('visible')  # Existing child survives the pending delay.
+    assert evaluate(flyout, 'activeChild === flyoutRows.itemAt(0).childPopup')
+    # Crossing back into the existing child cancels the sibling's timer.
+    # Offscreen stub windows overlap and don't synthesize cross-window Leave.
+    QApplication.sendEvent(flyout, QEvent(QEvent.Leave))
+    QTest.mouseMove(first, QPoint(100, 15))
+    QTest.qWait(380)
+    assert first.property('visible')
+    assert evaluate(flyout, 'flyoutRows.itemAt(1).childPopup === null')
+    QTest.mouseMove(flyout, QPoint(100, 55))
+    QTest.qWait(380)
+    assert evaluate(flyout, 'activeChild === flyoutRows.itemAt(1).childPopup && activeChild.visible')
+    assert not first.property('visible')
+    child = evaluate(flyout, 'activeChild')
+    evaluate(child, 'focusFirst();')
+    QTest.qWait(10)
+    QTest.keyClick(child, Qt.Key_Left)
+    assert not child.property('visible')
+    assert flyout.property('activeIndex') == 1

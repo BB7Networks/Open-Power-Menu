@@ -82,6 +82,12 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
             "QMenu::item:disabled { color:#89939C; }"
             "QMenu::separator { height:1px; background:#445463; margin:5px 10px; }"
             "QMenu::icon { padding-left:5px; }").arg(config["menu_density"] == "compact" ? 3 : config["menu_density"] == "comfortable" ? 8 : 6));
+    if (config["menu_icon_size"].toString("standard") != "standard") {
+        // Some desktop styles paint icons using their own metric rather than
+        // the proxy's PM_SmallIconSize. Size this menu's icon subcontrol too.
+        const int extent = style()->pixelMetric(QStyle::PM_SmallIconSize, nullptr, this);
+        setStyleSheet(styleSheet() + QString("QMenu::icon { width:%1px; height:%1px; }").arg(extent));
+    }
     presentation = model.publicMenu(config);
     installEventFilter(this);
     populate(this, presentation);

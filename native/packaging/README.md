@@ -4,6 +4,11 @@ This is a development installation, not a published 2.1 release. Back up your
 personal configuration and complete the physical Plasma release gates first.
 Never run the installer as root. It does not install system dependencies.
 
+GUI interaction tests use `xvfb-run` and `xauth` in the disposable build image.
+Without that virtual input display, the offscreen fallback explicitly skips the
+file-dialog input case; it cannot qualify that workflow. These are test tools,
+not native runtime dependencies.
+
 Build with CMake 3.22+ on the target distribution (Debian 13 amd64 is the tested baseline):
 
     cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON

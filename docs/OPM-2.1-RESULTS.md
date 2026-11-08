@@ -1,6 +1,14 @@
 # 2.1 development checkpoint — November 8, 2026
 
-## Current feature work — paused at user request
+## Current feature qualification
+
+The November 8 resumed pass starts at `4d672c2`, whose PR/push workflows both
+passed all eight jobs. Targeted GUI, rendering and import feedback corrections,
+current local evidence and remaining gates are in
+[feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md). Earlier counts below
+remain historical. PR #10 remains draft; physical acceptance is not performed.
+
+## Earlier feature checkpoint — retained history
 
 The next pass starts at `cdeb2c0` and adds hover timing, menu appearance presets and
 portable import/export. It is not yet fully qualified. Current evidence and precise

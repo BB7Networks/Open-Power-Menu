@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins && rm -rf /var/lib/apt/lists/* && \
+    qt6-qpa-plugins xvfb xauth && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home builder
 WORKDIR /src
 COPY --chown=1000:1000 CMakeLists.txt /src/

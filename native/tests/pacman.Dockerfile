@@ -4,7 +4,7 @@ ARG OPM_BASE_IMAGE=archlinux:base
 FROM ${OPM_BASE_IMAGE} AS build
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-wayland kirigami kservice kconfig kde-cli-tools \
-    dbus python pyside6 && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
+    dbus python pyside6 xorg-server-xvfb xorg-xauth && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 USER 1000:1000
