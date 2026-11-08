@@ -14,8 +14,9 @@ command. Reinstalls and minor updates do not repeat the offer.
 Review at any time with `open-power-menu --review-dependencies`; suppress reminders
 with `open-power-menu --dismiss-dependency-review`. This state lives in
 `$XDG_DATA_HOME/open-power-menu-recovery/dependency-review/native-2.1.json`, separately
-from menu configuration and transaction snapshots. State writes use the installer's
-no-follow, owner/mode-checked filesystem operations. A failed query/state write does
+from menu configuration and transaction snapshots. State writes use a separate cooperative lock and the installer's
+no-follow, owner/mode-checked filesystem operations. A concurrent review cannot
+replace another review's temporary state file. A failed query/state write does
 not fail a successful installation.
 
 On Arch/Manjaro the review reads `pacman -Qi pyside6` and displays install reason,
@@ -23,7 +24,9 @@ Required By and Optional For. On Debian it reads installed `python3-pyside6.*`
 packages through dpkg-query, explicit status through apt-mark, and installed reverse
 dependencies through apt-cache, including a separate broader optional/recommended
 view. Query arguments are literal arrays; returned package names must match a narrow
-package-name grammar. The review never invokes a removal transaction or sudo.
+package-name grammar. Folded pacman dependency lists are preserved in full. Queries have a shared
+five-second budget and one-second per-process timeout; oversized or timed-out
+responses remain incomplete. The review never invokes a removal transaction or sudo.
 
 No declared reverse dependencies is **not proof of safe removal**. pip packages,
 virtual environments, scripts and applications outside the package database can

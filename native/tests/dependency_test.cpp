@@ -1,9 +1,13 @@
 #include "packaging/dependency_review.hpp"
 #include <QDir>
+#include <QElapsedTimer>
 #include <QFile>
 #include <QJsonArray>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <fcntl.h>
+#include <sys/file.h>
+#include <unistd.h>
 using namespace Opm::Install;
 class DependencyTests : public QObject {
     Q_OBJECT
@@ -34,6 +38,49 @@ class DependencyTests : public QObject {
         const auto guide=dependencyGuidance(report);
         QVERIFY(guide.contains("not proof")); QVERIFY(guide.contains("Rollback"));
         QVERIFY(!guide.contains("pacman -R"));
+    }
+    void slowQueryFailsClosedWithinBudget() {
+        QTemporaryDir tmp;
+        QFile program(tmp.filePath("pacman"));
+        QVERIFY(program.open(QIODevice::WriteOnly));
+        program.write("#!/bin/sh\nexec /bin/sleep 3\n");
+        program.close();
+        QVERIFY(program.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        const auto previous = qgetenv("PATH");
+        qputenv("PATH", QFile::encodeName(tmp.path()));
+        QElapsedTimer elapsed;
+        elapsed.start();
+        const auto report = dependencyReview({}, [](const QString &name) { return name == "pacman"; });
+        qputenv("PATH", previous);
+        QVERIFY(!report["complete"].toBool());
+        QVERIFY(!report["installed"].toBool());
+        QVERIFY(elapsed.elapsed() < 2500);
+    }
+    void archWrappedDependencies() {
+        const auto report = dependencyReview([](const QString &, const QStringList &) {
+            return PackageQuery{0, "Name            : pyside6\nRequired By     : app-one  app-two\n                  app-three\nOptional For    : optional-one\n                  optional-two\nInstall Reason  : Installed as a dependency for another package\n", true};
+        }, [](const QString &name) { return name == "pacman"; });
+        QVERIFY(report["complete"].toBool());
+        const auto item = report["packages"].toArray().first().toObject();
+        QVERIFY(item["required_by"].toString().contains("app-three"));
+        QVERIFY(item["optional_for"].toString().contains("optional-two"));
+    }
+    void concurrentNoticeLeavesStateUntouched() {
+        QTemporaryDir tmp;
+        const auto state = tmp.filePath("open-power-menu-recovery/dependency-review");
+        QVERIFY(QDir().mkpath(state));
+        const auto path = QFile::encodeName(state + "/lock");
+        const int lock = ::open(path.constData(), O_RDWR | O_CREAT, 0600);
+        QVERIFY(lock >= 0);
+        QVERIFY(::flock(lock, LOCK_EX | LOCK_NB) == 0);
+        int queries = 0;
+        offerDependencyReview(tmp.path(), true, [&] { ++queries; return QJsonObject{{"installed", true}}; });
+        QCOMPARE(queries, 0);
+        QVERIFY(!QFile::exists(state + "/native-2.1.json"));
+        ::close(lock);
+        offerDependencyReview(tmp.path(), true, [&] { ++queries; return QJsonObject{{"installed", true}}; });
+        QCOMPARE(queries, 1);
+        QVERIFY(QFile::exists(state + "/native-2.1.json"));
     }
     void debianAndLiteralQueries() {
         QStringList calls;

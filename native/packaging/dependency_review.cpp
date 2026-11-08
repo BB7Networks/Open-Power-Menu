@@ -1,6 +1,8 @@
 #include "dependency_review.hpp"
 #include "safe_fs.hpp"
 #include <QProcess>
+#include <QElapsedTimer>
+#include <sys/file.h>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QStandardPaths>
@@ -8,18 +10,24 @@
 namespace Opm::Install {
 QJsonObject dependencyReview(PackageRunner run, PackageFinder find) {
     if (!find) find = [](const QString &name) { return !QStandardPaths::findExecutable(name).isEmpty(); };
-    if (!run) run = [](const QString &program, const QStringList &args) {
+    QElapsedTimer budget;
+    budget.start();
+    if (!run) run = [&budget](const QString &program, const QStringList &args) {
+        // Optional guidance must remain lightweight even with many Debian modules.
+        const int remaining = 5000 - int(budget.elapsed());
+        if (remaining <= 0) return PackageQuery{};
         QProcess process;
         auto env = QProcessEnvironment::systemEnvironment();
         env.insert("LC_ALL", "C");
         process.setProcessEnvironment(env);
         process.setStandardInputFile(QProcess::nullDevice());
         process.start(program, args);
-        if (!process.waitForFinished(3000)) {
+        if (!process.waitForFinished(std::min(remaining, 1000))) {
             process.kill(); process.waitForFinished(1000); return PackageQuery{};
         }
-        return PackageQuery{process.exitCode(), QString::fromUtf8(process.readAllStandardOutput()).left(65536),
-                            process.exitStatus() == QProcess::NormalExit};
+        const auto output = process.readAllStandardOutput();
+        return PackageQuery{process.exitCode(), QString::fromUtf8(output.left(65536)),
+                            process.exitStatus() == QProcess::NormalExit && output.size() <= 65536};
     };
     QJsonObject report{{"manager", "unsupported"}, {"installed", false}, {"complete", false},
                        {"recommendation", "Keep PySide6"}};
@@ -30,11 +38,21 @@ QJsonObject dependencyReview(PackageRunner run, PackageFinder find) {
         report["complete"] = query.completed && (query.exitCode == 0 || query.exitCode == 1);
         if (query.completed && query.exitCode == 0) {
             report["installed"] = true;
-            const auto field = [&](const QString &name) {
-                const QRegularExpression pattern("(?:^|\\n)" + name + "[ \\t]*:[ \\t]*([^\\n]*)");
-                return pattern.match(query.output).captured(1).trimmed();
-            };
-            const auto required = field("Required By"), optional = field("Optional For"), reason = field("Install Reason");
+            QHash<QString, QString> fields;
+            QString current;
+            const QRegularExpression header("^([^\\s:][^:]*)[ \\t]+:[ \\t]*(.*)$");
+            for (const auto &line : query.output.split('\n')) {
+                const auto match = header.match(line);
+                if (match.hasMatch()) {
+                    current = match.captured(1).trimmed();
+                    fields[current] = match.captured(2).trimmed();
+                } else if (!current.isEmpty() && !line.isEmpty() && line.front().isSpace()) {
+                    // pacman folds long reverse/optional dependency lists.
+                    fields[current] += ' ' + line.trimmed();
+                } else current.clear();
+            }
+            const auto required = fields.value("Required By"), optional = fields.value("Optional For"),
+                       reason = fields.value("Install Reason");
             const bool complete = !required.isEmpty() && !optional.isEmpty() && !reason.isEmpty();
             report["complete"] = complete;
             packages.append(QJsonObject{{"name", "pyside6"}, {"install_reason", reason},
@@ -88,9 +106,19 @@ QString dependencyGuidance(const QJsonObject &review) {
 static Fd stateDirectory(const QString &root) {
     return directory(root + "/open-power-menu-recovery/dependency-review", true);
 }
+static Fd stateLock(int directory) {
+    Fd lock(openat(directory, "lock", O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0600));
+    need(lock >= 0, "Open dependency-review lock");
+    struct stat info{};
+    need(fstat(lock, &info) == 0, "Inspect dependency-review lock");
+    inspect(info);
+    need(flock(lock, LOCK_EX | LOCK_NB) == 0, "Another dependency review is active");
+    return lock;
+}
 void reviewDependencies(const QString &root, bool dismiss) {
     if (dismiss) {
         auto state = stateDirectory(root);
+        auto lock = stateLock(state);
         replaceJson(state, "native-2.1.json", {{"suppressed", true}, {"shown", true}});
         QTextStream(stdout) << "Dependency cleanup reminders disabled. PySide6 kept.\n";
     } else QTextStream(stdout) << dependencyGuidance(dependencyReview());
@@ -99,6 +127,7 @@ void offerDependencyReview(const QString &root, bool upgradedLegacy, std::functi
     if (!upgradedLegacy) return;
     try {
         auto state = stateDirectory(root);
+        auto lock = stateLock(state);
         if (exists(state, "native-2.1.json")) {
             const auto saved = json(state, "native-2.1.json");
             if (saved["shown"].toBool() || saved["suppressed"].toBool()) return;
