@@ -23,6 +23,22 @@ Kirigami.ApplicationWindow {
     property bool invalidGeneral: false
     property string confirmAction: ""
     property var launcherRows: []
+    function revealGeneralFocus() {
+        if (tabs.currentIndex !== 0 || !activeFocusItem) return;
+        const item = activeFocusItem;
+        let ancestor = item;
+        while (ancestor && ancestor !== generalColumn) ancestor = ancestor.parent;
+        if (!ancestor) return; // Tabs, other pages and popup contents stay independent.
+        const scroll = generalPreferences.contentItem;
+        if (!scroll || typeof scroll.contentY !== "number" || !scroll.contentItem) return;
+        const top = item.mapToItem(scroll.contentItem, 0, 0).y;
+        const bottom = top + item.height;
+        let position = scroll.contentY;
+        if (top - 8 < position) position = top - 8;
+        else if (bottom + 8 > position + scroll.height) position = bottom + 8 - scroll.height;
+        scroll.contentY = Math.max(0, Math.min(position, Math.max(0, scroll.contentHeight - scroll.height)));
+    }
+    onActiveFocusItemChanged: Qt.callLater(() => window.revealGeneralFocus())
     function syncLaunchers() {
         let rows = Array.from(editorCatalog.launchers);
         if (!rows.some(row => row.id === settings.launcher_applet_id))
@@ -178,12 +194,15 @@ Kirigami.ApplicationWindow {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Controls.ScrollView {
+                id: generalPreferences
                 objectName: "generalPreferences"
+                onAvailableHeightChanged: Qt.callLater(() => window.revealGeneralFocus())
                 Controls.ScrollBar.vertical.policy: Controls.ScrollBar.AsNeeded
                 Controls.ScrollBar.horizontal.policy: Controls.ScrollBar.AlwaysOff
                 clip: true
                 contentWidth: availableWidth
                 ColumnLayout {
+                    id: generalColumn
                     width: parent.width
                     spacing: 16
                     Controls.Label {

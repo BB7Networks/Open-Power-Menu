@@ -198,7 +198,17 @@ class EditorGuiTests : public QObject {
             }
             if (pass == 0) {
                 for (const char *name : {"menu_density", "menu_width", "menu_icon_size", "hoverMode"})
+                {
                     QVERIFY(chooseLast(control(name)));
+                    auto *view = control("generalPreferences");
+                    QVERIFY(view);
+                    const auto visible = [&] {
+                        const QRectF viewport(view->mapToScene(QPointF(0,0)), QSizeF(view->width(),view->height()));
+                        auto *item=control(name);
+                        return viewport.contains(QRectF(item->mapToScene(QPointF(0,0)),QSizeF(item->width(),item->height())));
+                    };
+                    QTRY_VERIFY(visible());
+                }
                 auto *delay = control("hoverDelay");
                 QVERIFY(delay->isEnabled());
                 delay->forceActiveFocus();
@@ -217,6 +227,11 @@ class EditorGuiTests : public QObject {
             QCOMPARE(control("menu_icon_size")->property("currentIndex").toInt(), 2);
             QCOMPARE(control("hoverMode")->property("currentIndex").toInt(), 2);
             QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
+            const auto output=qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
+            if (!output.isEmpty()) {
+                QDir().mkpath(output);
+                QVERIFY(window->grabWindow().save(output + QString("/editor-general-narrow-%1.png").arg(pass)));
+            }
             QVERIFY(click(window, "layoutTab"));
             QVERIFY(click(window, "backupsTab"));
             QVERIFY(click(window, "generalTab"));
@@ -240,6 +255,8 @@ class EditorGuiTests : public QObject {
         QVERIFY(!engine.rootObjects().isEmpty());
         auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
         QVERIFY(QTest::qWaitForWindowExposed(window));
+        window->resize(620,480);
+        QTest::qWait(50);
         window->requestActivate();
         QTRY_VERIFY(QGuiApplication::focusWindow());
         QVERIFY(click(window, "backupsTab"));
