@@ -11,7 +11,9 @@ public 2.0.0 release. Historical migration and performance evidence is retained.
 - Configurable pointer-leave delay from 0.5 to 5.0 seconds in 0.1-second steps; the existing disabled default remains unchanged.
 - Native Sleep/Hibernate capability checks through KDE and logind, Polkit authorization and inhibitor enforcement. Existing KDE shutdown/restart/logout confirmation calls are preserved.
 - Optional, read-only PySide6 review after a successful legacy upgrade; keep is recommended, notice state is separate, and the installer never removes packages.
-- Arch build qualification recipe and CI; physical Manjaro/Plasma acceptance remains a release gate.
+- Separate Arch and Manjaro package/upgrade CI with checksum-pinned sources, sealed native bundles, runtime dependency checks and retained development artifacts; physical Plasma acceptance remains a release gate.
+- Qt platform-plugin validation follows advertised xcb/wayland capabilities while retaining load/ABI checks across rolling-distribution filename changes.
+- Optional dependency queries have bounded time/output, preserve wrapped pacman reverse-dependency lists and serialize one-time notice state.
 
 
 ## 1.0.1 - first public release

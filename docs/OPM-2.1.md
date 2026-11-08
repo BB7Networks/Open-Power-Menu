@@ -64,15 +64,25 @@ are listed in [native packaging](../native/packaging/README.md). New code adds n
 external runtime package: Qt DBus was already shipped; the standalone now links it
 for native power actions. PySide6 is never a native runtime dependency.
 
-[The Arch CI image](../native/tests/arch.Dockerfile) builds against the current Arch
-Qt/KDE stack. [PKGBUILD](../native/packaging/PKGBUILD) builds a distribution package
-from a reviewed local source archive. It stages the bundle under `/usr/lib` and
-provides `open-power-menu-native-setup`; it has no automatic desktop installation or
-Plasma restart hooks. Pin the local source checksum before any public packaging.
-Build separately on Manjaro; Arch qualification does not certify Manjaro binaries.
+[Pacman package CI](../native/tests/pacman.Dockerfile) builds Arch and Manjaro
+separately against their own Qt/KDE stacks. [PKGBUILD](../native/packaging/PKGBUILD)
+uses an exact committed source archive with SHA-256 pinned by
+[prepare-pacman.sh](../native/packaging/prepare-pacman.sh). It stages the sealed bundle
+under `/usr/lib` and provides `open-power-menu-native-setup`; it has no automatic
+desktop installation or Plasma restart hooks. Post-build stripping is disabled to
+preserve the hash inventory. Development artifacts include source and package
+checksums plus distribution/package inventories; CI retains them for seven days.
+Arch qualification does not certify Manjaro binaries or physical desktop behavior.
+
+Arch and Debian runtime images prove operation without Python; Manjaro retains its
+base image's Python for pacman-mirrors and verifies that PySide6 is absent. No runtime
+image needs a compiler. All exercise activation, editor startup, reinstall, removal
+and rollback through the actual installed bundle, with test fault hooks compiled out.
 
 Retain exact distribution/version/CPU checks, hash inventories, ELF dependency
-resolution, platform-plugin loading, QML smoke tests and activation checks. A rolling
+resolution, platform-plugin loading, QML smoke tests and activation checks. Platform
+plugins are identified by their advertised xcb/wayland capabilities and must load
+successfully, accommodating Qt filename changes without dropping ABI checks. A rolling
 distro update can invalidate an earlier package: rebuild on the intended snapshot
 and record Qt, KF6, glibc, package versions and date. A missing VERSION_ID is not a
 license to treat different distributions as interchangeable. Never advertise Debian

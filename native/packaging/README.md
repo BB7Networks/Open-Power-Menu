@@ -84,8 +84,34 @@ old runtime before legacy rollback.
 
 For Arch/Manjaro, use the target distribution's own Qt/KDE packages and build on
 that distribution. `PKGBUILD` stages a native bundle and explicit setup launcher,
-with no install hooks that change Plasma. Create a reviewed local source archive
-with `git archive --prefix=Open-Power-Menu/ -o open-power-menu-source.tar.gz HEAD`,
-place it beside PKGBUILD, and run makepkg in a disposable target-system builder.
-Pin the source checksum before release. Arch CI does not qualify Manjaro or physical
-Plasma. Keep distribution/version/CPU, hash, ELF, plugin and activation checks intact.
+with no install hooks that change Plasma. From a clean, committed source checkout:
+
+    sh native/packaging/prepare-pacman.sh . work/pacman-source
+    cd work/pacman-source
+    makepkg
+
+Run makepkg as an ordinary user in a disposable builder for the target distribution,
+with the build dependencies installed. The preparation helper refuses tracked edits
+or an existing output directory. It archives the exact commit, pins the source SHA-256
+in PKGBUILD and records SOURCE-COMMIT and SOURCE.sha256. Untracked files are excluded.
+The package disables post-sealing strip/debug transformations so the installed
+executables still match their bundle hash inventory. Test fault hooks are compiled out.
+
+Install the matching development package through pacman in a disposable test system,
+then explicitly run `open-power-menu-native-setup` from the ordinary desktop user
+session. Installing the pacman package alone does not integrate or restart Plasma.
+
+[Pacman package CI](../tests/pacman.Dockerfile) builds Arch and Manjaro separately,
+tests released 1.0.1 upgrades, and installs each sealed package into a separate runtime
+image. Arch and Debian runtime checks require Python to be absent. Manjaro retains
+the base image's Python used by pacman-mirrors, while requiring PySide6 to be absent;
+all three require no compiler for native installation and operation. This preserves
+unrelated system dependencies and does not make Python an OPM runtime dependency.
+
+CI retains development packages, bundles, the separate Store widget, checksums,
+source commit, os-release and build/runtime package inventories for seven days.
+These are development artifacts, not public releases or physical Plasma certification.
+See [qualification results](../../docs/OPM-2.1-RESULTS.md) for the tested snapshots.
+Keep distribution/version/CPU, hash, ELF, plugin and activation checks intact.
+Platform validation uses the plugins' advertised xcb/wayland capabilities and still
+loads them to check Qt compatibility; it does not depend on a particular filename.
