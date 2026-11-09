@@ -36,6 +36,8 @@ class Service : public QObject, protected QDBusContext {
     QString GetMenu();
     bool PowerCapabilitiesPending();
     QString GetIntegration();
+    // Persist only an explicit user drag. No geometry updates trigger this call.
+    QString SetMenuHeight(int logicalPixels);
     bool Run(const QString &key);
     QString StartRun(const QString &key);
     QString RunResult(const QString &operation);

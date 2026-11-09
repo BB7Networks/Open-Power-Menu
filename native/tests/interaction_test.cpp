@@ -61,6 +61,22 @@ class InteractionTests : public QObject {
             cfg[key] = false; QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
         }
     }
+    void deliberateDragHeightWriteIsBoundedAndAtomic() {
+        QTemporaryDir dir;
+        Storage store(dir.filePath("menu.json"));
+        store.save(defaults(), {});
+        Service service(store);
+        const auto response = QJsonDocument::fromJson(service.SetMenuHeight(725).toUtf8()).object();
+        QVERIFY(response["ok"].toBool());
+        QCOMPARE(response["height"].toInt(), 725);
+        QCOMPARE(store.load()["menu_height_mode"].toString(), "custom");
+        QCOMPARE(store.load()["menu_custom_height"].toInt(), 725);
+        for (int invalid : {0, 119, 10001, 20000}) {
+            const auto rejected = QJsonDocument::fromJson(service.SetMenuHeight(invalid).toUtf8()).object();
+            QVERIFY(!rejected["ok"].toBool());
+            QCOMPARE(store.load()["menu_custom_height"].toInt(), 725);
+        }
+    }
     void customHeightValidationAndMigration() {
         const auto legacy = decode(QByteArray(R"({"menu":[],"unknown":"kept"})"));
         QCOMPARE(legacy["menu_height_mode"].toString(), "auto");

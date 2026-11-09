@@ -97,6 +97,19 @@ QString Service::GetIntegration() {
         return json(integration(defaults()));
     }
 }
+QString Service::SetMenuHeight(int logicalPixels) {
+    touch();
+    return reply([&] {
+        if (logicalPixels < 120 || logicalPixels > 10000)
+            throw Error("Custom menu height must be between 120 and 10000 logical pixels", "invalid");
+        const auto revision = storage.revision();
+        auto config = decode(revision.content);
+        config["menu_height_mode"] = "custom";
+        config["menu_custom_height"] = logicalPixels;
+        storage.save(config, revision); // atomic, validated and conflict-checked
+        return QJsonObject{{"ok", true}, {"height", logicalPixels}};
+    });
+}
 bool Service::PowerCapabilitiesPending() {
     touch();
     // A fast reply can settle discovery between GetMenu and this call. Still

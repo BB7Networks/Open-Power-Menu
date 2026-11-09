@@ -89,6 +89,8 @@ PlasmoidItem {
     property string menuWidth: "auto"
     property string menuHeightMode: "auto"
     property int menuCustomHeight: 600
+    // Transient preview only while a deliberate grip drag is in progress.
+    property int dragMenuHeight: -1
     readonly property rect menuWorkArea: {
         const area = Metrics.workArea(root.screenGeometry, root.availableScreenRect);
         return Qt.rect(area.x, area.y, area.width, area.height);
@@ -766,6 +768,21 @@ PlasmoidItem {
         // Wait for adapter close/acknowledgment before opening Power Menu.
         launcherClosePoll.start();
     }
+    function commitDragHeight(logicalPixels) {
+        const target = Math.max(120, Math.min(10000, Math.round(logicalPixels)));
+        menuHeightMode = "custom";
+        menuCustomHeight = target;
+        dragMenuHeight = -1;
+        // Write only once after a completed grip drag, never on geometry events.
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+             "SetMenuHeight", [target], (ok, value) => {
+                 let answer = {};
+                 try { if (ok) answer = JSON.parse(String(value)); } catch (_) {}
+                 if (!ok || answer.ok !== true)
+                     commandError = answer.message || "The resized menu height could not be saved.";
+                 fetchIntegration();
+             });
+    }
     function openEditor() {
         // Close the panel popup so the separate Qt editor is visible.
         expanded = false;
@@ -930,7 +947,7 @@ PlasmoidItem {
             delay: root.autoCloseDelay
             menuOpen: root.expanded
             pointerInside: popupHover.hovered || flyout.pointerInside
-            protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending
+            protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending || root.dragMenuHeight >= 0
             onDismissed: root.expanded = false
         }
         HoverHandler {
@@ -1012,6 +1029,7 @@ PlasmoidItem {
             function onExpandedChanged() {
                 if (!root.expanded) {
                     root.powerIsOpen = false;
+                    root.dragMenuHeight = -1;
                     flyout.visible = false;
                     layoutEditor.cancelDrag();
                 } else {
@@ -1067,7 +1085,8 @@ PlasmoidItem {
             + Math.max(1, menuDivider.implicitHeight)
             + (root.layoutEditing ? layoutEditor.minimumUsableHeight : entryHeight) + 4)
             / (1 - (statusScroll.visible ? 0.25 : 0) - (setupScroll.visible ? 0.5 : 0))
-        readonly property real fittedHeight: Metrics.menuHeight(root.menuHeightMode, Math.max(root.menuCustomHeight, minimumUsableHeight),
+        readonly property real fittedHeight: Metrics.menuHeight(root.dragMenuHeight >= 0 ? "custom" : root.menuHeightMode,
+            Math.max(root.dragMenuHeight >= 0 ? root.dragMenuHeight : root.menuCustomHeight, minimumUsableHeight),
             naturalHeight, root.menuWorkArea.height || Screen.desktopAvailableHeight, themeVerticalPadding)
 
         // The unlocked layout editor stays in this single Plasma popup.
@@ -1098,6 +1117,55 @@ PlasmoidItem {
                     font.bold: true
                     text: "Power User Menu"
                     color: root.menuTextColor
+                }
+                // Explicit resize grip: its pointer capture distinguishes intent from
+                // Plasma's automatic/compositor-constrained window geometry.
+                Item {
+                    id: resizeGrip
+                    Layout.preferredWidth: 23
+                    Layout.preferredHeight: 29
+                    visible: !root.layoutEditing && !root.layoutBusy
+                    property real startGlobalY: 0
+                    property real startHeight: 0
+                    property bool moved: false
+                    Accessible.name: "Drag vertically to resize menu height"
+                    HoverHandler { id: resizeHover }
+                    QQC2.ToolTip.visible: resizeHover.hovered
+                    QQC2.ToolTip.text: "Drag to resize; releasing remembers Custom height"
+                    PC3.Label {
+                        anchors.centerIn: parent
+                        text: "↕"
+                        color: root.menuTextColor
+                        font.bold: true
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.SizeVerCursor
+                        onPressed: mouse => {
+                            resizeGrip.startGlobalY = resizeGrip.mapToGlobal(mouse.x, mouse.y).y;
+                            resizeGrip.startHeight = popup.height;
+                            resizeGrip.moved = false;
+                            root.dragMenuHeight = Math.round(popup.height);
+                            autoDismiss.keyboardUsed();
+                            mouse.accepted = true;
+                        }
+                        onPositionChanged: mouse => {
+                            if (!pressed) return;
+                            const currentGlobalY = resizeGrip.mapToGlobal(mouse.x, mouse.y).y;
+                            const delta = currentGlobalY - resizeGrip.startGlobalY;
+                            if (Math.abs(delta) <= 3 && !resizeGrip.moved) return;
+                            resizeGrip.moved = true;
+                            // Bottom panels grow upwards; other placements grow downwards.
+                            const direction = Plasmoid.location === PlasmaCore.Types.BottomEdge ? -1 : 1;
+                            root.dragMenuHeight = Math.max(120, Math.min(10000,
+                                Math.round(resizeGrip.startHeight + direction * delta)));
+                        }
+                        onReleased: {
+                            if (resizeGrip.moved) root.commitDragHeight(popup.fittedHeight);
+                            else root.dragMenuHeight = -1;
+                        }
+                        onCanceled: root.dragMenuHeight = -1
+                    }
                 }
                 PC3.ToolButton {
                     id: lockButton
