@@ -127,7 +127,11 @@ executables still match their bundle hash inventory. Test fault hooks are compil
 
 Install the matching development package through pacman in a disposable test system,
 then explicitly run `open-power-menu-native-setup` from the ordinary desktop user
-session. Installing the pacman package alone does not integrate or restart Plasma.
+session. Installing the pacman package alone does not integrate or restart Plasma. This also applies to package updates: run the setup command again to update the
+per-user editor and backend. If `open-power-menu --edit` still shows the old
+interface, record `type -a open-power-menu` and the resolved executable before
+changing anything. The Basic style changes rendering, not which installation
+is launched.
 
 [Pacman package CI](../tests/pacman.Dockerfile) builds Arch and Manjaro separately,
 tests released 1.0.1 upgrades, and installs each sealed package into a separate runtime

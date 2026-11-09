@@ -89,8 +89,6 @@ PlasmoidItem {
     property string menuWidth: "auto"
     property string menuHeightMode: "auto"
     property int menuCustomHeight: 600
-    // Transient preview only while a deliberate grip drag is in progress.
-    property int dragMenuHeight: -1
     readonly property rect menuWorkArea: {
         const area = Metrics.workArea(root.screenGeometry, root.availableScreenRect);
         return Qt.rect(area.x, area.y, area.width, area.height);
@@ -162,6 +160,11 @@ PlasmoidItem {
     // A switch to Power Menu isn't complete until the other menu has closed.
     // The selected adapter may close asynchronously or animate its window.
     // Only open Power Menu when the adapter confirms it is no longer visible.
+    property bool openingPower: false
+    property bool openingPreferencesReady: false
+    property bool openingEntriesReady: false
+    property bool integrationFetching: false
+    property var integrationCallbacks: []
     property int pendingPowerEpoch: -1
     property int launcherClosePollCount: 0
     property bool awaitingAsyncClose: false
@@ -175,7 +178,7 @@ PlasmoidItem {
         active: root.maskActive && root.hideOriginalLauncherRequested
         panelWindow: root.Window.window
         panelLocation: Plasmoid.location
-        compactButtonHeight: button.height
+        compactButtonHeight: root.compactRepresentationItem ? root.compactRepresentationItem.height : 0
         onLauncherOpened: root.onOriginalLauncherOpened()
     }
 
@@ -206,6 +209,7 @@ PlasmoidItem {
                     if (requestEpoch !== root.menuSwitchEpoch) return;
                     root.awaitingAsyncClose = false;
                     if (!ok) {
+                        root.openingPower = false;
                         root.launcherSwitchError = String(reason);
                         console.warn("Open Power Menu:", root.launcherSwitchError);
                         launcherClosePoll.stop();
@@ -223,10 +227,38 @@ PlasmoidItem {
         pendingPowerEpoch = -1;
         awaitingAsyncClose = false;
         launcherSwitchError = "";
-        powerIsOpen = true;
-        expanded = true;
-        fetchMenu();
-        launcherCloseFollowup.restart();
+        fetchMenu(false, () => {
+            if (epoch !== menuSwitchEpoch || !openingPower) return;
+            openingEntriesReady = true;
+            preparePowerPopup(epoch);
+        });
+    }
+
+    function preparePowerPopup(epoch) {
+        if (epoch !== menuSwitchEpoch || requestedMenu !== "power" || !openingPower
+                || !openingPreferencesReady || !openingEntriesReady) return;
+        // Instantiate and lay out the hidden representation with the saved
+        // preferences and completed model. callLater drains QML bindings; it is
+        // not a timed wait for the backend or the compositor.
+        preloadFullRepresentation = true;
+        Qt.callLater(() => {
+            if (epoch !== menuSwitchEpoch || requestedMenu !== "power" || !openingPower) return;
+            // An external launcher activation can win while D-Bus is loading.
+            // Recheck immediately before exposing a second native popup.
+            const plan = root.selectedLauncherPlan;
+            if (LauncherAdapters.originalIsVisiblyOpen(root.selectedLauncherItem, plan ? plan.applet : null)) {
+                openingPower = false;
+                requestedMenu = "launcher";
+                return;
+            }
+            const popup = root.fullRepresentationItem;
+            if (!popup) return;
+            popup.prepareForOpen();
+            openingPower = false;
+            powerIsOpen = true;
+            expanded = true;
+            launcherCloseFollowup.restart();
+        });
     }
 
     Timer {
@@ -258,6 +290,7 @@ PlasmoidItem {
             if (root.launcherClosePollCount >= 50) {
                 stop();
                 root.pendingPowerEpoch = -1;
+                root.openingPower = false;
                 root.launcherSwitchError = "Original launcher did not close; Power Menu was not opened";
                 console.warn("Open Power Menu:", root.launcherSwitchError,
                              LauncherAdapters.describeState(item, plan ? plan.applet : null));
@@ -480,15 +513,21 @@ PlasmoidItem {
         }
     }
 
-    function fetchIntegration() {
+    function fetchIntegration(done) {
+        if (done) integrationCallbacks.push(done);
+        // Coalesce the regular poll and opening request. A slow response must
+        // not be discarded forever by newer five-second polls.
+        if (integrationFetching) return;
+        integrationFetching = true;
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
              "GetIntegration", [], (ok, value) => {
-                 if (!ok) return; // A temporary D-Bus outage should not change panel state.
+                 integrationFetching = false;
                  try {
+                     if (!ok) return; // Retain preferences on an outage.
                      const cfg = JSON.parse(String(value));
                      const desired = cfg.hide_original_launcher === true;
                      const selected = Number(cfg.launcher_applet_id || 0);
-                     if (!Number.isInteger(selected) || selected < 0) return;
+                     if (!Number.isInteger(selected) || selected < 0) throw new Error("Invalid launcher ID");
                      if (launcherAppletId !== selected) {
                          releaseMask();
                          launcherAppletId = selected;
@@ -509,6 +548,10 @@ PlasmoidItem {
                      synchronizeLauncherVisibility();
                  } catch (e) {
                      console.warn("Open Power Menu: invalid integration configuration", e);
+                 } finally {
+                     const completed = integrationCallbacks;
+                     integrationCallbacks = [];
+                     completed.forEach(callback => callback());
                  }
              });
     }
@@ -666,6 +709,7 @@ PlasmoidItem {
         const wasPowerPopupOpen = expanded === true;
         const epoch = ++menuSwitchEpoch;
         requestedMenu = "launcher";
+        openingPower = false;
         LauncherAdapters.traceRequest(root, "left-request", epoch);
         launcherClosePoll.stop();
         pendingPowerEpoch = -1;
@@ -684,14 +728,15 @@ PlasmoidItem {
     Timer {
         id: powerRefresh
         interval: 250
-        onTriggered: { if (root.expanded && !root.layoutEditing && !root.layoutBusy) root.fetchMenu(true); }
+        property var readyCallback: null
+        onTriggered: { if ((root.expanded || root.openingPower) && !root.layoutEditing && !root.layoutBusy) root.fetchMenu(true, readyCallback); }
     }
-    function fetchMenu(powerOnlyRefresh = false) {
+    function fetchMenu(powerOnlyRefresh = false, done = null) {
         if (!powerOnlyRefresh) { powerRefresh.stop(); powerRefreshAttempts = 0; }
-        if (layoutEditing || layoutBusy) return;
+        if (layoutEditing || layoutBusy) { if (done) done(); return; }
         const epoch = ++menuFetchEpoch;
         fetching = true;
-        menuStatus = "Loading system shortcuts...";
+        if (!menuEntries.length) menuStatus = "Loading system shortcuts...";
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
              "GetMenu", [], (ok, value) => {
                  if (epoch !== menuFetchEpoch || layoutEditing || layoutBusy) return;
@@ -715,12 +760,17 @@ PlasmoidItem {
                  rebuild();
                  // Optional additive API: old backends can reject it harmlessly.
                  // Bounded polling works on Plasma versions predating SignalWatcher.
-                 if (ok && expanded && powerRefreshAttempts < 8)
+                 if (ok && (expanded || openingPower) && powerRefreshAttempts < 8)
                      send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
                           "PowerCapabilitiesPending", [], (stateOk, pending) => {
-                              if (epoch !== menuFetchEpoch || !expanded || layoutEditing || layoutBusy) return;
-                              if (stateOk && pending === true) { ++powerRefreshAttempts; powerRefresh.restart(); }
+                              if (epoch !== menuFetchEpoch || (!expanded && !openingPower) || layoutEditing || layoutBusy) return;
+                              if (stateOk && pending === true) {
+                                  ++powerRefreshAttempts;
+                                  powerRefresh.readyCallback = done;
+                                  powerRefresh.restart();
+                              } else if (done) done();
                           });
+                 else if (done) done();
              });
     }
     // The main menu always has only top-level rows. Submenus are real side
@@ -732,7 +782,7 @@ PlasmoidItem {
         // Plasma's PlasmoidItem first calls setExpanded(true) for activated().
         // The state below distinguishes a genuine OPM popup or pending handoff
         // from that eager expansion. Never launch a second standalone window.
-        if (powerIsOpen || (requestedMenu === "power" && launcherClosePoll.running)) {
+        if (powerIsOpen || (requestedMenu === "power" && (launcherClosePoll.running || openingPower))) {
             root.openMenu(); // Toggle off an existing/pending power popup.
             return;
         }
@@ -741,12 +791,14 @@ PlasmoidItem {
     }
 
     function openMenu() {
-        fetchIntegration();
-        const alreadyOpen = expanded || (launcherClosePoll.running && requestedMenu === "power");
+        const alreadyOpen = expanded || ((launcherClosePoll.running || openingPower) && requestedMenu === "power");
         const epoch = ++menuSwitchEpoch; // Cancel an unsent left-click activation.
         launcherActivationSettle.stop(); // Cancel pending Power -> Launcher switch.
         pendingLauncherEpoch = -1;
         requestedMenu = alreadyOpen ? "none" : "power";
+        openingPower = !alreadyOpen;
+        openingPreferencesReady = false;
+        openingEntriesReady = false;
         LauncherAdapters.traceRequest(root, "right-request", epoch);
         launcherClosePoll.stop();
         launcherCloseFollowup.stop();
@@ -757,8 +809,14 @@ PlasmoidItem {
             expanded = false;
             return;
         }
+        fetchIntegration(() => {
+            if (epoch !== menuSwitchEpoch || !openingPower) return;
+            openingPreferencesReady = true;
+            preparePowerPopup(epoch);
+        });
         const result = closeLauncherPopup();
         if (!result.ok) {
+            openingPower = false;
             launcherSwitchError = "Cannot dismiss original launcher (" + result.mode + ")";
             console.warn("Open Power Menu:", launcherSwitchError);
             return;
@@ -767,21 +825,6 @@ PlasmoidItem {
         launcherClosePollCount = 0;
         // Wait for adapter close/acknowledgment before opening Power Menu.
         launcherClosePoll.start();
-    }
-    function commitDragHeight(logicalPixels) {
-        const target = Math.max(120, Math.min(10000, Math.round(logicalPixels)));
-        menuHeightMode = "custom";
-        menuCustomHeight = target;
-        dragMenuHeight = -1;
-        // Write only once after a completed grip drag, never on geometry events.
-        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
-             "SetMenuHeight", [target], (ok, value) => {
-                 let answer = {};
-                 try { if (ok) answer = JSON.parse(String(value)); } catch (_) {}
-                 if (!ok || answer.ok !== true)
-                     commandError = answer.message || "The resized menu height could not be saved.";
-                 fetchIntegration();
-             });
     }
     function openEditor() {
         // Close the panel popup so the separate Qt editor is visible.
@@ -937,6 +980,11 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: popup
         focus: true
+        function prepareForOpen() {
+            width = Layout.preferredWidth;
+            menuColumn.forceLayout();
+            height = fittedHeight;
+        }
         property int activeIndex: -1
         FontMetrics { id: menuFont; font: Kirigami.Theme.defaultFont }
         readonly property int entryIconSize: Metrics.iconSize(root.menuIconSize, menuFont.height)
@@ -947,7 +995,7 @@ PlasmoidItem {
             delay: root.autoCloseDelay
             menuOpen: root.expanded
             pointerInside: popupHover.hovered || flyout.pointerInside
-            protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending || root.dragMenuHeight >= 0
+            protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending
             onDismissed: root.expanded = false
         }
         HoverHandler {
@@ -1029,7 +1077,6 @@ PlasmoidItem {
             function onExpandedChanged() {
                 if (!root.expanded) {
                     root.powerIsOpen = false;
-                    root.dragMenuHeight = -1;
                     flyout.visible = false;
                     layoutEditor.cancelDrag();
                 } else {
@@ -1085,8 +1132,8 @@ PlasmoidItem {
             + Math.max(1, menuDivider.implicitHeight)
             + (root.layoutEditing ? layoutEditor.minimumUsableHeight : entryHeight) + 4)
             / (1 - (statusScroll.visible ? 0.25 : 0) - (setupScroll.visible ? 0.5 : 0))
-        readonly property real fittedHeight: Metrics.menuHeight(root.dragMenuHeight >= 0 ? "custom" : root.menuHeightMode,
-            Math.max(root.dragMenuHeight >= 0 ? root.dragMenuHeight : root.menuCustomHeight, minimumUsableHeight),
+        readonly property real fittedHeight: Metrics.menuHeight(root.menuHeightMode,
+            Math.max(root.menuCustomHeight, minimumUsableHeight),
             naturalHeight, root.menuWorkArea.height || Screen.desktopAvailableHeight, themeVerticalPadding)
 
         // The unlocked layout editor stays in this single Plasma popup.
@@ -1117,55 +1164,6 @@ PlasmoidItem {
                     font.bold: true
                     text: "Power User Menu"
                     color: root.menuTextColor
-                }
-                // Explicit resize grip: its pointer capture distinguishes intent from
-                // Plasma's automatic/compositor-constrained window geometry.
-                Item {
-                    id: resizeGrip
-                    Layout.preferredWidth: 23
-                    Layout.preferredHeight: 29
-                    visible: !root.layoutEditing && !root.layoutBusy
-                    property real startGlobalY: 0
-                    property real startHeight: 0
-                    property bool moved: false
-                    Accessible.name: "Drag vertically to resize menu height"
-                    HoverHandler { id: resizeHover }
-                    QQC2.ToolTip.visible: resizeHover.hovered
-                    QQC2.ToolTip.text: "Drag to resize; releasing remembers Custom height"
-                    PC3.Label {
-                        anchors.centerIn: parent
-                        text: "↕"
-                        color: root.menuTextColor
-                        font.bold: true
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.SizeVerCursor
-                        onPressed: mouse => {
-                            resizeGrip.startGlobalY = resizeGrip.mapToGlobal(mouse.x, mouse.y).y;
-                            resizeGrip.startHeight = popup.height;
-                            resizeGrip.moved = false;
-                            root.dragMenuHeight = Math.round(popup.height);
-                            autoDismiss.keyboardUsed();
-                            mouse.accepted = true;
-                        }
-                        onPositionChanged: mouse => {
-                            if (!pressed) return;
-                            const currentGlobalY = resizeGrip.mapToGlobal(mouse.x, mouse.y).y;
-                            const delta = currentGlobalY - resizeGrip.startGlobalY;
-                            if (Math.abs(delta) <= 3 && !resizeGrip.moved) return;
-                            resizeGrip.moved = true;
-                            // Bottom panels grow upwards; other placements grow downwards.
-                            const direction = Plasmoid.location === PlasmaCore.Types.BottomEdge ? -1 : 1;
-                            root.dragMenuHeight = Math.max(120, Math.min(10000,
-                                Math.round(resizeGrip.startHeight + direction * delta)));
-                        }
-                        onReleased: {
-                            if (resizeGrip.moved) root.commitDragHeight(popup.fittedHeight);
-                            else root.dragMenuHeight = -1;
-                        }
-                        onCanceled: root.dragMenuHeight = -1
-                    }
                 }
                 PC3.ToolButton {
                     id: lockButton

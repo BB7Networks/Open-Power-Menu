@@ -241,7 +241,7 @@ def test_configured_hover_cancel_keyboard_and_nested(flyout, delay):
     assert evaluate(flyout, 'activeChild === null')
 
 
-@pytest.mark.parametrize('appearance', ['native', 'aero'])
+@pytest.mark.parametrize('appearance', ['native', 'aero', 'aero-light'])
 def test_appearance_metrics_and_screen_bound(flyout, appearance):
     evaluate(flyout, f'appearance="{appearance}";')
     heights=[]
@@ -332,7 +332,7 @@ def test_nested_open_menu_tracks_preferences_without_losing_selection(flyout):
     assert evaluate(flyout, 'activeChild.height <= 92')
 
 
-@pytest.mark.parametrize('appearance', ['native', 'aero'])
+@pytest.mark.parametrize('appearance', ['native', 'aero', 'aero-light'])
 @pytest.mark.parametrize('icons', [True, False])
 @pytest.mark.parametrize('font_size', [12, 24])
 def test_rendered_hint_column_centers_and_empty_keys(flyout, appearance, icons, font_size, tmp_path):
@@ -433,6 +433,9 @@ Window {
  property string layoutStatus: ""
  property string menuStatus: ""
  property string menuAppearance: "native"
+ readonly property color menuTextColor: menuAppearance === "aero" ? "#eff3f8" : menuAppearance === "aero-light" ? "#24394b" : "black"
+ readonly property color menuSurfaceColor: menuAppearance === "aero" ? "#27313d" : menuAppearance === "aero-light" ? "#eaf1f7" : "transparent"
+ readonly property color menuAccentColor: "blue"
  property string menuDensity: "standard"
  property string menuHeightMode: "auto"
  property int menuCustomHeight: 600

@@ -190,6 +190,7 @@ Kirigami.ApplicationWindow {
             text: "The configuration changed in another window. Your draft is retained. Save will offer recovery choices."
         }
         StackLayout {
+            Layout.minimumWidth: 0
             currentIndex: tabs.currentIndex
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -203,7 +204,7 @@ Kirigami.ApplicationWindow {
                 contentWidth: availableWidth
                 ColumnLayout {
                     id: generalColumn
-                    width: parent.width
+                    width: generalPreferences.availableWidth
                     spacing: 16
                     Controls.Label {
                         text: "Choose your launcher, Start button icon and menu style. Your launcher and favorites stay intact."
@@ -301,172 +302,239 @@ Kirigami.ApplicationWindow {
                                 horizontalAlignment: Text.AlignHCenter
                                 Layout.fillWidth: true
                             }
-                            Kirigami.Separator { Layout.fillWidth: true }
-                            Controls.Label { text: "Theme"; font.bold: true }
-                            RowLayout {
+                            Kirigami.Separator {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Menu theme"; Layout.preferredWidth: 155 }
-                                Controls.ComboBox {
-                                objectName: "menuTheme"
-                                Accessible.name: "menuTheme"
-                                model: ["Use the desktop theme","Aero Dark","Aero Light"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: window.settings.appearance === "aero" ? 1 : window.settings.appearance === "aero-light" ? 2 : 0
-                                onActivated: index => window.preference("appearance", ["native", "aero", "aero-light"][index])
-                                
                             }
-                                
+                            Controls.Label {
+                                text: "Theme"
+                                font.bold: true
                             }
-                            Kirigami.Separator { Layout.fillWidth: true }
-                            Controls.Label { text: "Size & Layout"; font.bold: true }
-                            RowLayout {
+                            GridLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Menu density"; Layout.preferredWidth: 155 }
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Menu theme"
+                                    Layout.preferredWidth: 155
+                                }
                                 Controls.ComboBox {
-                                objectName: "menu_density"
-                                Accessible.name: "menu density"
-                                model: ["Compact","Standard","Comfortable"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: ["compact", "standard", "comfortable"].indexOf(window.settings.menu_density)
-                                onActivated: index => window.preference("menu_density", ["compact", "standard", "comfortable"][index])
-                                
+                                    objectName: "menuTheme"
+                                    Accessible.name: "Menu theme"
+                                    model: ["Use the desktop theme", "Aero Dark", "Aero Light"]
+                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                    Layout.preferredWidth: implicitWidth
+                                    currentIndex: window.settings.appearance === "aero" ? 1 : window.settings.appearance === "aero-light" ? 2 : 0
+                                    onActivated: index => window.preference("appearance", ["native", "aero", "aero-light"][index])
+                                }
                             }
-                                
-                            }
-                            RowLayout {
+                            Kirigami.Separator {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Menu width"; Layout.preferredWidth: 155 }
-                                Controls.ComboBox {
-                                objectName: "menu_width"
-                                Accessible.name: "menu width"
-                                model: ["Automatic","Narrow","Wide"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: ["auto", "narrow", "wide"].indexOf(window.settings.menu_width)
-                                onActivated: index => window.preference("menu_width", ["auto", "narrow", "wide"][index])
-                                
                             }
-                                
+                            Controls.Label {
+                                text: "Size & Layout"
+                                font.bold: true
                             }
-                            RowLayout {
+                            GridLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Widget menu height"; Layout.preferredWidth: 155 }
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Menu density"
+                                    Layout.preferredWidth: 155
+                                }
                                 Controls.ComboBox {
-                                objectName: "menu_height_mode"
-                                Accessible.name: "menu height mode"
-                                model: ["Auto-fit","Custom"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: window.settings.menu_height_mode === "custom" ? 1 : 0
-                                onActivated: index => window.preference("menu_height_mode", index ? "custom" : "auto")
-                                
+                                    objectName: "menu_density"
+                                    Accessible.name: "menu density"
+                                    model: ["Compact", "Standard", "Comfortable"]
+                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                    Layout.preferredWidth: implicitWidth
+                                    currentIndex: ["compact", "standard", "comfortable"].indexOf(window.settings.menu_density)
+                                    onActivated: index => window.preference("menu_density", ["compact", "standard", "comfortable"][index])
+                                }
                             }
-                                Controls.SpinBox {
-                                objectName: "menu_custom_height"
-                                Accessible.name: "Custom height in logical pixels"
-                                from: 120; to: 10000; stepSize: 10; editable: true
-                                Layout.preferredWidth: 118
-                                enabled: window.settings.menu_height_mode === "custom"
-                                value: window.settings.menu_custom_height || 600
-                                onValueModified: window.preference("menu_custom_height", value)
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Menu width"
+                                    Layout.preferredWidth: 155
+                                }
+                                Controls.ComboBox {
+                                    objectName: "menu_width"
+                                    Accessible.name: "menu width"
+                                    model: ["Automatic", "Narrow", "Wide"]
+                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                    Layout.preferredWidth: implicitWidth
+                                    currentIndex: ["auto", "narrow", "wide"].indexOf(window.settings.menu_width)
+                                    onActivated: index => window.preference("menu_width", ["auto", "narrow", "wide"][index])
+                                }
                             }
-                            Controls.Button {
-                                objectName: "resetMenuHeight"
-                                text: "Reset"
-                                enabled: window.settings.menu_height_mode === "custom"
-                                onClicked: window.preference("menu_height_mode", "auto")
-                                Controls.ToolTip.text: "Reset menu height to Auto-fit"
-                                Controls.ToolTip.visible: hovered
-                            }
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Widget menu height"
+                                    Layout.preferredWidth: 155
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Controls.ComboBox {
+                                        objectName: "menu_height_mode"
+                                        Accessible.name: "menu height mode"
+                                        model: ["Auto-fit", "Custom"]
+                                        implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                        Layout.preferredWidth: implicitWidth
+                                        currentIndex: window.settings.menu_height_mode === "custom" ? 1 : 0
+                                        onActivated: index => window.preference("menu_height_mode", index ? "custom" : "auto")
+                                    }
+                                    Controls.SpinBox {
+                                        objectName: "menu_custom_height"
+                                        Accessible.name: "Custom height in logical pixels"
+                                        from: 120
+                                        to: 10000
+                                        stepSize: 10
+                                        editable: true
+                                        Layout.preferredWidth: 118
+                                        enabled: window.settings.menu_height_mode === "custom"
+                                        value: window.settings.menu_custom_height || 600
+                                        onValueModified: window.preference("menu_custom_height", value)
+                                    }
+                                    Controls.Button {
+                                        objectName: "resetMenuHeight"
+                                        text: "Reset"
+                                        enabled: window.settings.menu_height_mode === "custom"
+                                        onClicked: window.preference("menu_height_mode", "auto")
+                                        Controls.ToolTip.text: "Reset menu height to Auto-fit"
+                                        Controls.ToolTip.visible: hovered
+                                    }
+                                }
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
                                 wrapMode: Text.WordWrap
                                 text: "Auto-fit follows the menu contents; Custom remembers the preferred height within the available screen area."
                             }
-                            Kirigami.Separator { Layout.fillWidth: true }
-                            Controls.Label { text: "Icons"; font.bold: true }
+                            Kirigami.Separator {
+                                Layout.fillWidth: true
+                            }
+                            Controls.Label {
+                                text: "Icons"
+                                font.bold: true
+                            }
                             Controls.CheckBox {
                                 objectName: "showMenuIcons"
                                 text: "Show icons in Power User Menu"
                                 checked: window.settings.show_menu_icons
                                 onToggled: window.preference("show_menu_icons", checked)
                             }
-                            RowLayout {
+                            GridLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Icon size"; Layout.preferredWidth: 155 }
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Icon size"
+                                    Layout.preferredWidth: 155
+                                }
                                 Controls.ComboBox {
-                                objectName: "menu_icon_size"
-                                Accessible.name: "menu icon size"
-                                model: ["Small","Standard","Large"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: ["small", "standard", "large"].indexOf(window.settings.menu_icon_size)
-                                onActivated: index => window.preference("menu_icon_size", ["small", "standard", "large"][index])
-                                enabled: window.settings.show_menu_icons
+                                    objectName: "menu_icon_size"
+                                    Accessible.name: "menu icon size"
+                                    model: ["Small", "Standard", "Large"]
+                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                    Layout.preferredWidth: implicitWidth
+                                    currentIndex: ["small", "standard", "large"].indexOf(window.settings.menu_icon_size)
+                                    onActivated: index => window.preference("menu_icon_size", ["small", "standard", "large"][index])
+                                    enabled: window.settings.show_menu_icons
+                                }
                             }
-                                
+                            Kirigami.Separator {
+                                Layout.fillWidth: true
                             }
-                            Kirigami.Separator { Layout.fillWidth: true }
-                            Controls.Label { text: "Menu Behavior"; font.bold: true }
+                            Controls.Label {
+                                text: "Menu Behavior"
+                                font.bold: true
+                            }
                             Controls.CheckBox {
                                 text: "Automatically close when pointer leaves menu"
                                 checked: window.settings.auto_close_on_pointer_leave
                                 onToggled: window.preference("auto_close_on_pointer_leave", checked)
                             }
-                            RowLayout {
+                            GridLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Close delay (seconds)"; Layout.preferredWidth: 155 }
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Close delay (seconds)"
+                                    Layout.preferredWidth: 155
+                                }
                                 Controls.SpinBox {
-                                objectName: "closeDelay"
-                                from: 5; to: 50; stepSize: 1; Layout.preferredWidth: 108
-                                value: window.settings.auto_close_delay_ms / 100
-                                textFromValue: (value, locale) => Number(value / 10).toLocaleString(locale, 'f', 1)
-                                onValueModified: window.preference("auto_close_delay_ms", value * 100)
-                                Accessible.name: "Automatic-close delay in seconds"
-                            }
+                                    objectName: "closeDelay"
+                                    from: 5
+                                    to: 50
+                                    stepSize: 1
+                                    Layout.preferredWidth: 108
+                                    value: window.settings.auto_close_delay_ms / 100
+                                    textFromValue: (value, locale) => Number(value / 10).toLocaleString(locale, 'f', 1)
+                                    valueFromText: (text, locale) => Math.round(Number.fromLocaleString(locale, text) * 10)
+                                    onValueModified: window.preference("auto_close_delay_ms", value * 100)
+                                    Accessible.name: "Automatic-close delay in seconds"
+                                }
                                 enabled: window.settings.auto_close_on_pointer_leave
                             }
-                            RowLayout {
+                            GridLayout {
                                 Layout.fillWidth: true
-                                spacing: 10
-                                Controls.Label { text: "Open submenu on hover"; Layout.preferredWidth: 155 }
-                                Controls.ComboBox {
-                                objectName: "hoverMode"
-                                Accessible.name: "hoverMode"
-                                model: ["Existing / system","Immediate","Delayed"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
-                                Layout.preferredWidth: implicitWidth
-                                currentIndex: window.settings.submenu_hover_delay_ms < 0 ? 0 : window.settings.submenu_hover_delay_ms === 0 ? 1 : 2
-                                onActivated: index => window.preference("submenu_hover_delay_ms", index === 0 ? -1 : index === 1 ? 0 : 300)
-                                
-                            }
-                                Controls.SpinBox {
-                                objectName: "hoverDelay"
-                                Accessible.name: "Submenu hover delay in milliseconds"
-                                enabled: window.settings.submenu_hover_delay_ms > 0
-                                from: 100; to: 600; stepSize: 100
-                                Layout.preferredWidth: 112
-                                value: Math.max(100, window.settings.submenu_hover_delay_ms)
-                                textFromValue: value => value + " ms"
-                                onValueModified: window.preference("submenu_hover_delay_ms", value)
-                            }
+                                columns: width < 580 ? 1 : 2
+                                columnSpacing: 10
+                                rowSpacing: 6
+                                Controls.Label {
+                                    text: "Open submenu on hover"
+                                    Layout.preferredWidth: 155
+                                }
+                                RowLayout {
+                                    spacing: 8
+                                    Controls.ComboBox {
+                                        objectName: "hoverMode"
+                                        Accessible.name: "hoverMode"
+                                        model: ["Existing / system", "Immediate", "Delayed"]
+                                        implicitContentWidthPolicy: Controls.ComboBox.WidestText
+                                        Layout.preferredWidth: implicitWidth
+                                        currentIndex: window.settings.submenu_hover_delay_ms < 0 ? 0 : window.settings.submenu_hover_delay_ms === 0 ? 1 : 2
+                                        onActivated: index => window.preference("submenu_hover_delay_ms", index === 0 ? -1 : index === 1 ? 0 : 300)
+                                    }
+                                    Controls.SpinBox {
+                                        objectName: "hoverDelay"
+                                        Accessible.name: "Submenu hover delay in milliseconds"
+                                        enabled: window.settings.submenu_hover_delay_ms > 0
+                                        from: 100
+                                        to: 600
+                                        stepSize: 100
+                                        Layout.preferredWidth: 112
+                                        value: Math.max(100, window.settings.submenu_hover_delay_ms)
+                                        textFromValue: (value, locale) => Number(value).toLocaleString(locale, 'f', 0) + " ms"
+                                        valueFromText: (text, locale) => Number.fromLocaleString(locale, text.replace(/\s*ms$/, ""))
+                                        onValueModified: window.preference("submenu_hover_delay_ms", value)
+                                    }
+                                }
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
                                 wrapMode: Text.WordWrap
                                 text: "Close delay applies outside the menu and its flyouts. Keyboard navigation and editing keep it open."
                             }
-                            Kirigami.Separator { Layout.fillWidth: true }
-                            Controls.Label { text: "Keyboard Shortcuts"; font.bold: true }
+                            Kirigami.Separator {
+                                Layout.fillWidth: true
+                            }
+                            Controls.Label {
+                                text: "Keyboard Shortcuts"
+                                font.bold: true
+                            }
                             Controls.CheckBox {
                                 objectName: "accessKeysEnabled"
                                 text: "Enable menu access keys"
@@ -550,15 +618,13 @@ Kirigami.ApplicationWindow {
                     onCancelRequested: window.close()
                     onCloseRequested: window.close()
                 }
-                RowLayout {
+                Flow {
                     Layout.fillWidth: true
+                    spacing: 6
                     Controls.CheckBox {
                         text: "Show unavailable commands in the menu"
                         checked: !!window.settings.show_unavailable
                         onToggled: window.preference("show_unavailable", checked)
-                    }
-                    Item {
-                        Layout.fillWidth: true
                     }
                     Controls.Button {
                         text: "Reset access keys"
@@ -699,6 +765,7 @@ Kirigami.ApplicationWindow {
             }
             Controls.Button {
                 text: "Close"
+                objectName: "closeConfiguration"
                 onClicked: window.close()
             }
         }

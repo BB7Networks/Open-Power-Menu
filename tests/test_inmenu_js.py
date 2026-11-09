@@ -174,6 +174,7 @@ def test_icon_preference_transport_defaults_and_recovery():
     code = 'const assert=require("node:assert/strict");\n'
     code += function((UI / 'main.qml').read_text(), 'fetchIntegration')
     code += r'''
+let integrationFetching=false,integrationCallbacks=[];
 let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
 let response={},ok=true;
 function send(service,path,iface,method,args,callback){callback(ok,JSON.stringify(response))}
@@ -275,6 +276,7 @@ def test_saved_height_preferences_poll_without_restart():
     source=(UI/'main.qml').read_text()
     code='const assert=require("node:assert/strict");\n'+function(source,'fetchIntegration')
     code+=r'''
+let integrationFetching=false,integrationCallbacks=[];
 let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
 let menuHeightMode='auto',menuCustomHeight=600,menuDensity='standard';
 let response={menu_height_mode:'custom',menu_custom_height:910,menu_density:'compact'};

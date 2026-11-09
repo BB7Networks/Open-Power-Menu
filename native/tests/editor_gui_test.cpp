@@ -49,6 +49,8 @@ class EditorGuiTests : public QObject {
             }
         if (!clickable(item))
             return false;
+        QCursor::setPos(item->mapToGlobal(QPointF(item->width()/2,item->height()/2)).toPoint());
+        QTest::qWait(10);
         QTest::mouseClick(
             item->window(), Qt::LeftButton, Qt::NoModifier,
             item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint());
@@ -60,7 +62,11 @@ class EditorGuiTests : public QObject {
             const auto children = root->childItems();
             for (auto it = children.crbegin(); it != children.crend(); ++it)
                 if (auto *item = self(self, *it)) return item;
-            if (clickable(root) && (root->property("text").toString().remove('&') == text || root->property("fileName").toString() == text)) return root;
+            auto label = root->property("text").toString().remove('&');
+            // KDE's standard Open button is "Open..."; Basic uses "Open".
+            if (label.endsWith("...")) label.chop(3);
+            else if (label.endsWith(QChar(0x2026))) label.chop(1);
+            if (clickable(root) && (label == text || root->property("fileName").toString() == text)) return root;
             return nullptr;
         };
         for (auto *top : QGuiApplication::topLevelWindows()) {
@@ -238,6 +244,7 @@ class EditorGuiTests : public QObject {
             QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
             const auto output=qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
             if (!output.isEmpty()) {
+                QTest::qWait(50);
                 QDir().mkpath(output);
                 QVERIFY(window->grabWindow().save(output + QString("/editor-general-narrow-%1.png").arg(pass)));
             }
@@ -247,6 +254,60 @@ class EditorGuiTests : public QObject {
             QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
             window->close();
         }
+    }
+
+    void appearanceMouseAndMinimumGeometry() {
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        auto personal = defaults();
+        personal["appearance"] = "aero"; // Existing dark-theme value remains valid.
+        personal["menu"] = QJsonArray{QJsonObject{{"label", "Personal command"}, {"command", QJsonArray{"/bin/true"}}}};
+        store.save(personal, {});
+        EditorSession session(store); EditorCatalog catalog;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window=qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        const auto control=[&](const char *name){return window->findChild<QQuickItem *>(name);};
+        for(const auto size : {QSize(620,480), QSize(960,720), QSize(1280,900)}) {
+            window->resize(size); window->requestActivate();
+            auto *theme=control("menuTheme"); QVERIFY(theme);
+            theme->forceActiveFocus();
+            QTest::qWait(50);
+            for(const char *name : {"menuTheme", "menu_density", "menu_width", "menu_height_mode",
+                    "menu_custom_height", "resetMenuHeight", "menu_icon_size", "hoverMode", "hoverDelay",
+                    "saveConfiguration", "closeConfiguration"}) {
+                auto *item=control(name); QVERIFY(item);
+                const auto left=item->mapToScene(QPointF()).x();
+                QVERIFY2(left >= 0 && left+item->width() <= window->width(), name);
+                if(item->property("implicitContentWidthPolicy").isValid())
+                    QVERIFY2(item->width() >= item->implicitWidth(), name);
+            }
+            auto *popup=theme->property("popup").value<QObject *>(); QVERIFY(popup);
+            QVERIFY(click(window,"menuTheme"));
+            QTRY_VERIFY(popup->property("opened").toBool());
+            QVERIFY(clickText("Aero Light"));
+            QTRY_VERIFY(!popup->property("visible").toBool());
+            QCOMPARE(session.configuration()["appearance"].toString(), "aero-light");
+            QVERIFY(click(window,"saveConfiguration"));
+            QCOMPARE(store.load()["appearance"].toString(), "aero-light");
+            QCOMPARE(store.load()["menu"], personal["menu"]);
+            theme->forceActiveFocus(); QTest::qWait(50);
+            const auto output=qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
+            if(!output.isEmpty()) {
+                QDir().mkpath(output);
+                QVERIFY(window->grabWindow().save(output+QString("/editor-theme-%1x%2.png").arg(size.width()).arg(size.height())));
+            }
+            QVERIFY(click(window,"menuTheme"));
+            QTRY_VERIFY(popup->property("opened").toBool());
+            QVERIFY(clickText("Use the desktop theme"));
+            QTRY_VERIFY(!popup->property("visible").toBool());
+            QCOMPARE(session.configuration()["appearance"].toString(), "native");
+        }
+        window->close();
     }
 
     void portableDialogsCancelApplyAndRecover() {
@@ -360,6 +421,7 @@ class EditorGuiTests : public QObject {
         QTRY_VERIFY(confirm->property("opened").toBool());
         QVERIFY(clickText("Yes"));
         QTRY_COMPARE(store.load(), original);
+        QTRY_VERIFY(!confirm->property("visible").toBool());
         QVERIFY(file.open(QIODevice::WriteOnly)); file.write("{"); file.close();
         QVERIFY(openImport());
         QVERIFY(!preview->property("visible").toBool());

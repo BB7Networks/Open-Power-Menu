@@ -7,18 +7,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins xvfb xauth && rm -rf /var/lib/apt/lists/* && \
+    qt6-qpa-plugins qt6-wayland xvfb xauth xdotool x11-utils \
+    plasma-desktop plasma-workspace kwin-x11 kwin-wayland \
+    python3 python3-pyside6.qtdbus python3-pyside6.qtgui && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home builder
 WORKDIR /src
 COPY --chown=1000:1000 CMakeLists.txt /src/
 COPY --chown=1000:1000 native /src/native
 COPY --chown=1000:1000 openpowermenu/data /src/openpowermenu/data
-COPY --chown=1000:1000 plasmoid/contents/ui /src/plasmoid/contents/ui
+COPY --chown=1000:1000 plasmoid /src/plasmoid
 RUN chown builder:builder /src
 USER 1000:1000
 RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_EDITOR=ON && \
     cmake --build /tmp/build --parallel 2 && \
-    ctest --test-dir /tmp/build --output-on-failure && \
+    QT_QUICK_CONTROLS_STYLE=Basic ctest --test-dir /tmp/build --output-on-failure && \
+    QT_QUICK_CONTROLS_STYLE=org.kde.desktop ctest --test-dir /tmp/build -R native-editor-gui --output-on-failure && \
+    python3 native/tests/plasma_startup.py --output /tmp/plasma-startup && \
     cmake --install /tmp/build --prefix /tmp/stage
 
 FROM debian:trixie-slim

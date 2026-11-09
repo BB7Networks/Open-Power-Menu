@@ -20,7 +20,7 @@ def test_widget_activation_handler_and_native_configuration():
     assert 'expanded = false;' in handler
     assert 'property bool powerIsOpen: false' in qml
     assert 'root.powerIsOpen = false;' in qml
-    assert 'powerIsOpen = true;' in function(qml, 'finishOpeningPower')
+    assert 'powerIsOpen = true;' in function(qml, 'preparePowerPopup')
     assert 'Plasmoid.globalShortcut: "Meta+X"' not in qml  # Never force this on every reload.
     assert 'Plasmoid.globalShortcut = "Meta+X"' in qml
     assert 'opmDefaultShortcutTried' in (ROOT / 'plasmoid/contents/config/main.xml').read_text()

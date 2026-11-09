@@ -106,7 +106,7 @@ plugin=org.kde.plasma.kickoff
             self.assertIn(phrase,qml)
         for forbidden in ('root.maskFirst', 'root.maskSecond', 'root.maskIcon',
                           'value: 1;', 'opacity: 0', 'Layout.maximumWidth'):
-            self.assertNotIn(forbidden,qml[:qml.index('    function fetchIntegration()')])
+            self.assertNotIn(forbidden,qml[:qml.index('    function fetchIntegration(')])
 
     def test_no_modification_of_saved_plasma_or_launcher_state(self):
         js = VISIBILITY.read_text()
