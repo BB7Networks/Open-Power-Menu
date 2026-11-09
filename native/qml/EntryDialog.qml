@@ -164,7 +164,7 @@ Controls.Dialog {
                 textRole: "title"
                 Layout.fillWidth: true
             }
-"            Controls.Label {
+            Controls.Label {
                 objectName: "entryEffectiveCommandLabel"
                 visible: dialog.entryKind === "builtin"
                 text: "Runs on this PC: " + (dialog.builtin.effective || "")
