@@ -123,7 +123,7 @@ PROBE = '''
 '''
 
 
-def instrument(case, platform):
+def instrument(case, platform, pointer_regression=False):
     widget = case/'data/plasma/plasmoids/org.openpowermenu.start'
     shutil.copytree(ROOT/'plasmoid', widget)
     path = widget/'contents/ui/main.qml'
@@ -188,15 +188,27 @@ def instrument(case, platform):
         # Drive activation from actual exposure/paint/hide transitions, not
         # timers that can overtake a backend response on a loaded CI runner.
         source=source.replace('previous=compare; }','previous=compare; }\n            root.startupDriveWayland();')
+    if not pointer_regression:
+        # Preserve the small atomic log lines of the other startup tests.
+        # Per-row coordinates are only needed for actual pointer traversal.
+        source=source.replace('rows:p ? p.startupPointerRows() : null,', 'rows:null,')
     path.write_text(source)
 
 
 def read_states(path):
     rows = []
     if path.exists():
-        for line in path.read_text(errors='replace').splitlines():
-            if 'OPM_STARTUP ' in line:
-                rows.append(json.loads(line.split('OPM_STARTUP ', 1)[1]))
+        # The shell writes long JSON trace lines in multiple writes. A concurrent
+        # snapshot may end halfway through the last line: do not parse it yet.
+        lines=path.read_text(errors='replace').splitlines(keepends=True)
+        for index,line in enumerate(lines):
+            if 'OPM_STARTUP ' not in line: continue
+            try:
+                rows.append(json.loads(line.split('OPM_STARTUP ',1)[1]))
+            except json.JSONDecodeError:
+                if index==len(lines)-1 and not line.endswith('\\n'):
+                    break
+                raise
     return rows
 
 
@@ -385,7 +397,7 @@ def main():
             case=output/f'{platform}-{name}'
             case.mkdir() # Refuse to overwrite evidence or reuse an unknown profile.
             for key in ['config','data','cache','state','runtime']: (case/key).mkdir(mode=0o700)
-            instrument(case,platform)
+            instrument(case,platform,pointer_regression=(platform=='xcb' and name=='ready'))
             runtime=tempfile.TemporaryDirectory(prefix='opm-plasma-')
             (case/'runtime-path.txt').write_text(runtime.name)
             env={**os.environ,'XDG_CONFIG_HOME':str(case/'config'),'XDG_DATA_HOME':str(case/'data'),
