@@ -790,22 +790,58 @@ PlasmoidItem {
             else root.launchPending = false;
         }
     }
+    function finishRun(result, epoch) {
+        launchPending = false;
+        if (epoch !== menuSwitchEpoch) return;
+        if (result.ok === true) expanded = false;
+        else commandError = result.error || "Could not start this item. Reopen the menu to refresh it.";
+    }
     function runItem(key, epoch) {
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
-             "Run", [key], (ok, value) => {
-                 launchPending = false;
-                 if (epoch !== menuSwitchEpoch) return;
-                 if (!ok || value === false) {
-                     commandError = ok ? "Could not start this item. It may be unavailable; refresh or check it in Configure."
-                                       : "Backend unavailable. Run open-power-menu --check and try again.";
-                     if (ok) send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
-                                  "LastError", [], (received, detail) => {
-                         if (received && detail && epoch === menuSwitchEpoch) commandError = String(detail);
-                     });
-                 } else {
-                     expanded = false;
+             "StartRun", [key], (ok, value) => {
+                 if (!ok) {
+                     finishRun({error: "Could not confirm this request. Check the backend; do not automatically retry."}, epoch);
+                     return;
                  }
+                 let result;
+                 try {
+                     result = JSON.parse(value);
+                     if (!result || (result.state !== "pending" && result.state !== "finished") ||
+                             (result.state === "finished" && typeof result.ok !== "boolean"))
+                         throw new Error("Invalid activation result");
+                 }
+                 catch (_) { finishRun({error: "Invalid activation response. Check the backend before trying again."}, epoch); return; }
+                 if (result.state === "pending" && result.operation) {
+                     activationPoll.operation = result.operation;
+                     activationPoll.epoch = epoch;
+                     activationPoll.deadline = Date.now() + 130000;
+                     activationPoll.restart();
+                 } else finishRun(result, epoch);
              });
+    }
+    Timer {
+        id: activationPoll
+        interval: 250
+        property string operation: ""
+        property int epoch: -1
+        property double deadline: 0
+        onTriggered: {
+            send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
+                 "RunResult", [operation], (ok, value) => {
+                     if (!ok) { finishRun({error: "Lost contact during activation. Completion is uncertain; do not retry."}, epoch); return; }
+                     let result;
+                     try {
+                     result = JSON.parse(value);
+                     if (!result || (result.state !== "pending" && result.state !== "finished") ||
+                             (result.state === "finished" && typeof result.ok !== "boolean"))
+                         throw new Error("Invalid activation result");
+                 }
+                     catch (_) { finishRun({error: "Invalid activation result; do not retry."}, epoch); return; }
+                     if (result.state !== "pending") finishRun(result, epoch);
+                     else if (Date.now() >= deadline) finishRun({error: "Authorization is still unresolved; do not retry."}, epoch);
+                     else activationPoll.restart();
+                 });
+        }
     }
 
     compactRepresentation: Item {

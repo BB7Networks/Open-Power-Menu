@@ -74,18 +74,70 @@ class DBusPower final : public PowerManager {
 };
 }
 namespace {
-PowerCall blockingTransport() {
-    return [](bool system, const QDBusMessage &request) {
-        return (system ? QDBusConnection::systemBus() : QDBusConnection::sessionBus())
-            .call(request, QDBus::Block, request.isInteractiveAuthorizationAllowed() ? 120000 : 1500);
-    };
-}
+
 // One generation shares HasInhibit between the two operations. All five reads
 // run concurrently; one unresponsive service cannot accumulate sequential waits.
 class CachedPower final : public PowerManager {
     PowerAsyncCall transport;
     std::function<qint64()> now;
-    DBusPower execution;
+    std::unique_ptr<DBusPower> testExecution;
+    Completion completion;
+    std::function<bool()> selectionValid;
+    QTimer executionDeadline;
+    quint64 executionEpoch = 0;
+    int executionStep = 0, readTimeout, authTimeout;
+    bool executing = false, uncertain = false;
+    QString operation;
+    void complete(QString error, bool unknown = false) {
+        executionDeadline.stop();
+        executing = false;
+        uncertain = unknown;
+        auto done = std::move(completion);
+        completion = {};
+        selectionValid = {};
+        if (done) done(std::move(error));
+    }
+    void advance() {
+        const auto epoch = executionEpoch;
+        if (selectionValid && !selectionValid()) {
+            complete("The selection or client changed. Reopen the menu to refresh it."); return;
+        }
+        const int step = executionStep;
+        const bool system = step >= 2;
+        auto request = QDBusMessage::createMethodCall(
+            system ? "org.freedesktop.login1" : "org.freedesktop.PowerManagement",
+            system ? "/org/freedesktop/login1" : step == 1 ? "/org/freedesktop/PowerManagement/Inhibit" : "/org/freedesktop/PowerManagement",
+            system ? "org.freedesktop.login1.Manager" : step == 1 ? "org.freedesktop.PowerManagement.Inhibit" : "org.freedesktop.PowerManagement",
+            step == 1 ? "HasInhibit" : step == 3 ? operation + "WithFlags" : "Can" + operation);
+        if (step == 3) {
+            request.setArguments({QVariant::fromValue(qulonglong(1))});
+            request.setInteractiveAuthorizationAllowed(true);
+        }
+        executionDeadline.start(step == 3 ? authTimeout : readTimeout);
+        const QPointer<CachedPower> guard(this);
+        transport(system, request, [guard, epoch, step](QDBusMessage reply) {
+            if (!guard || guard->executionEpoch != epoch || guard->executionStep != step) return;
+            if (!guard->executing) return; // A timeout is never retried or reinterpreted by a late callback.
+            guard->executionDeadline.stop();
+            if (reply.type() == QDBusMessage::ErrorMessage) {
+                const bool unknown = step == 3 && (reply.errorName().endsWith("NoReply") || reply.errorName().endsWith("Timeout") || reply.errorName().endsWith("Disconnected"));
+                guard->complete("Power management: " + reply.errorName() + ": " + reply.errorMessage() +
+                    (unknown ? ". Completion is uncertain; do not retry." : ""), unknown);
+                return;
+            }
+            if (reply.type() != QDBusMessage::ReplyMessage || reply.arguments().size() != (step == 3 ? 0 : 1)) {
+                guard->complete("Invalid power response", step == 3); return;
+            }
+            if (step == 3) { guard->complete({}); return; }
+            const auto value = reply.arguments().first();
+            const bool allowed = step == 2 ? value.metaType().id() == QMetaType::QString &&
+                (value.toString() == "yes" || value.toString() == "challenge") :
+                value.metaType().id() == QMetaType::Bool && value.toBool() == (step == 0);
+            if (!allowed) { guard->complete(step == 1 ? "An application is preventing sleep; review KDE power management" : "Power operation is unavailable or denied by system policy"); return; }
+            ++guard->executionStep;
+            guard->advance();
+        });
+    }
     std::array<QDBusMessage, 5> replies;
     std::array<bool, 5> received{};
     QHash<QString, PowerAvailability> states;
@@ -151,8 +203,14 @@ class CachedPower final : public PowerManager {
         }
     }
   public:
-    CachedPower(PowerAsyncCall call, std::function<qint64()> clock, PowerCall dispatch)
-        : transport(std::move(call)), now(std::move(clock)), execution(std::move(dispatch)) {
+    CachedPower(PowerAsyncCall call, std::function<qint64()> clock, PowerCall dispatch, int checkTimeout, int authorizationTimeout)
+        : transport(std::move(call)), now(std::move(clock)), readTimeout(checkTimeout), authTimeout(authorizationTimeout) {
+        if (dispatch) testExecution = std::make_unique<DBusPower>(std::move(dispatch));
+        executionDeadline.setSingleShot(true);
+        executionDeadline.setTimerType(Qt::PreciseTimer);
+        connect(&executionDeadline, &QTimer::timeout, this, [this] {
+            complete(executionStep == 3 ? "Power authorization timed out. Completion is uncertain; do not retry." : "Power policy check timed out", executionStep == 3);
+        });
         deadline.setSingleShot(true);
         deadline.setTimerType(Qt::PreciseTimer);
         connect(&deadline, &QTimer::timeout, this, [this] { finish(generation); });
@@ -170,6 +228,9 @@ class CachedPower final : public PowerManager {
         return states.value(action);
     }
     void invalidate() override {
+        ++executionEpoch;
+        if (executing) complete("Power service changed. Reopen the menu; the operation was not retried.", executionStep == 3);
+        // An uncertain dispatched operation stays quarantined for this manager's lifetime.
         ++generation;
         deadline.stop();
         pending = false;
@@ -181,17 +242,36 @@ class CachedPower final : public PowerManager {
         return states.value(action, {false, "Checking KDE/logind power availability"});
     }
     void execute(const QString &action) override {
-        // Never dispatch from cached permission. Keep the original fresh KDE,
-        // Polkit and atomic logind inhibitor checks after the menu is dismissed.
-        execution.execute(action);
+        // Synchronous execution is retained only for explicitly injected test
+        // transports. Production frontends must await executeAsync completion.
+        if (!testExecution) throw Error("Power activation requires asynchronous completion", "power");
+        testExecution->execute(action);
+    }
+    bool executionPending() const override { return executing || uncertain; }
+    void executeAsync(const QString &action, Completion done, std::function<bool()> valid) override {
+        if (executionPending()) { done("A power operation is pending or its completion is uncertain; do not retry."); return; }
+        if (action != "sleep" && action != "hibernate") { done("Unknown native power action"); return; }
+        operation = action == "sleep" ? "Suspend" : "Hibernate";
+        completion = std::move(done);
+        selectionValid = std::move(valid);
+        executing = true;
+        executionStep = 0;
+        ++executionEpoch;
+        advance();
     }
 };
 }
 std::shared_ptr<PowerManager> cachedPowerManager(PowerAsyncCall call,
                                                std::function<qint64()> clock,
-                                               PowerCall execution) {
-    return std::make_shared<CachedPower>(std::move(call), std::move(clock),
-                                         execution ? std::move(execution) : blockingTransport());
+                                               PowerCall execution, int checkTimeout, int authorizationTimeout) {
+    return std::make_shared<CachedPower>(std::move(call), std::move(clock), std::move(execution), checkTimeout, authorizationTimeout);
+}
+void PowerManager::executeAsync(const QString &action, Completion done, std::function<bool()> valid) {
+    try {
+        if (valid && !valid()) throw Error("The selection changed. Reopen the menu to refresh it.");
+        execute(action); // Explicitly injected synchronous fixtures only.
+        done({});
+    } catch (const Error &error) { done(QString::fromUtf8(error.what())); }
 }
 std::shared_ptr<PowerManager> powerManager(PowerCall call) {
     if (call) return std::make_shared<DBusPower>(std::move(call));
@@ -199,7 +279,7 @@ std::shared_ptr<PowerManager> powerManager(PowerCall call) {
     timer->start();
     return cachedPowerManager([](bool system, const QDBusMessage &request, PowerReply done) {
         auto *watcher = new QDBusPendingCallWatcher(
-            (system ? QDBusConnection::systemBus() : QDBusConnection::sessionBus()).asyncCall(request, 1500),
+            (system ? QDBusConnection::systemBus() : QDBusConnection::sessionBus()).asyncCall(request, request.isInteractiveAuthorizationAllowed() ? 120000 : 1500),
             QCoreApplication::instance());
         QObject::connect(watcher, &QDBusPendingCallWatcher::finished, watcher,
                          [done = std::move(done)](QDBusPendingCallWatcher *finished) {

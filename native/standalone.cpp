@@ -1,5 +1,8 @@
 #include "standalone.hpp"
 #include "launch.hpp"
+#include <QEventLoop>
+#include <QPointer>
+#include "launch.hpp"
 #include <QApplication>
 #include <QCursor>
 #include <QEvent>
@@ -106,8 +109,8 @@ QPoint menuPosition(const QRect &area, const QSize &size, const QPoint &cursor,
     pos.setY(std::clamp(pos.y(), area.top(), std::max(area.top(), area.bottom() - size.height() + 1)));
     return pos;
 }
-Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std::shared_ptr<PowerManager> power)
-    : config(std::move(source)), model(std::move(power)), traceEnabled(diagnostics),
+Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std::shared_ptr<PowerManager> power, std::function<bool()> stillCurrent)
+    : config(std::move(source)), model(std::move(power)), current(std::move(stillCurrent)), traceEnabled(diagnostics),
       wayland(QGuiApplication::platformName().startsWith("wayland")),
       darkAero((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero") {
     validate(config);
@@ -135,7 +138,8 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
         const int extent = style()->pixelMetric(QStyle::PM_SmallIconSize, nullptr, this);
         setStyleSheet(styleSheet() + QString("QMenu::icon { width:%1px; height:%1px; }").arg(extent));
     }
-    presentation = model.publicMenu(config);
+    captured = model.capture(config);
+    presentation = captured.menu;
     installEventFilter(this);
     populate(this, presentation);
     if (presentation.isEmpty() && model.powerCapabilities()->discoveryPending()) {
@@ -143,9 +147,11 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
         loading->setEnabled(false);
     }
     connect(model.powerCapabilities().get(), &PowerManager::changed, this, [this] {
-        const auto updated = model.publicMenu(config);
-        if (updated == presentation && !presentation.isEmpty()) return;
-        presentation = updated;
+        auto updated = model.capture(config);
+        // Do not silently replace dispatch identity when only command alternatives change.
+        if (updated.menu == presentation && !presentation.isEmpty()) return;
+        captured = std::move(updated);
+        presentation = captured.menu;
         populate(this, presentation);
         if (presentation.isEmpty() && !model.powerCapabilities()->discoveryPending() && isVisible()) close();
         if (isVisible()) adjustSize();
@@ -322,7 +328,36 @@ bool Standalone::executeSelection(QAction *action) {
         return false;
     lastError.clear();
     bool launched = false;
-    try { launched = model.execute(config, selections.value(action), &presentation); }
+    const QPointer<Standalone> self(this);
+    try {
+        if (current && !current()) throw Error("Configuration changed. Reopen the menu to refresh it.");
+        const auto key = selections.value(action);
+        const auto snapshot = captured;
+        const auto entry = model.selected(config, key, snapshot);
+        if (entry.powerAction.isEmpty()) launched = launchDetached(entry.argv);
+        else {
+            QEventLoop wait;
+            const QPointer<QEventLoop> loop(&wait);
+            struct Result { bool finished = false; QString error; };
+            auto result = std::make_shared<Result>();
+            connect(this, &QObject::destroyed, &wait, &QEventLoop::quit);
+            model.powerCapabilities()->executeAsync(entry.powerAction, [loop, result](QString error) {
+                result->finished = true; result->error = error;
+                if (loop) loop->quit();
+            }, [self, key, snapshot] {
+                if (!self) return false;
+                try {
+                    if (self->current && !self->current()) return false;
+                    self->model.selected(self->config, key, snapshot);
+                    return true;
+                } catch (const Error &) { return false; }
+            });
+            if (!result->finished) wait.exec(); // Qt input/timers continue; no blocking D-Bus transport.
+            if (!self) return false;
+            lastError = result->error;
+            launched = result->finished && result->error.isEmpty();
+        }
+    }
     catch (const Error &error) { lastError = QString::fromUtf8(error.what()); QTextStream(stderr) << error.what() << '\n'; }
     report(launched ? "command-launched" : "launch-failed");
     return launched;

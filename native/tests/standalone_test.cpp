@@ -57,6 +57,29 @@ static int openWithTimeout(Standalone &menu) {
 class StandaloneTest : public QObject {
     Q_OBJECT
   private slots:
+    void configurationRevisionAndAsynchronousActivation() {
+        QTemporaryDir dir; Storage storage(dir.filePath("menu.json"));
+        auto cfg = configuration(); storage.save(cfg, storage.revision());
+        const auto revision = storage.revision();
+        Standalone ordinary(cfg, {}, false, powerManager(), [&] { return storage.revision() == revision; });
+        cfg["menu"] = QJsonArray{command("Replacement")}; storage.save(cfg, revision);
+        QVERIFY(!ordinary.executeSelection(ordinary.actions()[0]));
+        QVERIFY(ordinary.errorMessage().contains("Configuration changed"));
+        int calls = 0, ticks = 0;
+        auto power = cachedPowerManager([&](bool system, const QDBusMessage &request, PowerReply done) {
+            if (request.member().endsWith("WithFlags")) {
+                ++calls;
+                QTimer::singleShot(200, this, [done, request] { done(request.createErrorReply("org.test.Cancelled", "Cancelled")); });
+            } else done(request.createReply(request.member() == "HasInhibit" ? QVariant(false) : system ? QVariant("challenge") : QVariant(true)));
+        }, [] { return 0; });
+        cfg["menu"] = QJsonArray{QJsonObject{{"action", "sleep"}}};
+        Standalone menu(cfg, {}, false, power);
+        QTimer heartbeat; heartbeat.setInterval(10);
+        connect(&heartbeat, &QTimer::timeout, this, [&] { ++ticks; }); heartbeat.start();
+        QVERIFY(!menu.executeSelection(menu.actions()[0]));
+        QVERIFY(menu.errorMessage().contains("Cancelled")); QCOMPARE(calls, 1);
+        QVERIFY(ticks >= 5); // the standalone event loop stays usable while awaiting the final result
+    }
     void aeroIconContrastPreservesArtworkAndDpi() {
         QTemporaryDir dir;
         QDir().mkpath(dir.filePath("contrast/32x32/apps"));

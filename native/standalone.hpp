@@ -14,7 +14,7 @@ class Standalone : public QMenu {
     Q_OBJECT
   public:
     explicit Standalone(QJsonObject config, QString theme = {}, bool diagnostics = false,
-                        std::shared_ptr<PowerManager> power = powerManager());
+                        std::shared_ptr<PowerManager> power = powerManager(), std::function<bool()> current = {});
     ~Standalone() override;
     int open(const QString &anchor = {});
     bool executeSelection(QAction *action);
@@ -31,6 +31,8 @@ class Standalone : public QMenu {
     QString lastError;
     Model model;
     QJsonArray presentation;
+    Presentation captured;
+    std::function<bool()> current;
     QHash<QAction *, QString> selections, accessKeys;
     QSet<QMenu *> inside;
     QTimer leaveTimer, focusTimer;

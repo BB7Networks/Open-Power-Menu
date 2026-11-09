@@ -228,7 +228,7 @@ class NativeContract(unittest.TestCase):
         with self.service():
             self.assertEqual(self.call('Ping'), 'Open Power Menu v2.1.0-dev')
             self.assertTrue(json.loads(self.call('GetIntegration'))['hide_original_launcher'])
-            self.assertEqual(json.loads(self.call('GetMenu'))[0]['key'], '0')
+            self.assertRegex(json.loads(self.call('GetMenu'))[0]['key'], r'^[a-f0-9]{32}/0$')
             # No editor stub masquerades as successful functionality.
             self.assertEqual(self.call('Edit'), 'false')
             conflict = self.run_native('--service', ok=False)
@@ -247,6 +247,64 @@ class NativeContract(unittest.TestCase):
             self.write({'menu': [{'command': ['missing-application']}]})
             self.assertEqual(self.call('Run', '0'), 'false')
             self.assertFalse(marker.exists())
+
+    def test_presentation_selection_identity(self):
+        def item(label, name):
+            return {'label': label, 'command': ['/usr/bin/touch', str(self.root / name)]}
+        def menu():
+            return json.loads(self.call('GetMenu'))
+        self.write({'menu': [item('Same', 'old')]})
+        with self.service():
+            key = menu()[0]['key']
+            self.write({'menu': [item('Same', 'replacement')]})
+            self.assertEqual(self.call('Run', key), 'false')
+            self.assertFalse((self.root / 'old').exists())
+            self.assertFalse((self.root / 'replacement').exists())
+            self.write({'menu': [item('Alpha', 'alpha'), item('Beta', 'beta')]})
+            client_a = menu()
+            client_b = menu()
+            self.assertNotEqual(client_a[0]['key'], client_b[0]['key'])
+            self.assertEqual(self.call('Run', client_a[0]['key']), 'true')
+            until((self.root / 'alpha').exists)
+            self.assertEqual(self.call('Run', client_b[1]['key']), 'true')
+            until((self.root / 'beta').exists)
+            self.assertEqual(self.call('Run', client_b[1]['key']), 'false')
+            for changed in ([item('Beta', 'wrong'), item('Alpha', 'wrong')], [item('Beta', 'wrong')], []):
+                self.write({'menu': [item('Alpha', 'alpha'), item('Beta', 'beta')]})
+                client_a = menu()
+                self.write({'menu': changed})
+                menu()  # a different client's refresh must never rebind A's token
+                self.assertEqual(self.call('Run', client_a[0]['key']), 'false')
+                self.assertFalse((self.root / 'wrong').exists())
+            self.write({'menu': [item('Same', 'old')]})
+            key = menu()[0]['key']
+            # Identical bytes in a replaced inode still invalidate the presentation.
+            temp = self.config.with_suffix('.new')
+            temp.write_bytes(self.config.read_bytes()); temp.replace(self.config)
+            self.assertEqual(self.call('Run', key), 'false')
+
+    def test_presentation_availability_changes(self):
+        tool = self.executable('changing-tool', '#!/bin/sh\nexit 0\n')
+        self.write({'show_unavailable': True, 'menu': [{'command': ['changing-tool']}]})
+        with self.service():
+            shown = json.loads(self.call('GetMenu'))
+            tool.unlink()
+            self.assertEqual(self.call('Run', shown[0]['key']), 'false')
+            unavailable = json.loads(self.call('GetMenu'))
+            self.assertFalse(unavailable[0]['enabled'])
+            self.executable('changing-tool', '#!/bin/sh\nexit 0\n')
+            self.assertEqual(self.call('Run', unavailable[0]['key']), 'false')
+
+    def test_changed_command_alternative_is_rejected(self):
+        first = self.executable('first-alternative', '#!/bin/sh\nexit 0\n')
+        self.executable('second-alternative', '#!/bin/sh\nexit 0\n')
+        self.write({'menu': [{'label': 'Alternatives', 'commands': [['first-alternative'], ['second-alternative']]}]})
+        with self.service():
+            shown = json.loads(self.call('GetMenu'))
+            first.unlink()
+            self.assertEqual(self.call('Run', shown[0]['key']), 'false')
+            fresh = json.loads(self.call('GetMenu'))
+            self.assertEqual(self.call('Run', fresh[0]['key']), 'true')
 
     def test_native_editor_launch_uses_same_configuration(self):
         install = self.root / 'native install; literal'
@@ -297,7 +355,7 @@ class NativeContract(unittest.TestCase):
             with self.service() as backend:
                 for key in ('0;touch', '-1', '0.0', '99999'):
                     self.assertEqual(self.call('Run', key), 'false')
-                self.assertEqual(self.call('Run', '0'), 'true')
+                self.assertEqual(self.call('Run', json.loads(self.call('GetMenu'))[0]['key']), 'true')
                 until(marker.exists)
                 data = json.loads(marker.read_text())
                 self.assertEqual(data['args'], literals)

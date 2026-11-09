@@ -488,6 +488,7 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
                                            : power->presentedCapability(entry.powerAction);
             } else
                 entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]));
+            if (!entry.argv.isEmpty()) entry.program = QStandardPaths::findExecutable(entry.argv.first());
             const bool enabled = !entry.argv.isEmpty() || powerState.available;
             if (!enabled && !showUnavailable)
                 continue;
@@ -526,6 +527,30 @@ static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {
         result.append(view);
     }
     return result;
+}
+Presentation Model::capture(const QJsonObject &config) {
+    const auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]));
+    Presentation shown;
+    shown.menu = present(tree, {}, config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
+    std::function<void(const QList<Entry> &, QString)> collect = [&](const QList<Entry> &items, QString prefix) {
+        for (qsizetype i = 0; i < items.size(); ++i) {
+            const auto key = prefix + QString::number(i);
+            shown.entries.insert(key, items[i]);
+            collect(items[i].children, key + '.');
+        }
+    };
+    collect(tree, {});
+    return shown;
+}
+Entry Model::selected(const QJsonObject &config, const QString &key, const Presentation &shown) {
+    const auto current = selection(config, key, &shown.menu);
+    const auto old = shown.entries.constFind(key);
+    if (!current || old == shown.entries.cend() || !current->view["enabled"].toBool() ||
+        !old->view["enabled"].toBool() || current->argv != old->argv || current->program != old->program || current->powerAction != old->powerAction)
+        throw Error("The item or its availability changed. Reopen the menu to refresh it.", "stale");
+    auto selected = *current;
+    if (!selected.argv.isEmpty() && !selected.program.isEmpty()) selected.argv[0] = selected.program;
+    return selected;
 }
 QJsonArray Model::publicMenu(const QJsonObject &config) {
     return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])), {},

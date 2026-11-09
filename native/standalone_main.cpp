@@ -52,13 +52,16 @@ int main(int argc, char **argv) {
             return 0;
         }
         Opm::Storage storage(parser.value("config"));
-        const auto config = storage.load();
+        const auto revision = storage.revision();
+        const auto config = Opm::decode(revision.content);
         if (parser.isSet("check") || parser.isSet("list")) {
             Opm::Model model;
             QTextStream(stdout) << QJsonDocument(model.diagnosticMenu(config)).toJson(QJsonDocument::Indented);
             return 0;
         }
-        Opm::Standalone menu(config, parser.value("theme"), parser.isSet("diagnose-launch"));
+        Opm::Standalone menu(config, parser.value("theme"), parser.isSet("diagnose-launch"), Opm::powerManager(), [storage, revision] {
+            try { return storage.revision() == revision; } catch (const Opm::Error &) { return false; }
+        });
         const int result = menu.open(parser.value("anchor"));
         if (result == 1) {
             if (menu.actions().isEmpty())

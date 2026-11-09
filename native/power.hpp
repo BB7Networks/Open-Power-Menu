@@ -12,9 +12,12 @@ class PowerManager : public QObject {
     virtual ~PowerManager() = default;
     virtual PowerAvailability capability(const QString &action) = 0;
     // Selection must not initiate a new discovery that shifts presented keys.
-    // This is presentation state only; execute() always checks current policy.
+    // This is presentation state only; executeAsync() always checks current policy.
     virtual PowerAvailability presentedCapability(const QString &action) { return capability(action); }
     virtual void execute(const QString &action) = 0;
+    using Completion = std::function<void(QString error)>;
+    virtual void executeAsync(const QString &action, Completion done, std::function<bool()> valid = {});
+    virtual bool executionPending() const { return false; }
     virtual void invalidate() {}
     virtual bool discoveryPending() const { return false; }
   signals:
@@ -29,5 +32,5 @@ using PowerAsyncCall = std::function<void(bool, const QDBusMessage &, PowerReply
 // allow deterministic cache, recovery and late-response tests without power actions.
 std::shared_ptr<PowerManager> cachedPowerManager(PowerAsyncCall call,
                                                std::function<qint64()> clock,
-                                               PowerCall execution = {});
+                                               PowerCall execution = {}, int checkTimeout = 1500, int authorizationTimeout = 120000);
 }

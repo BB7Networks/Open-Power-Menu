@@ -228,3 +228,11 @@ See [package installation and exact runtime dependencies](packaging/README.md),
 bundle baseline. Other distributions/architectures require matching builds and
 acceptance; a Debian binary is not a Manjaro package. Physical Plasma acceptance
 remains mandatory before publishing or changing the normal released download.
+
+## Stabilized selection and activation contract
+
+Native 2.1 menu keys are opaque, expiring presentation identities. Clients must
+use the key returned by `GetMenu`, not construct positional paths. The widget
+uses `StartRun`/`RunResult` for request-specific asynchronous power completion;
+legacy `Run` returns its final boolean through a delayed reply. See the
+[runtime stabilization contract and tests](../docs/OPM-2.1-RUNTIME-STABILIZATION.md).

@@ -96,16 +96,21 @@ for(let i=0;i<5;i++){
  assert.equal(root.layoutDraft,null);
 }
 '''
-    code += '\n' + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
+    code += '\n' + function((UI / 'main.qml').read_text(), 'finishRun') + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
 let layoutEditing=true,layoutBusy=false,launchPending=false,menuSwitchEpoch=0,commandError='',expanded=true;
 function send(...args){root.send(...args)}
+let activationPoll={restarts:0,restart(){this.restarts++}};
 launchItem('0'); assert.equal(requests.length,0);
 layoutEditing=false;layoutBusy=true;launchItem('0');assert.equal(requests.length,0);
-layoutBusy=false;launchItem('0');assert.equal(requests[0].method,'Run');
-requests.shift().done(true,false);assert.equal(expanded,true);assert.match(commandError,/Could not start/);
-assert.equal(requests[0].method,'LastError');requests.shift().done(true,'Permission denied');assert.equal(commandError,'Permission denied');
-launchItem('0');requests.shift().done(true,true);assert.equal(expanded,false);
-expanded=true;launchItem('0');menuSwitchEpoch++;requests.shift().done(true,true);
+layoutBusy=false;launchItem('0');assert.equal(requests[0].method,'StartRun');
+requests.shift().done(true,JSON.stringify({state:'finished',ok:false,error:'Permission denied'}));assert.equal(expanded,true);assert.equal(commandError,'Permission denied');
+assert.equal(requests.length,0); // no service-global LastError race
+launchItem('0');requests.shift().done(true,JSON.stringify({state:'pending',operation:'own-request'}));
+assert.equal(activationPoll.operation,'own-request');assert.equal(activationPoll.restarts,1);assert.equal(launchPending,true);
+launchItem('0');assert.equal(requests.length,0); // duplicate guarded while pending
+finishRun({ok:false,error:'Cancelled'},menuSwitchEpoch);assert.equal(launchPending,false);
+launchItem('0');requests.shift().done(true,JSON.stringify({state:'finished',ok:true}));assert.equal(expanded,false);
+expanded=true;launchItem('0');menuSwitchEpoch++;requests.shift().done(true,JSON.stringify({state:'finished',ok:true}));
 assert.equal(expanded,true); // stale launch callback cannot close a newer popup
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
@@ -190,7 +195,7 @@ def test_desktop_dispatch_waits_for_popup_close_and_cancels_stale_request():
     from test_v0416_popup_handoff import timer_handler
     source=(UI/'main.qml').read_text()
     code='const assert=require("node:assert/strict");\n'
-    code+=function(source,'runItem')+function(source,'launchItem')
+    code+=function(source,'finishRun')+function(source,'runItem')+function(source,'launchItem')
     code+=timer_handler(source,'desktopCloseSettle').replace('function settleTick()', 'function desktopTick()')
     code+=r'''
 let layoutEditing=false,layoutBusy=false,launchPending=false,commandError='',expanded=true,menuSwitchEpoch=1;
@@ -200,9 +205,38 @@ const desktopCloseSettle={key:'',epoch:-1,restart(){waiting++}};
 function send(...args){sent.push(args)}
 launchItem('desktop',true);assert.equal(expanded,false);assert.equal(sent.length,0);assert.equal(waiting,1);
 let {key,epoch}=desktopCloseSettle;desktopTick();assert.equal(sent.length,1);
-sent.shift().at(-1)(true,true);assert.equal(launchPending,false);
+sent.shift().at(-1)(true,JSON.stringify({state:'finished',ok:true}));assert.equal(launchPending,false);
 expanded=true;launchItem('desktop',true);({key,epoch}=desktopCloseSettle);menuSwitchEpoch++;
 desktopTick();assert.equal(sent.length,0);assert.equal(launchPending,false);
 '''
     result=subprocess.run(['node','-e',code],capture_output=True,text=True,timeout=15)
     assert result.returncode==0,result.stdout+result.stderr
+
+
+def test_async_activation_poll_reports_only_its_operation_and_never_retries():
+    if not shutil.which('node'):
+        pytest.skip('Node required')
+    from test_v0416_popup_handoff import timer_handler
+    source = (UI / 'main.qml').read_text()
+    code = 'const assert=require("node:assert/strict");\n'
+    code += function(source, 'finishRun')
+    code += timer_handler(source, 'activationPoll').replace('function settleTick()', 'function activationTick()')
+    code += r'''
+let launchPending=true, menuSwitchEpoch=7, expanded=true, commandError='';
+let operation='request-a', epoch=7, deadline=Date.now()+10000, sent=[];
+const activationPoll={restarts:0,restart(){this.restarts++}};
+function send(...args){sent.push(args)}
+activationTick(); assert.equal(sent[0][3],'RunResult'); assert.deepEqual(sent[0][4],['request-a']);
+sent.shift().at(-1)(true,JSON.stringify({state:'pending'}));
+assert.equal(activationPoll.restarts,1); assert.equal(launchPending,true);
+activationTick(); sent.shift().at(-1)(true,JSON.stringify({state:'finished',ok:false,error:'Cancelled by policy'}));
+assert.equal(launchPending,false); assert.equal(commandError,'Cancelled by policy'); assert.equal(expanded,true);
+launchPending=true; activationTick(); sent.shift().at(-1)(false,'');
+assert.match(commandError,/uncertain/); assert.equal(sent.length,0); assert.equal(activationPoll.restarts,1);
+launchPending=true; deadline=0; activationTick(); sent.shift().at(-1)(true,JSON.stringify({state:'pending'}));
+assert.match(commandError,/unresolved/); assert.equal(launchPending,false); assert.equal(activationPoll.restarts,1);
+launchPending=true; activationTick(); sent.shift().at(-1)(true,'null');
+assert.equal(launchPending,false); assert.match(commandError,/Invalid/);
+'''
+    result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr

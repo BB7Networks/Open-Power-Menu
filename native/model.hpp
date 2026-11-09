@@ -27,14 +27,18 @@ struct Entry {
     QJsonObject view;
     QStringList argv;
     QString powerAction;
+    QString program;
     QList<Entry> children;
 };
+struct Presentation { QJsonArray menu; QHash<QString, Entry> entries; };
 class Model {
   public:
     explicit Model(std::shared_ptr<PowerManager> power = powerManager()) : power(std::move(power)) {}
     bool execute(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation = nullptr);
     QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false, bool discoverPower = true);
     QJsonArray publicMenu(const QJsonObject &config);
+    Presentation capture(const QJsonObject &config);
+    Entry selected(const QJsonObject &config, const QString &key, const Presentation &shown);
     // One-shot CLI diagnostics can await discovery; interactive frontends must
     // use publicMenu(), which never waits for a power service.
     QJsonArray diagnosticMenu(const QJsonObject &config);

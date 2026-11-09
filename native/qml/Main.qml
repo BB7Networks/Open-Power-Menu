@@ -359,6 +359,11 @@ Kirigami.ApplicationWindow {
                                     Accessible.name: "Automatic-close delay in seconds"
                                 }
                             }
+                            Controls.Label {
+                                text: "Close delay applies outside the menu and all flyouts. Keyboard navigation and editing keep it open."
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
                             RowLayout {
                                 Controls.Label { text: "Open submenu on hover" }
                                 Controls.ComboBox {
@@ -378,6 +383,11 @@ Kirigami.ApplicationWindow {
                                     onValueModified: window.preference("submenu_hover_delay_ms", value)
                                 }
                             }
+                            Controls.Label {
+                                text: "Existing / system preserves this menu frontend's normal submenu hover timing."
+                                wrapMode: Text.Wrap
+                                Layout.fillWidth: true
+                            }
                             Controls.CheckBox {
                                 objectName: "accessKeysEnabled"
                                 text: "Enable menu access keys"
@@ -390,11 +400,6 @@ Kirigami.ApplicationWindow {
                                 enabled: window.settings.access_keys_enabled
                                 checked: window.settings.show_access_key_hints
                                 onToggled: window.preference("show_access_key_hints", checked)
-                            }
-                            Controls.Label {
-                                text: "Delay applies outside the menu and all flyouts. Keyboard navigation and editing keep it open."
-                                wrapMode: Text.Wrap
-                                Layout.fillWidth: true
                             }
                         }
                     }
@@ -664,7 +669,7 @@ Kirigami.ApplicationWindow {
         }
         onApplied: {
             if (editorSession.applyImport()) {
-                portableStatus.text = "Imported configuration; previous settings kept as a protected recovery copy.";
+                portableStatus.text = "Configuration imported.";
                 close();
             } else { close(); }
         }

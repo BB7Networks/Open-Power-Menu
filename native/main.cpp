@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
         if (parser.isSet("call")) {
             QDBusInterface remote(busName, "/OpenPowerMenu", "org.openpowermenu.Service",
                                   QDBusConnection::sessionBus());
-            remote.setTimeout(10000);
+            remote.setTimeout(parser.value("call") == "Run" ? 130000 : 10000);
             QList<QVariant> args;
             for (const auto &arg : parser.positionalArguments())
                 args.append(arg);
