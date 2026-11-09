@@ -1045,11 +1045,14 @@ PlasmoidItem {
         // is read from the visible row before the flyout becomes visible.
         property string activeFlyoutKey: ""
 
-        function showFlyout(entry, sourceRow) {
+        function showFlyout(entry, sourceRow, keyboard = false) {
             if (root.layoutEditing || root.layoutBusy) return;
             if (entry.kind !== "submenu") return;
             if (flyout.visible && activeFlyoutKey === entry.key
-                    && flyout.visualParent === flyoutAnchor) return;
+                    && flyout.visualParent === flyoutAnchor) {
+                if (keyboard) flyout.keyboardActivationRequested = true;
+                return;
+            }
             flyout.visible = false;
             flyout.entries = entry.items || [];
             flyout.screenRect = Qt.binding(() => root.menuWorkArea);
@@ -1058,6 +1061,7 @@ PlasmoidItem {
             flyout.positionAtRow(sourceRow, flyoutAnchor, sourceRow.menuScreen);
             flyout.visualParent = flyoutAnchor;
             flyout.popupDirection = flyout.chooseSide(flyoutAnchor);
+            flyout.keyboardActivationRequested = keyboard;
             activeFlyoutKey = entry.key;
             flyout.visible = true;
         }
@@ -1425,7 +1429,7 @@ PlasmoidItem {
                 activeIndex = index;
                 const row = normalRows.itemAt(index);
                 if (!row) return;
-                if (row.entry.kind === "submenu") { showFlyout(row.entry, row); flyout.focusFirst(); }
+                if (row.entry.kind === "submenu") { showFlyout(row.entry, row, true); flyout.focusFirst(); }
                 else root.launchItem(row.entry.key, row.entry.close_before_run === true);
                 event.accepted = true;
                 return;
@@ -1444,7 +1448,7 @@ PlasmoidItem {
             } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Right) {
                 const row = normalRows.itemAt(activeIndex);
                 if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
-                if (row.entry.kind === "submenu") { showFlyout(row.entry, row); flyout.focusFirst(); }
+                if (row.entry.kind === "submenu") { showFlyout(row.entry, row, true); flyout.focusFirst(); }
                 else if (event.key !== Qt.Key_Right) root.launchItem(row.entry.key, row.entry.close_before_run === true);
                 event.accepted = true;
             }

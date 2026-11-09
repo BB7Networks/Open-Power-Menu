@@ -161,7 +161,8 @@ def instrument(case, platform, pointer_regression=False):
                     configuredAutoClose:root.autoCloseOnPointerLeave};
         }
         function startupFlyoutState() {
-            return {visible:flyout.visible,appearance:flyout.appearance,width:flyout.width,height:flyout.height,
+            return {visible:flyout.visible,doesNotAcceptFocus:(flyout.flags & Qt.WindowDoesNotAcceptFocus)!==0,
+                    appearance:flyout.appearance,width:flyout.width,height:flyout.height,
                     text:String(flyout.textColor),surface:String(flyout.surfaceColor)};
         }
         Connections {
@@ -331,7 +332,7 @@ def session(args):
                     rows=states[-1]['rows']
                     assert len(rows)==12 and rows[5]['kind']=='separator' and rows[8]['kind']=='separator', rows
                     last=tuple(map(round,states[-1]['button']))
-                    for index in (2,5,6,8,9,11,0):
+                    for index in (0,2,5,6,8,9,11,0,2,0):
                         goal=tuple(map(round,rows[index]['point']))
                         segments=max(1,int(max(abs(goal[0]-last[0]),abs(goal[1]-last[1]))/18))
                         for segment in range(1,segments+1):
@@ -352,6 +353,7 @@ def session(args):
                 subprocess.run(['xdotool','mousemove',str(x),str(y)],check=True)
                 shown=wait_for(lambda: next((s for s in reversed(read_states(log)) if s['flyout'] and s['flyout']['visible']),None))
                 assert shown['flyout']['appearance']==os.environ['OPM_APPEARANCE'], shown
+                assert shown['flyout']['doesNotAcceptFocus'], 'Mouse-opened X11 flyout stole focus'
                 assert shown['window'][3]==first[-1]['window'][3], shown
                 if os.environ['OPM_APPEARANCE']=='aero-light':
                     assert shown['flyout']['text']=='#24394b' and shown['flyout']['surface']=='#eaf1f7', shown

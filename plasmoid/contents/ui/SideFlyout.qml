@@ -23,6 +23,14 @@ PlasmaCore.PopupPlasmaWindow {
     floating: true
     margin: 0
     animated: false
+    // Mouse-hovered native flyouts on X11 must not activate: when one closes,
+    // X11 otherwise restores focus to the previous desktop application,
+    // causing Plasma's parent applet popup to auto-dismiss. Keyboard-opened
+    // flyouts opt back into focus *before* becoming visible.
+    property bool keyboardActivationRequested: false
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+        ((Qt.platform.pluginName === "xcb" && !keyboardActivationRequested)
+            ? Qt.WindowDoesNotAcceptFocus : 0)
     // Do not force Qt.Popup: that changes Wayland popup placement semantics.
     // PlasmaWindow already supplies its own frameless top-level flags.
 
@@ -59,6 +67,9 @@ PlasmaCore.PopupPlasmaWindow {
     }
     signal returnToParent()
     function focusFirst() {
+        // Callers set this before showing the window; also handle a flyout
+        // already open from hover when keyboard navigation takes over.
+        keyboardActivationRequested = true;
         activeIndex = LayoutDraft.nextIndex(entries, -1, 1, false);
         requestActivate();
         flyoutSurface.forceActiveFocus();
@@ -198,7 +209,7 @@ PlasmaCore.PopupPlasmaWindow {
                 flyout.activeIndex = index;
                 const row = flyoutRows.itemAt(index);
                 if (!row) return;
-                if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
+                if (row.entry.kind === "submenu") { row.openChild(true); if (row.childPopup) row.childPopup.focusFirst(); }
                 else { flyout.triggered(row.entry.key, row.entry.close_before_run === true); flyout.visible = false; }
                 event.accepted = true;
                 return;
@@ -219,7 +230,7 @@ PlasmaCore.PopupPlasmaWindow {
             } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 const row = flyoutRows.itemAt(flyout.activeIndex);
                 if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
-                if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
+                if (row.entry.kind === "submenu") { row.openChild(true); if (row.childPopup) row.childPopup.focusFirst(); }
                 else if (event.key !== Qt.Key_Right) {
                     flyout.triggered(row.entry.key, row.entry.close_before_run === true);
                     flyout.visible = false;
@@ -260,7 +271,7 @@ PlasmaCore.PopupPlasmaWindow {
                         width: column.width
                         height: entry.kind === "separator" ? 12 : flyout.entryHeight
 
-                        function openChild() {
+                        function openChild(keyboard = false) {
                             if (row.entry.kind !== "submenu") return;
                             if (!childPopup) {
                                 // Load deeper levels lazily. A static self-
@@ -304,6 +315,7 @@ PlasmaCore.PopupPlasmaWindow {
                             childPopup.screenRect = Qt.binding(() => flyout.screenRect);
                             childPopup.positionAtRow(row, childAnchor, row.menuScreen);
                             childPopup.popupDirection = childPopup.chooseSide(childAnchor);
+                            childPopup.keyboardActivationRequested = keyboard;
                             flyout.showChild(childPopup);
                         }
                         Component.onDestruction: {

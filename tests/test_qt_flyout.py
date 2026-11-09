@@ -137,6 +137,22 @@ def test_aero_light_toolbar_icons_use_dark_masks(main_popup):
         assert main_popup.findChild(QQuickItem, name).property('visible') is False
 
 
+def test_hover_flyouts_do_not_take_x11_focus_but_keyboard_flyouts_can(flyout):
+    # Actual X11 traversal and focus are exercised in isolated Plasma CI.
+    # Verify shipped flag bindings and recursive keyboard-mode propagation.
+    evaluate(flyout, 'keyboardActivationRequested=false;')
+    assert evaluate(flyout, '((flags & Qt.WindowDoesNotAcceptFocus) !== 0) === (Qt.platform.pluginName === "xcb")')
+    evaluate(flyout, 'keyboardActivationRequested=true;')
+    assert not evaluate(flyout, '(flags & Qt.WindowDoesNotAcceptFocus) !== 0')
+    evaluate(flyout, 'keyboardActivationRequested=false; flyoutRows.itemAt(0).openChild();')
+    child = evaluate(flyout, 'activeChild')
+    assert child is not None and not child.property('keyboardActivationRequested')
+    evaluate(flyout, 'closeChild(); flyoutRows.itemAt(0).openChild(true);')
+    child = evaluate(flyout, 'activeChild')
+    assert child.property('keyboardActivationRequested')
+    assert not evaluate(child, '(flags & Qt.WindowDoesNotAcceptFocus) !== 0')
+
+
 def test_reset_on_model_hide_and_nested_reopen(flyout):
     evaluate(flyout, 'focusFirst();')
     assert flyout.property('activeIndex') == 0
