@@ -199,6 +199,7 @@ Controls.Dialog {
                 objectName: "entryName"
                 visible: dialog.entryKind !== "separator"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 Accessible.name: "Menu entry name"
             }
             Controls.Label {
@@ -211,6 +212,7 @@ Controls.Dialog {
                 objectName: "entryIcon"
                 visible: dialog.entryKind !== "separator"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 Accessible.name: "Menu entry icon"
             }
             Controls.Label {
@@ -236,6 +238,7 @@ Controls.Dialog {
                 objectName: "entryProgram"
                 visible: dialog.entryKind === "command"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 Accessible.name: "Program to run"
             }
             RowLayout {
@@ -277,6 +280,7 @@ Controls.Dialog {
                     Controls.TextField {
                         text: value
                         Layout.fillWidth: true
+                        Layout.minimumWidth: 0
                         Accessible.name: "Argument " + (index + 1)
                         onTextEdited: argumentModel.setProperty(index, "value", text)
                     }
