@@ -149,6 +149,9 @@ Controls.Dialog {
                 visible: text.length > 0
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
                 color: "#da4453"
             }
             Controls.Label {
@@ -163,6 +166,9 @@ Controls.Dialog {
                 model: dialog.catalog.actions
                 textRole: "title"
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Controls.Label {
                 objectName: "entryEffectiveCommandLabel"
@@ -171,6 +177,9 @@ Controls.Dialog {
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Controls.TextArea {
                 objectName: "builtinFallbacks"
@@ -180,6 +189,9 @@ Controls.Dialog {
                 selectByMouse: true
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
                 Accessible.name: "Fallback order"
             }
             Controls.Button {
@@ -225,6 +237,11 @@ Controls.Dialog {
                 objectName: "entryAccessKeyLabel"
                 text: "Access key (A–Z or 0–9; empty disables this entry)"
                 visible: dialog.entryKind !== "separator"
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Controls.TextField {
                 id: accessKeyField
@@ -267,18 +284,27 @@ Controls.Dialog {
                 textFormat: Text.PlainText
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Controls.Label {
                 visible: dialog.entryKind === "command"
                 text: "Each field below is one argument. Spaces stay within that argument; nothing is interpreted by a shell."
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Controls.Label {
                 visible: dialog.entryKind === "command" && !!dialog.original.alternatives
                 text: "This entry has alternative commands. They stay intact unless you change the program or arguments."
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
             }
             Repeater {
                 model: dialog.entryKind === "command" ? argumentModel : null
