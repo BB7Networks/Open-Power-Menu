@@ -19,6 +19,17 @@ removed the loading-status row. Thus this startup defect predates the grip.
 A permanently stuck minimum-size window on the user's Manjaro session has not
 been reproduced; the virtual session corrected itself after the reply.
 
+The user's CI trace subsequently captured Custom 460 opening with 560 pixels of
+content and a 568-pixel outer window, then correcting to 460/468 about 10 ms
+later. Replaying the previous source with height-change instrumentation showed
+the cause: preference loading enabled Custom while its value was still the
+default 600, briefly resizing the hidden native window to the screen-clamped
+560 before assigning 460. X11 could deliver that intermediate geometry during
+exposure. Mode and value now publish as one snapshot, before the other appearance
+settings, and sizing reads that snapshot directly. The new regression rejects
+the intermediate preference/layout state even when it happens to settle before
+painting. It fails against the preceding source and passes with the correction.
+
 First-frame assertions subsequently reproduced a second initialization issue:
 Plasma's host item could still be 375 pixels tall while the native window and
 OPM's preferred content height already required 404. This could clip the first
@@ -145,6 +156,9 @@ X screens; those checks belong to the virtual Wayland cases.
 The matrix includes a left-panel case on both platforms. Supplemental top/right
 panel probes also passed, using the same driver against the final geometry code
 before the additional content bounds were applied.
+The corrected slow-preferences X11 case also passed three concurrent runs
+restricted to two CPUs (12 further openings), exercising delayed preferences
+and shell restart under contention.
 
 | Case, on X11 and Wayland | Natural content | Preferred content | Actual window at first and later exposure |
 | --- | ---: | ---: | ---: |

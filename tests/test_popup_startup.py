@@ -30,7 +30,8 @@ function fixture() {
   expanded:false,requestedMenu:'none',openingPower:false,openingEntriesReady:false,openingPreferencesReady:false,
   pendingPowerEpoch:-1,pendingLauncherEpoch:-1,awaitingAsyncClose:false,launcherSwitchError:'',
   powerIsOpen:false,powerRefreshAttempts:0,layoutEditing:false,layoutBusy:false,menuEntries:[],visibleEntries:[],
-  fetching:false,menuStatus:'',backendMissing:false,launcherAppletId:0,menuHeightMode:'auto',menuCustomHeight:600,
+  fetching:false,menuStatus:'',backendMissing:false,launcherAppletId:0,menuHeightPreference:{mode:'auto',height:600},
+  get menuHeightMode(){return this.menuHeightPreference.mode},get menuCustomHeight(){return this.menuHeightPreference.height},
   closeLauncherPopup(){return {ok:true}},synchronizeLauncherVisibility(){},releaseMask(){},activateSelectedLauncher(){},
   fullRepresentationItem:{prepared:0,prepareForOpen(){this.prepared++}},
   send(service,path,iface,method,args,done){calls.push({method,args,done})}};

@@ -87,8 +87,11 @@ PlasmoidItem {
     property int submenuHoverDelay: -1
     property string menuDensity: "standard"
     property string menuWidth: "auto"
-    property string menuHeightMode: "auto"
-    property int menuCustomHeight: 600
+    // Publish the mode and remembered value together. Switching to Custom with
+    // the old default value first can queue a stale native-window resize.
+    property var menuHeightPreference: ({mode: "auto", height: 600})
+    readonly property string menuHeightMode: menuHeightPreference.mode
+    readonly property int menuCustomHeight: menuHeightPreference.height
     readonly property rect menuWorkArea: {
         const area = Metrics.workArea(root.screenGeometry, root.availableScreenRect);
         return Qt.rect(area.x, area.y, area.width, area.height);
@@ -539,6 +542,10 @@ PlasmoidItem {
                      hideOriginalLauncherRequested = desired;
                      buttonIconMode = cfg.button_icon_mode === "custom" ? "custom" : "launcher";
                      customButtonIcon = String(cfg.button_icon || "");
+                     menuHeightPreference = {
+                         mode: cfg.menu_height_mode === "custom" ? "custom" : "auto",
+                         height: cfg.menu_custom_height === undefined ? 600 : Number(cfg.menu_custom_height)
+                     };
                      menuAppearance = cfg.appearance === "aero" || cfg.appearance === "aero-light" ? cfg.appearance : "native";
                      showMenuIcons = cfg.show_menu_icons !== false;
                      autoCloseOnPointerLeave = cfg.auto_close_on_pointer_leave === true;
@@ -546,8 +553,6 @@ PlasmoidItem {
                      submenuHoverDelay = cfg.submenu_hover_delay_ms === undefined ? -1 : Number(cfg.submenu_hover_delay_ms);
                      menuDensity = cfg.menu_density || "standard";
                      menuWidth = cfg.menu_width || "auto";
-                     menuHeightMode = cfg.menu_height_mode === "custom" ? "custom" : "auto";
-                     menuCustomHeight = cfg.menu_custom_height === undefined ? 600 : Number(cfg.menu_custom_height);
                      menuIconSize = cfg.menu_icon_size || "standard";
                      synchronizeLauncherVisibility();
                  } catch (e) {
@@ -1149,8 +1154,8 @@ PlasmoidItem {
             + Math.max(1, menuDivider.implicitHeight)
             + (root.layoutEditing ? layoutEditor.minimumUsableHeight : entryHeight) + 4)
             / (1 - (statusScroll.visible ? 0.25 : 0) - (setupScroll.visible ? 0.5 : 0))
-        readonly property real fittedHeight: Metrics.menuHeight(root.menuHeightMode,
-            Math.max(root.menuCustomHeight, minimumUsableHeight),
+        readonly property real fittedHeight: Metrics.menuHeight(root.menuHeightPreference.mode,
+            Math.max(root.menuHeightPreference.height, minimumUsableHeight),
             naturalHeight, root.menuWorkArea.height || Screen.desktopAvailableHeight, themeVerticalPadding)
 
         // The unlocked layout editor stays in this single Plasma popup.

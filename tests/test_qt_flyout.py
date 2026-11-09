@@ -439,6 +439,7 @@ Window {
  property string menuDensity: "standard"
  property string menuHeightMode: "auto"
  property int menuCustomHeight: 600
+ readonly property var menuHeightPreference: ({mode:menuHeightMode,height:menuCustomHeight})
  property string menuWidth: "auto"
  property string menuIconSize: "standard"
  property rect menuWorkArea: Qt.rect(-1920,40,1920,1600)

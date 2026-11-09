@@ -278,14 +278,14 @@ def test_saved_height_preferences_poll_without_restart():
     code+=r'''
 let integrationFetching=false,integrationCallbacks=[];
 let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
-let menuHeightMode='auto',menuCustomHeight=600,menuDensity='standard';
+let menuHeightPreference={mode:'auto',height:600},menuDensity='standard';
 let response={menu_height_mode:'custom',menu_custom_height:910,menu_density:'compact'};
 function send(service,path,iface,method,args,callback){assert.equal(method,'GetIntegration');callback(true,JSON.stringify(response))}
 function synchronizeLauncherVisibility(){} function releaseMask(){}
-fetchIntegration();assert.equal(menuHeightMode,'custom');assert.equal(menuCustomHeight,910);
-response.menu_density='comfortable';fetchIntegration();assert.equal(menuDensity,'comfortable');assert.equal(menuCustomHeight,910);
-response.menu_height_mode='auto';fetchIntegration();assert.equal(menuHeightMode,'auto');assert.equal(menuCustomHeight,910);
-response={};fetchIntegration();assert.equal(menuHeightMode,'auto');assert.equal(menuCustomHeight,600);
+fetchIntegration();assert.equal(menuHeightPreference.mode,'custom');assert.equal(menuHeightPreference.height,910);
+response.menu_density='comfortable';fetchIntegration();assert.equal(menuDensity,'comfortable');assert.equal(menuHeightPreference.height,910);
+response.menu_height_mode='auto';fetchIntegration();assert.equal(menuHeightPreference.mode,'auto');assert.equal(menuHeightPreference.height,910);
+response={};fetchIntegration();assert.equal(menuHeightPreference.mode,'auto');assert.equal(menuHeightPreference.height,600);
 '''
     result=subprocess.run(['node','-e',code],capture_output=True,text=True)
     assert result.returncode==0,result.stderr

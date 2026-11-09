@@ -93,6 +93,7 @@ PROBE = '''
         return {time:Date.now(),event:event,open:root.expanded,entries:root.menuEntries.length,
             fetching:root.fetching,density:root.menuDensity,icons:root.menuIconSize,mode:root.menuHeightMode,
             saved:root.menuCustomHeight,area:root.menuWorkArea.height,
+            heightPreference:root.menuHeightPreference,
             button:center ? [center.x,center.y] : null,
             panelPainted:root.startupPanelPainted,popupPainted:root.startupPopupPainted,
             panelVisible:root.Window.window ? root.Window.window.visible : false,
@@ -125,6 +126,7 @@ def instrument(case, platform):
                             'Component.onCompleted: console.info("OPM_WIDGET_READY",Date.now())')
     source = source.replace('    property var menuEntries: []', PROBE+'\n    property var menuEntries: []')
     source = source.replace('        id: popup\n', '''        id: popup
+        onFittedHeightChanged: console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("height")))
         function startupRowCenter() {
             const row=normalRows.itemAt(0);
             const point=row ? row.mapToGlobal(row.width/2,row.height/2) : Qt.point(0,0);
@@ -261,6 +263,12 @@ def session(args):
             assert len(first) == 2, first
             frames=[state for state in states if state['event']=='frame']
             assert len(frames)>=2, states
+            for state in states:
+                pref=state.get('heightPreference')
+                if pref and pref['mode']=='custom':
+                    assert pref['height']==int(os.environ['OPM_CUSTOM_HEIGHT']), state
+                    if state['preferred'] is not None:
+                        assert state['preferred']<=pref['height'], state
             for frame in frames:
                 assert frame['actual']==frame['preferred'], frame
             for state in first:
