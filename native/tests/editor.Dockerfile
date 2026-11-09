@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins qt6-wayland xvfb xauth xdotool x11-utils \
+    qt6-svg-plugins qt6-qpa-plugins qt6-wayland xvfb xauth xdotool x11-utils \
     plasma-desktop plasma-workspace kwin-x11 kwin-wayland \
     python3 python3-pyside6.qtdbus python3-pyside6.qtgui && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home builder
@@ -15,6 +15,7 @@ WORKDIR /src
 COPY --chown=1000:1000 CMakeLists.txt /src/
 COPY --chown=1000:1000 native /src/native
 COPY --chown=1000:1000 openpowermenu/data /src/openpowermenu/data
+COPY --chown=1000:1000 assets /src/assets
 COPY --chown=1000:1000 plasmoid /src/plasmoid
 RUN chown builder:builder /src
 USER 1000:1000
@@ -32,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins && rm -rf /var/lib/apt/lists/* && \
+    qt6-svg-plugins qt6-qpa-plugins && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home opm
 COPY --from=build /tmp/stage/bin/ /usr/local/bin/
 COPY --chmod=0644 native/tests/editor-runtime-smoke.sh /usr/local/libexec/opm-editor-smoke.sh

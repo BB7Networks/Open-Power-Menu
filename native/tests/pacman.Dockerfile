@@ -3,7 +3,7 @@
 ARG OPM_BASE_IMAGE=archlinux:base
 FROM ${OPM_BASE_IMAGE} AS build
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
-    qt6-base qt6-declarative qt6-wayland kirigami kservice kconfig kde-cli-tools \
+    qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 xorg-server-xvfb xorg-xauth && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 WORKDIR /src
 COPY --chown=1000:1000 . /src
@@ -26,7 +26,7 @@ RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \
 FROM ${OPM_BASE_IMAGE}
 ARG OPM_RUNTIME_PYTHON=absent
 ENV OPM_TEST_RUNTIME_PYTHON=${OPM_RUNTIME_PYTHON}
-RUN pacman -Syu --noconfirm --needed qt6-base qt6-declarative qt6-wayland \
+RUN pacman -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
     kirigami kservice kconfig kde-cli-tools dbus && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
 COPY --from=build /src/work/pacman-source/artifacts /opt/opm-artifacts
 RUN pacman -U --noconfirm /opt/opm-artifacts/*.pkg.tar.zst && \

@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins qt6-wayland xvfb xauth systemd python3 python3-pyside6.qtdbus python3-pyside6.qtwidgets && rm -rf /var/lib/apt/lists/* && \
+    qt6-svg-plugins qt6-qpa-plugins qt6-wayland xvfb xauth systemd python3 python3-pyside6.qtdbus python3-pyside6.qtwidgets && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home builder
 RUN chown builder:builder /src
 USER 1000:1000
@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    qt6-qpa-plugins qt6-wayland && rm -rf /var/lib/apt/lists/* && \
+    qt6-svg-plugins qt6-qpa-plugins qt6-wayland && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home opm
 COPY --from=build /tmp/build/native-bundle /opt/opm-bundle
 COPY --chmod=0644 native/tests/package-runtime-smoke.sh /usr/local/libexec/opm-package-smoke.sh
