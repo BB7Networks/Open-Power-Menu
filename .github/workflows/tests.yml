@@ -4,6 +4,119 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
+  native-pacman:
+    name: Native ${{ matrix.distro }} package and upgrades
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Arch
+            image: archlinux:base
+            runtime_python: absent
+          - distro: Manjaro
+            image: manjarolinux/base:latest
+            runtime_python: distro
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare checksum-pinned native source and released upgrade baseline
+        run: |
+          sh native/packaging/prepare-pacman.sh . work/pacman-source
+          git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
+          mkdir -p work/package-legacy
+          git archive FETCH_HEAD | tar -x -C work/package-legacy
+      - name: Build pacman package and test legacy upgrades on the target distro
+        run: docker build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} -f native/tests/pacman.Dockerfile -t opm-native-pacman:test .
+      - name: Install sealed package, activate and roll back without PySide6 or a compiler
+        run: docker run --rm --network none opm-native-pacman:test
+      - name: Collect development artifacts and distribution snapshot
+        run: |
+          container=$(docker create --network none opm-native-pacman:test)
+          docker cp "$container:/opt/opm-artifacts" work/qualified-dev
+          docker rm "$container"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1-dev-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualified-dev/
+          retention-days: 7
+  native-packaging:
+    name: Native packaging and upgrades
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export the exact released upgrade baseline
+        run: |
+          git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
+          mkdir -p work/package-legacy
+          git archive FETCH_HEAD | tar -x -C work/package-legacy
+      - name: Build complete native package and test transactions
+        run: docker build -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+      - name: Install, activate, reinstall, remove and roll back without Python
+        run: docker run --rm --network none opm-native-package:test
+  native-standalone:
+    name: Native standalone menu
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native menu
+        run: docker build -f native/tests/standalone.Dockerfile -t opm-native-standalone:test .
+      - name: Staged launch without Python or compiler and missing-library diagnostic
+        run: docker run --rm --network none opm-native-standalone:test
+      - name: Install virtual compositor test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev qt6-wayland dbus xvfb xauth weston kwin-wayland
+      - name: Test X11 and Wayland menu interaction
+        run: |
+          cmake -S . -B build/standalone -G Ninja -DOPM_BUILD_STANDALONE=ON
+          cmake --build build/standalone --parallel 2
+          dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb build/standalone/native/native-standalone-tests
+          dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin OPM_OUTPUT_COUNT=2 OPM_SCALE=1.25 sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+  native-editor:
+    name: Native editor and recovery
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native editor on Debian 13
+        run: docker build -f native/tests/editor.Dockerfile -t opm-native-editor:test .
+      - name: Run GUI without Python or a compiler
+        run: docker run --rm --network none opm-native-editor:test
+  native-runtime:
+    name: Native Qt backend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev dbus
+      - name: Build native runtime
+        run: |
+          cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/native --parallel 2
+      - name: Native model and storage tests
+        run: ctest --test-dir build/native --output-on-failure
+      - name: Legacy compatibility and private D-Bus tests
+        run: |
+          dbus-run-session -- python3 native/tests/contract.py \
+            --binary build/native/native/open-power-menu-native \
+            --probe build/native/native/native-launch-probe
+      - name: Check staged source installation
+        run: |
+          cmake --install build/native --prefix "$RUNNER_TEMP/opm-native"
+          "$RUNNER_TEMP/opm-native/bin/open-power-menu-native" --version
+          test ! -e "$RUNNER_TEMP/opm-native/share/dbus-1/services/org.openpowermenu.Service.service"
+      - name: Smoke test without Python installed
+        run: |
+          mkdir -p "$RUNNER_TEMP/opm-runtime"
+          cp native/tests/runtime.Dockerfile "$RUNNER_TEMP/opm-runtime/Dockerfile"
+          cp build/native/native/open-power-menu-native "$RUNNER_TEMP/opm-runtime/"
+          docker build -t opm-native-runtime:test "$RUNNER_TEMP/opm-runtime"
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE/native/tests/runtime-smoke.sh:/smoke.sh:ro" \
+            opm-native-runtime:test sh /smoke.sh
   portable:
     name: Portable tests
     runs-on: ubuntu-latest
@@ -54,10 +167,10 @@ jobs:
           import subprocess
           import PySide6
           parser = Path(PySide6.__file__).parent / "qmlformat"
-          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "MenuEntryContent.qml", "PointerDismissal.qml", "adapters/AppGridPanelBridge.qml"]
+          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "MenuEntryContent.qml", "PointerDismissal.qml", "BackendSetup.qml", "adapters/AppGridPanelBridge.qml"]
           subprocess.run([str(parser), *["plasmoid/contents/ui/" + name for name in files]],
                          stdout=subprocess.DEVNULL, check=True)
           PY
-      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_qt_flyout.py tests/test_qt_dismissal.py tests/test_installation.py
+      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_qt_flyout.py tests/test_qt_dismissal.py tests/test_installation.py tests/test_native_store.py
         env:
           QT_QPA_PLATFORM: offscreen

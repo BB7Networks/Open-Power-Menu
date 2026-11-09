@@ -10,6 +10,7 @@ QQC2.Control {
     property var draft: null
     property bool busy: false
     property bool expired: false
+    property bool showActions: true
     readonly property var rows: draft ? (Draft.children(draft.entries, draft.parentId) || []) : []
     readonly property int selectedIndex: draft ? rows.findIndex(entry => entry.id === draft.selectedId) : -1
     property string draggedId: ""
@@ -37,7 +38,13 @@ QQC2.Control {
     signal saveRequested()
     signal cancelRequested()
     signal closeRequested()
-    implicitHeight: 356
+    readonly property real chromeHeight: topPadding + bottomPadding + Math.max(48, navigationBar.implicitHeight)
+        + instructions.implicitHeight + (rows.length ? 24 : 32)
+        + (showActions ? actions.implicitHeight : 0) + 12
+    readonly property real minimumUsableHeight: chromeHeight + (rows.length ? rowHeight : 0)
+    implicitHeight: chromeHeight + rows.length * rowHeight
+    FontMetrics { id: layoutFont; font: control.font }
+    readonly property real rowHeight: Math.max(36, layoutFont.height + 12)
     implicitWidth: 304
     focusPolicy: Qt.StrongFocus
     Accessible.name: "Power User Menu layout editing. Commands are inactive."
@@ -83,7 +90,8 @@ QQC2.Control {
         const entries = Draft.children(draft.entries, draft.parentId) || [];
         const changedLevel = displayedToken !== draft.token || displayedParent !== draft.parentId;
         const changedRows = rowModel.count !== entries.length || entries.some((entry, index) =>
-            index >= rowModel.count || rowModel.get(index).itemId !== entry.id);
+            index >= rowModel.count || rowModel.get(index).itemId !== entry.id
+                || rowModel.get(index).itemTitle !== entry.title || rowModel.get(index).itemKind !== entry.kind);
         if (!changedLevel && !changedRows) { revealSelection = false; rememberView(); return; }
         restoringView = true;
         displayedToken = draft.token;
@@ -95,6 +103,8 @@ QQC2.Control {
             const existing = rowIndex(entry.id);
             if (existing < 0) rowModel.insert(index, {itemId: entry.id, itemTitle: entry.title, itemKind: entry.kind});
             else if (existing !== index) rowModel.move(existing, index, 1);
+            rowModel.setProperty(index, "itemTitle", entry.title);
+            rowModel.setProperty(index, "itemKind", entry.kind);
         }
         if (rowModel.count > entries.length) rowModel.remove(entries.length, rowModel.count - entries.length);
         const reveal = revealSelection;
@@ -116,6 +126,9 @@ QQC2.Control {
 
     function choose(id) {
         edited(Draft.select(draft, draft.parentId, id));
+    }
+    function revealCurrent() {
+        if (selectedIndex >= 0) list.positionViewAtIndex(selectedIndex, ListView.Contain);
     }
     function move(id, parentId, beforeId) {
         if (busy || expired) return;
@@ -324,7 +337,7 @@ QQC2.Control {
             id: navigationBar
             objectName: "layoutBack"
             Layout.fillWidth: true
-            Layout.preferredHeight: 48
+            Layout.preferredHeight: Math.max(48, implicitHeight)
             enabled: !!control.draft && !!control.draft.parentId && !control.busy
             text: control.draft && control.draft.parentId
                 ? "Go Back · " + Draft.find(control.draft.entries, control.draft.parentId).entry.title
@@ -339,6 +352,7 @@ QQC2.Control {
             QQC2.ToolTip.text: "Click to go back, or drag here and hold to move up one level"
         }
         QQC2.Label {
+            id: instructions
             Layout.fillWidth: true
             text: "Drag an item onto a submenu and hold to open it. Drag onto Go Back to move up."
             wrapMode: Text.WordWrap
@@ -363,7 +377,7 @@ QQC2.Control {
                 property var entry: ({id: itemId, title: itemTitle, kind: itemKind})
                 objectName: "layoutRow-" + entry.id
                 width: list.width
-                height: 36
+                height: control.rowHeight
                 leftPadding: 12
                 rightPadding: 30
                 text: entry.title
@@ -408,6 +422,8 @@ QQC2.Control {
             }
         }
         RowLayout {
+            id: actions
+            visible: control.showActions
             Layout.fillWidth: true
             QQC2.Button {
                 objectName: "saveLayout"

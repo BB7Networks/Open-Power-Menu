@@ -154,7 +154,7 @@ def test_friendly_wrappers(isolated_install):
     if os.geteuid() == 0:
         pytest.skip('Friendly installer intentionally refuses root')
     source = temp / 'source with spaces'
-    shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns('.git', '.venv', 'dist', '__pycache__', '.pytest_cache'))
+    shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns('.git', '.venv', 'build', 'dist', '__pycache__', '.pytest_cache'))
     assert 'SUCCESS' in run('bash', 'install.sh', cwd=source, env=env).stdout
     assert (temp / 'bin/open-power-menu').exists()
     assert 'Cancelled' in run('bash', 'uninstall.sh', cwd=source, env=env, input='n\n').stdout

@@ -28,6 +28,7 @@ def policy():
 def leave(obj):
     obj.setProperty('menuOpen',True)
     obj.setProperty('pointerInside',True)
+    QTest.qWait(170)  # establish a visit after opening geometry settles
     obj.setProperty('pointerInside',False)
 
 
@@ -123,3 +124,84 @@ def test_standalone_menu_leave_policy(monkeypatch, enabled):
     assert gui.launch_menu(cfg, diagnostic=inspect) == 0
     assert checks == [True, True, True]
     assert timers and not timers[0].isActive()
+
+
+def test_delay_change_restarts_full_grace_period(policy):
+    obj, calls = policy
+    obj.setProperty('enabled', True)
+    leave(obj)
+    QTest.qWait(20)
+    obj.setProperty('delay', 100)
+    QTest.qWait(40)
+    assert calls == []
+    QTest.qWait(90)
+    assert calls == [True]
+
+
+def test_rapid_reopening_cancels_old_timer(policy):
+    obj, calls = policy
+    obj.setProperty('enabled', True)
+    for _ in range(8):
+        leave(obj)
+        obj.setProperty('menuOpen', False)
+        obj.setProperty('menuOpen', True)
+    QTest.qWait(70)
+    assert calls == []
+
+
+@pytest.mark.parametrize('cancel', ['exit', 'disabled', 'destroyed'])
+def test_hover_timer_cancellation_and_destruction(cancel):
+    app=QApplication.instance() or QApplication([])
+    engine=QQmlEngine()
+    source=Path(__file__).resolve().parents[1]/'plasmoid/contents/ui/HoverOpen.qml'
+    component=QQmlComponent(engine,QUrl.fromLocalFile(str(source)))
+    obj=component.create()
+    assert obj, [str(e) for e in component.errors()]
+    calls=[]
+    obj.openRequested.connect(lambda: calls.append(True))
+    obj.setProperty('delay',100)
+    obj.setProperty('hovered',True)
+    QTest.qWait(20)
+    if cancel=='exit': obj.setProperty('hovered',False)
+    elif cancel=='disabled': obj.setProperty('enabled',False)
+    else:
+        from PySide6.QtCore import QCoreApplication, QEvent
+        obj.deleteLater()
+        QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
+    QTest.qWait(150)
+    assert not calls
+    if cancel != 'destroyed':
+        obj.setProperty('enabled',True)
+        obj.setProperty('hovered',True)
+        QTest.qWait(150)
+        assert calls == [True]
+        obj.deleteLater(); app.processEvents()
+
+
+def test_opening_and_geometry_hover_noise_does_not_arm(policy):
+    obj,calls=policy; obj.setProperty('enabled',True)
+    for _ in range(20):
+        obj.setProperty('menuOpen',True)
+        obj.setProperty('pointerInside',True) # window initially overlaps launcher pointer
+        obj.setProperty('pointerInside',False) # moved by panel/compositor layout
+        QTest.qWait(210)
+        assert not calls and not obj.property('pending')
+        obj.setProperty('pointerInside',True)
+        obj.geometryChanged() # async content/monitor change moves it away
+        obj.setProperty('pointerInside',False)
+        QTest.qWait(210)
+        assert not calls and not obj.property('pending')
+        obj.setProperty('menuOpen',False)
+
+
+def test_stationary_global_pointer_does_not_cancel_keyboard_protection(policy):
+    obj,calls=policy; obj.setProperty('enabled',True)
+    leave(obj)
+    obj.observePointer(100,100)
+    obj.keyboardUsed()
+    obj.observePointer(100,100)
+    QTest.qWait(70)
+    assert not calls and obj.property('keyboardMode')
+    obj.observePointer(101,100)
+    QTest.qWait(70)
+    assert calls == [True]

@@ -3,6 +3,8 @@
 // Anchor to a one-pixel proxy positioned from the active menu row, keeping
 // right/left adaptive selection and a bottom-aligned, screen-clamped flyout.
 import QtQuick
+import "AccessKeys.js" as AccessKeys
+import "MenuMetrics.js" as Metrics
 import QtQuick.Layouts
 import QtQuick.Window
 import QtQuick.Controls as QQC2
@@ -21,19 +23,39 @@ PlasmaCore.PopupPlasmaWindow {
     floating: true
     margin: 0
     animated: false
+    // Mouse-hovered native flyouts on X11 must not activate: when one closes,
+    // X11 otherwise restores focus to the previous desktop application,
+    // causing Plasma's parent applet popup to auto-dismiss. Keyboard-opened
+    // flyouts opt back into focus *before* becoming visible.
+    property bool keyboardActivationRequested: false
+    flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+        ((Qt.platform.pluginName === "xcb" && !keyboardActivationRequested)
+            ? Qt.WindowDoesNotAcceptFocus : 0)
     // Do not force Qt.Popup: that changes Wayland popup placement semantics.
     // PlasmaWindow already supplies its own frameless top-level flags.
 
     property var entries: []
     property var activeChild: null
     property string appearance: "native"
+    readonly property color textColor: appearance === "aero" ? "#eff3f8" : appearance === "aero-light" ? "#24394b" : Kirigami.Theme.textColor
+    readonly property color surfaceColor: appearance === "aero" ? "#27313D" : appearance === "aero-light" ? "#eaf1f7" : Kirigami.Theme.backgroundColor
+    readonly property color borderColor: appearance === "aero" ? "#53718A" : appearance === "aero-light" ? "#9ab1c4" : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.25)
+    readonly property color accentColor: appearance === "aero-light" ? "#648eac" : Kirigami.Theme.highlightColor
     property int activeIndex: -1
+    property string menuDensity: "standard"
+    property string menuWidth: "auto"
+    property string menuIconSize: "standard"
+    property int submenuHoverDelay: -1
+    property bool keyboardMode: false
+    property FontMetrics menuFont: FontMetrics { font: Kirigami.Theme.defaultFont }
+    readonly property int entryIconSize: Metrics.iconSize(menuIconSize, menuFont.height)
+    readonly property int entryHeight: Metrics.rowHeight(menuDensity, menuFont.height, showMenuIcons ? entryIconSize : 0)
     property bool showMenuIcons: true
-    onShowMenuIconsChanged: if (activeChild) activeChild.showMenuIcons = showMenuIcons
     // Both model replacement and reuse start without a keyboard selection.
-    onEntriesChanged: resetSelection()
+    onEntriesChanged: { resetSelection(); geometrySettling(); }
     function resetSelection() {
         activeIndex = -1;
+        keyboardMode = false;
         closeChild();
     }
     property int settledPopupDirection: Qt.RightEdge
@@ -45,18 +67,45 @@ PlasmaCore.PopupPlasmaWindow {
     }
     signal returnToParent()
     function focusFirst() {
+        // Callers set this before showing the window; also handle a flyout
+        // already open from hover when keyboard navigation takes over.
+        keyboardActivationRequested = true;
         activeIndex = LayoutDraft.nextIndex(entries, -1, 1, false);
         requestActivate();
         flyoutSurface.forceActiveFocus();
     }
-    onAppearanceChanged: if (activeChild) activeChild.appearance = appearance
     // The screen rectangle is provided by the Plasmoid, not inferred from
     // which edge the *panel* happens to occupy. This also handles multiple
     // monitors and non-corner launcher positions.
     property rect screenRect: Qt.rect(0, 0, 0, 0)
     signal triggered(string key, bool closeBeforeRun)
     signal keyboardUsed()
-    signal pointerMoved()
+    signal pointerMoved(real globalX, real globalY)
+    signal geometryChanged()
+    property Item anchorRow: null
+    property Item anchorProxy: null
+    function reposition() {
+        if (!visible || !anchorRow || !anchorProxy) return;
+        positionAtRow(anchorRow, anchorProxy, screenRect);
+        popupDirection = chooseSide(anchorProxy);
+    }
+    property Timer pointerTransition: Timer { interval: 150; repeat: false }
+    function geometrySettling() {
+        if (visible) pointerTransition.restart();
+        geometryChanged();
+        Qt.callLater(reposition);
+        if (activeChild) Qt.callLater(activeChild.reposition);
+    }
+    onWidthChanged: geometrySettling()
+    onHeightChanged: geometrySettling()
+    onXChanged: geometrySettling()
+    onYChanged: geometrySettling()
+    onScreenRectChanged: geometrySettling()
+    property Connections rowGeometry: Connections {
+        target: flyout.anchorRow
+        function onYChanged() { flyout.geometrySettling(); }
+        function onHeightChanged() { flyout.geometrySettling(); }
+    }
     readonly property bool pointerInside: visible && (surfaceHover.hovered || (activeChild && activeChild.pointerInside))
 
     function chooseSide(anchor, availableScreen = screenRect) {
@@ -88,6 +137,8 @@ PlasmaCore.PopupPlasmaWindow {
     // Keep the popup on its source screen even when the panel is on top/side.
     function positionAtRow(row, proxy, screen) {
         if (!row || !proxy) return;
+        anchorRow = row;
+        anchorProxy = proxy;
         const rowGlobal = row.mapToGlobal(0, 0);
         const rowLocal = row.mapToItem(proxy.parent, 0, 0);
         const popupH = Math.max(1, height);
@@ -106,7 +157,7 @@ PlasmaCore.PopupPlasmaWindow {
     function rowsHeight(model) {
         let total = 8;
         for (const entry of model || [])
-            total += entry.kind === "separator" ? 12 : 34;
+            total += entry.kind === "separator" ? 12 : flyout.entryHeight;
         return Math.max(total, 40);
     }
     function closeChild() {
@@ -122,29 +173,47 @@ PlasmaCore.PopupPlasmaWindow {
     }
     onVisibleChanged: {
         resetSelection();
-        if (visible) Qt.callLater(updateIndicatorDirection);
+        if (visible) { geometrySettling(); Qt.callLater(updateIndicatorDirection); }
     }
 
     // PlasmaWindow's mainItem is resized to the window's size minus its
     // theme padding. Set the window size, not mainItem's width or height.
-    width: 260 + leftPadding + rightPadding
-    height: Math.min(rowsHeight(entries), Math.max(180, Math.min(540,
-        Screen.desktopAvailableHeight > 0 ? Screen.desktopAvailableHeight - 56 : 540)))
-        + topPadding + bottomPadding
+    width: Metrics.menuWidth(menuWidth, 260 + leftPadding + rightPadding, menuFont.height, screenRect.width || Screen.desktopAvailableWidth)
+    height: Metrics.menuHeight("auto", 0, rowsHeight(entries) + topPadding + bottomPadding,
+        screenRect.height || Screen.desktopAvailableHeight, 0)
 
     mainItem: Rectangle {
         id: flyoutSurface
-        color: flyout.appearance === "aero" ? "#27313D" : Kirigami.Theme.backgroundColor
-        border.color: flyout.appearance === "aero" ? "#53718A" : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.25)
+        color: flyout.surfaceColor
+        border.color: flyout.borderColor
         border.width: 1
         radius: 3
         focus: true
         HoverHandler {
             id: surfaceHover
-            onPointChanged: flyout.pointerMoved()
+            property point lastGlobal: Qt.point(NaN, NaN)
+            onPointChanged: {
+                const global = flyoutSurface.mapToGlobal(point.position.x, point.position.y);
+                if (!flyout.pointerTransition.running && Number.isFinite(lastGlobal.x) && (global.x !== lastGlobal.x || global.y !== lastGlobal.y)) {
+                    flyout.keyboardMode = false;
+                    flyout.pointerMoved(global.x, global.y);
+                }
+                lastGlobal = global;
+            }
         }
         Keys.onPressed: event => {
+            flyout.keyboardMode = true;
             flyout.keyboardUsed();
+            const index = AccessKeys.index(flyout.entries, event.text, event.modifiers, event.isAutoRepeat);
+            if (index >= 0) {
+                flyout.activeIndex = index;
+                const row = flyoutRows.itemAt(index);
+                if (!row) return;
+                if (row.entry.kind === "submenu") { row.openChild(true); if (row.childPopup) row.childPopup.focusFirst(); }
+                else { flyout.triggered(row.entry.key, row.entry.close_before_run === true); flyout.visible = false; }
+                event.accepted = true;
+                return;
+            }
             if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
                 flyout.closeChild();
                 flyout.activeIndex = LayoutDraft.nextIndex(flyout.entries, flyout.activeIndex, event.key === Qt.Key_Up ? -1 : 1, false);
@@ -161,7 +230,7 @@ PlasmaCore.PopupPlasmaWindow {
             } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                 const row = flyoutRows.itemAt(flyout.activeIndex);
                 if (!row || row.entry.enabled === false || row.entry.kind === "separator") return;
-                if (row.entry.kind === "submenu") { row.openChild(); if (row.childPopup) row.childPopup.focusFirst(); }
+                if (row.entry.kind === "submenu") { row.openChild(true); if (row.childPopup) row.childPopup.focusFirst(); }
                 else if (event.key !== Qt.Key_Right) {
                     flyout.triggered(row.entry.key, row.entry.close_before_run === true);
                     flyout.visible = false;
@@ -198,13 +267,11 @@ PlasmaCore.PopupPlasmaWindow {
                         required property int index
                         property var entry: modelData
                         property var childPopup: null
-                        readonly property rect menuScreen: Qt.rect(
-                            Screen.virtualX, Screen.virtualY,
-                            Screen.width, Screen.height)
+                        readonly property rect menuScreen: flyout.screenRect
                         width: column.width
-                        height: entry.kind === "separator" ? 12 : 34
+                        height: entry.kind === "separator" ? 12 : flyout.entryHeight
 
-                        function openChild() {
+                        function openChild(keyboard = false) {
                             if (row.entry.kind !== "submenu") return;
                             if (!childPopup) {
                                 // Load deeper levels lazily. A static self-
@@ -231,17 +298,24 @@ PlasmaCore.PopupPlasmaWindow {
                                 });
                                 childPopup.keyboardUsed.connect(flyout.keyboardUsed);
                                 childPopup.pointerMoved.connect(flyout.pointerMoved);
+                                childPopup.geometryChanged.connect(flyout.geometryChanged);
                                 childPopup.returnToParent.connect(function() {
                                     if (!flyout.visible) return;
                                     flyout.requestActivate();
                                     flyoutSurface.forceActiveFocus();
                                 });
                             }
-                            childPopup.appearance = flyout.appearance;
-                            childPopup.showMenuIcons = flyout.showMenuIcons;
-                            childPopup.screenRect = row.menuScreen;
+                            hoverOpen.cancel();
+                            childPopup.menuDensity = Qt.binding(() => flyout.menuDensity);
+                            childPopup.menuWidth = Qt.binding(() => flyout.menuWidth);
+                            childPopup.menuIconSize = Qt.binding(() => flyout.menuIconSize);
+                            childPopup.submenuHoverDelay = Qt.binding(() => flyout.submenuHoverDelay);
+                            childPopup.appearance = Qt.binding(() => flyout.appearance);
+                            childPopup.showMenuIcons = Qt.binding(() => flyout.showMenuIcons);
+                            childPopup.screenRect = Qt.binding(() => flyout.screenRect);
                             childPopup.positionAtRow(row, childAnchor, row.menuScreen);
                             childPopup.popupDirection = childPopup.chooseSide(childAnchor);
+                            childPopup.keyboardActivationRequested = keyboard;
                             flyout.showChild(childPopup);
                         }
                         Component.onDestruction: {
@@ -261,7 +335,7 @@ PlasmaCore.PopupPlasmaWindow {
                             anchors.leftMargin: 3
                             anchors.rightMargin: 3
                             radius: 2
-                            color: Kirigami.Theme.highlightColor
+                            color: flyout.accentColor
                             opacity: ((flyout.activeIndex === row.index) && row.entry.kind !== "separator") ? 0.28 : 0
                         }
                         MenuEntryContent {
@@ -269,10 +343,20 @@ PlasmaCore.PopupPlasmaWindow {
                             anchors.leftMargin: 8
                             anchors.rightMargin: 8
                             entry: row.entry
+                            appearance: flyout.appearance
                             showIcons: flyout.showMenuIcons
-                            foreground: flyout.appearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                            showHints: Metrics.hasHints(flyout.entries)
+                            iconSize: flyout.entryIconSize
+                            foreground: flyout.textColor
                             opensLeft: (row.childPopup && row.childPopup.visible
                                 ? row.childPopup.indicatorDirection : flyout.chooseSide(row, row.menuScreen)) === Qt.LeftEdge
+                        }
+                        HoverOpen {
+                            id: hoverOpen
+                            delay: flyout.submenuHoverDelay
+                            enabled: flyout.visible && !flyout.keyboardMode && row.entry.kind === "submenu"
+                            hovered: mouse.containsMouse
+                            onOpenRequested: row.openChild()
                         }
                         MouseArea {
                             id: mouse
@@ -281,13 +365,13 @@ PlasmaCore.PopupPlasmaWindow {
                             enabled: row.entry.kind !== "separator" && row.entry.enabled !== false
                             onEntered: {
                                 flyout.activeIndex = row.index;
-                                if (row.entry.kind === "submenu") row.openChild();
-                                else flyout.closeChild();
+                                if (row.entry.kind !== "submenu") flyout.closeChild();
                             }
                             onPositionChanged: {
                                 if (containsMouse) flyout.activeIndex = row.index;
                             }
                             onClicked: {
+                                hoverOpen.cancel();
                                 flyout.activeIndex = row.index;
                                 if (row.entry.kind === "submenu") row.openChild();
                                 else {

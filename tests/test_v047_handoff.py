@@ -83,7 +83,7 @@ const assert=require('node:assert/strict');const vm=require('node:vm');
 const h={};vm.createContext(h);vm.runInContext(process.env.JS,h);
 const item={gridOpen:false,gridWindow:{visible:true},expanded:false};
 const applet={pluginName:'dev.xarbit.appgrid'};
-const root={requestedMenu:'power',pendingPowerEpoch:5,menuSwitchEpoch:5,
+const root={openingPower:true,requestedMenu:'power',pendingPowerEpoch:5,menuSwitchEpoch:5,
    launcherClosePollCount:0,launcherSwitchError:'',awaitingAsyncClose:false,
    selectedLauncherPlan:{item,applet},selectedLauncherItem:item,expanded:false,
    closeLauncherPopup(){this.retries++}, retries:0,
@@ -94,7 +94,10 @@ const follow={running:false,restart(){this.running=true}};
 const c={root,menuSwitchEpoch:5,requestedMenu:'power',expanded:false,
     LauncherAdapters:h,launcherClosePoll:poll,launcherCloseFollowup:follow,
     pendingPowerEpoch:5,awaitingAsyncClose:false,launcherSwitchError:'',
-    console,fetchMenu(){root.loaded++},stop(){poll.stop()}};
+    openingPower:true,openingEntriesReady:false,
+    // This handoff fixture has a ready backend; startup readiness is tested separately.
+    preparePowerPopup(){root.expanded=true;follow.restart()},
+    console,fetchMenu(_,done){root.loaded++;done()},stop(){poll.stop()}};
 for(const key of ['expanded','menuSwitchEpoch','requestedMenu','pendingPowerEpoch','awaitingAsyncClose','launcherSwitchError'])
     Object.defineProperty(c,key,{get(){return root[key]},set(v){root[key]=v}});
 vm.createContext(c);

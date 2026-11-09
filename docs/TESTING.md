@@ -81,6 +81,36 @@ still test command resolution/quoting, missing KDE tools and failed launches.
 These tests **cannot** prove KWin's actual global-key delivery or lifecycle
 signals on a physical Plasma desktop.
 
+## Native migration checks
+
+The v2.0 preview adds CMake/Qt Test checks and a Python-standard-library
+differential harness; PySide6 is not required for these tests. See
+[native development](../native/README.md) for the commands and the isolated
+no-Python runtime smoke images. **Native Qt backend** and **Native editor and
+recovery** CI jobs run alongside the existing portable and Qt jobs. The editor
+job builds Qt Quick/Kirigami on Debian 13, runs all four native test targets,
+then opens the actual editor in a separate image without Python or a compiler.
+
+Native tests cover bounded/no-symlink reads, malformed configurations, atomic
+saves, backup retention, file-identity/content conflicts, reference-only layout
+transactions, capability probes, D-Bus compatibility and detached argv launch.
+Recovery tests cover preview/restore/delete, protected copies with retention
+zero, malformed/oversized/unsafe backups and changed previews. Editor-session
+tests cover metadata and alternative-command preservation, bounded Undo/Redo,
+hidden nested entries, unsaved drafts, concurrent writers and overwrite preview
+conflicts. GUI tests exercise actual controls, canceled/confirmed restoration
+and protected deletion, builtin customization, application replacement and
+manual edits after application selection. KService fixtures cover hidden/unavailable apps and
+KDE desktop-file dispatch; KConfig discovery leaves panel bytes unchanged.
+All power commands are fake tools during automated testing. The existing Python
+model is the comparison oracle for normal configurations. Legacy GUI tests stay
+in place until the entire native application replaces the normal installation.
+
+These tests do not certify the pending standalone frontend, binary EZ installer
+or physical widget integration. See the
+[migration gates](architecture/native-migration-status.md) before changing the
+installed service or claiming that the complete app no longer needs PySide6.
+
 ## Live acceptance matrix (still required)
 
 Use a test account or VM and retain a recovery terminal. Do not restart Plasma
@@ -145,3 +175,60 @@ Do not mark this matrix complete based on offscreen tests. Attach real
 
 See [release verification](RELEASE-1.0.1.md) for Desktop, optional pointer-leave
 dismissal, EZ installation/rollback and the final Manjaro Wayland checklist.
+
+## Native standalone release gate
+
+Build with `OPM_BUILD_STANDALONE=ON` and use disposable configuration/data/cache
+profiles and private session buses. See [the standalone recipes](../native/README.md#standalone-menu-development-build).
+The dedicated CI job covers Core-only build isolation, Widgets interaction,
+minimal runtime exposure without Python/compiler, missing-library diagnostics,
+Xvfb/X11, headless Weston and virtual KWin. Set `OPM_WAYLAND_COMPOSITOR=kwin`,
+`OPM_OUTPUT_COUNT=2`, `OPM_SCALE=1.25` on `standalone-wayland.sh` for two virtual
+outputs at fractional scale. KWin's binary is copied without optional file
+capabilities inside the disposable test runtime; no privileged compositor runs.
+
+Before production installer migration/release, repeat on physical Plasma:
+
+- Launcher and shortcut activation under both Wayland and X11, including
+  compositor-granted/refused activation and keyboard focus on first opening.
+- Parent/child/grandchild hover, rapid crossing, keyboard arrows/Enter/Escape,
+  outside click/application focus loss and repeated opening/closing.
+- Pointer exit/re-entry at the fixed 1200 ms timeout, keyboard suspension and
+  dismissal while a submenu or timer is active.
+- Panels at top/bottom/left/right, different work areas, screen-edge collisions,
+  adaptive flyout direction, negative/non-primary monitors and mixed
+  100/125/150% scales. Wayland global positioning remains compositor controlled.
+- Native desktop light/dark themes and Aero, system icons on/off, disabled rows,
+  selection contrast, long-menu scrolling, high-DPI and accessibility behavior.
+- Harmless literal-argv probes only; detached applications must survive menu
+  exit. Confirm power prompts separately with deliberate human supervision.
+
+Virtual sessions and palette captures do not certify this physical gate. Never
+restart an active Plasma session or replace production activation for these tests.
+
+## Native packaging acceptance
+
+Export the exact 1.0.1 source baseline for the upgrade tests, then build the
+complete disposable test image:
+
+```sh
+mkdir -p work/package-legacy
+git archive 34058480b6e3bc1ecc1f19d420fb744f570eca34 | tar -x -C work/package-legacy
+docker build -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+docker run --rm --network none opm-native-package:test
+```
+
+The build stage runs the existing five native CTest targets and nine packaging
+scenarios with actual temporary XDG profiles and private buses. It invokes the
+released legacy installer and activates the real 1.0.1 Python service before
+upgrading/rolling back. Test-only crash/failure hooks are compiled out before
+copying the bundle to the runtime image. The final image contains no Python,
+PySide6 or compiler and verifies the explicit bootstrap, native CLI, editor,
+production D-Bus activation, reinstall, removal and rollback. Package hashes,
+distro/version/CPU, platform plugins and missing runtime components are checked.
+
+The remaining physical release gate covers the installed widget, Meta+X,
+original-launcher masking/restoration, native editor/backups, standalone menu,
+light/dark/Aero themes, focus, real panel work areas and mixed-DPI monitors on
+Plasma Wayland and X11. Virtual-session and private-bus results do not certify
+that gate. No live installation is replaced by these automated tests.
