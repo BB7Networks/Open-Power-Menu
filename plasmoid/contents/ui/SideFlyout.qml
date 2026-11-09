@@ -331,6 +331,7 @@ PlasmaCore.PopupPlasmaWindow {
                             anchors.leftMargin: 8
                             anchors.rightMargin: 8
                             entry: row.entry
+                            appearance: flyout.appearance
                             showIcons: flyout.showMenuIcons
                             showHints: Metrics.hasHints(flyout.entries)
                             iconSize: flyout.entryIconSize

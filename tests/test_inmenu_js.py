@@ -17,6 +17,29 @@ def library(name, exports):
     return f'const {name} = (() => {{\n{source}\nreturn {{{exports}}};\n}})();\n'
 
 
+def test_aero_light_icon_contrast_policy():
+    if not shutil.which('node'):
+        pytest.skip('Node is required for QML JavaScript tests')
+    code = 'const assert=require("node:assert/strict");\n'
+    code += library('IconContrast', 'shouldMask') + r'''
+const check=IconContrast.shouldMask;
+for (const icon of ['view-list-details','computer','network-wired','drive-harddisk',
+                    'system-search','network-server','system-shutdown','system-lock-screen',
+                    'go-next-symbolic']) {
+    assert.equal(check('aero-light',icon), true, icon);
+    assert.equal(check('native',icon), false, icon);
+    assert.equal(check('aero',icon), false, icon);
+}
+for (const icon of ['system-file-manager','battery','utilities-system-monitor',
+                    'preferences-system','applications-other','user-desktop',
+                    '/tmp/art.png','file:///tmp/art.svg','']) {
+    assert.equal(check('aero-light',icon), false, icon);
+}
+'''
+    result = subprocess.run(['node','-e',code],capture_output=True,text=True,timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_draft_and_controller_behavior():
     if not shutil.which('node'):
         pytest.skip('Node is required for QML JavaScript tests')

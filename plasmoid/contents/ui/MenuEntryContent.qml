@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.components as PC3
+import "IconContrast.js" as IconContrast
 
 RowLayout {
     id: content
@@ -12,6 +13,7 @@ RowLayout {
     property bool showHints: !!entry.access_hint
     property bool opensLeft: false
     property color foreground: Kirigami.Theme.textColor
+    property string appearance: "native"
     visible: entry.kind !== "separator"
     spacing: 8
 
@@ -24,6 +26,7 @@ RowLayout {
             objectName: "leftIndicator"
             anchors.fill: parent
             source: "go-previous-symbolic"
+            isMask: content.appearance === "aero-light"
             color: content.foreground
             visible: content.entry.kind === "submenu" && content.opensLeft
         }
@@ -33,6 +36,8 @@ RowLayout {
         Layout.preferredWidth: content.iconSize
         Layout.preferredHeight: content.iconSize
         source: content.entry.icon || "application-x-executable"
+        // Kirigami.Icon.color applies only when isMask is true.
+        isMask: IconContrast.shouldMask(content.appearance, content.entry.icon || "application-x-executable")
         color: content.foreground
         visible: content.showIcons
         opacity: content.entry.enabled === false ? 0.4 : 1
@@ -74,6 +79,7 @@ RowLayout {
             objectName: "rightIndicator"
             anchors.fill: parent
             source: "go-next-symbolic"
+            isMask: content.appearance === "aero-light"
             color: content.foreground
             visible: content.entry.kind === "submenu" && !content.opensLeft
         }

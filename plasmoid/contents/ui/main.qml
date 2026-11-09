@@ -1190,7 +1190,7 @@ PlasmoidItem {
                 }
                 PC3.ToolButton {
                     id: lockButton
-                    icon.name: root.layoutEditing ? "object-unlocked" : "object-locked"
+                    icon.name: root.menuAppearance === "aero-light" ? "" : root.layoutEditing ? "object-unlocked" : "object-locked"
                     icon.color: root.menuTextColor
                     text: root.layoutEditing ? "Finish editing layout" : "Unlock menu layout to rearrange items"
                     display: QQC2.AbstractButton.IconOnly
@@ -1201,11 +1201,20 @@ PlasmoidItem {
                     QQC2.ToolTip.visible: hovered
                     QQC2.ToolTip.text: text
                     onClicked: LayoutController.toggle(root)
+                    Kirigami.Icon {
+                        objectName: "aeroLightLockIcon"
+                        anchors.centerIn: parent
+                        width: 19; height: 19; z: 2
+                        visible: root.menuAppearance === "aero-light"
+                        source: root.layoutEditing ? "object-unlocked" : "object-locked"
+                        isMask: true
+                        color: root.menuTextColor
+                    }
                 }
                 PC3.ToolButton {
                     id: refreshButton
                     icon.color: root.menuTextColor
-                    icon.name: "view-refresh"
+                    icon.name: root.menuAppearance === "aero-light" ? "" : "view-refresh"
                     text: "Refresh menu"
                     display: QQC2.AbstractButton.IconOnly
                     Layout.preferredWidth: 29
@@ -1214,11 +1223,20 @@ PlasmoidItem {
                     QQC2.ToolTip.text: "Refresh menu entries"
                     enabled: !root.layoutEditing && !root.layoutBusy
                     onClicked: { root.commandError = ""; root.fetchMenu(); root.fetchIntegration(); }
+                    Kirigami.Icon {
+                        objectName: "aeroLightRefreshIcon"
+                        anchors.centerIn: parent
+                        width: 19; height: 19; z: 2
+                        visible: root.menuAppearance === "aero-light"
+                        source: "view-refresh"
+                        isMask: true
+                        color: root.menuTextColor
+                    }
                 }
                 PC3.ToolButton {
                     id: configureButton
                     icon.color: root.menuTextColor
-                    icon.name: "configure"
+                    icon.name: root.menuAppearance === "aero-light" ? "" : "configure"
                     text: "Configure menu"
                     display: QQC2.AbstractButton.IconOnly
                     Layout.preferredWidth: 29
@@ -1227,6 +1245,15 @@ PlasmoidItem {
                     QQC2.ToolTip.text: "Add, remove and reorder menu entries"
                     enabled: !root.layoutEditing && !root.layoutBusy
                     onClicked: root.openEditor()
+                    Kirigami.Icon {
+                        objectName: "aeroLightConfigureIcon"
+                        anchors.centerIn: parent
+                        width: 19; height: 19; z: 2
+                        visible: root.menuAppearance === "aero-light"
+                        source: "configure"
+                        isMask: true
+                        color: root.menuTextColor
+                    }
                 }
             }
             Kirigami.Separator {
@@ -1301,6 +1328,7 @@ PlasmoidItem {
                                 anchors.leftMargin: 8
                                 anchors.rightMargin: 8
                                 entry: menuRow.entry
+                                appearance: root.menuAppearance
                                 showIcons: root.showMenuIcons
                                 showHints: Metrics.hasHints(root.visibleEntries)
                                 iconSize: popup.entryIconSize

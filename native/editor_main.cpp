@@ -2,6 +2,7 @@
 #include "editor_session.hpp"
 #include <QCommandLineParser>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -13,6 +14,11 @@ int main(int argc, char **argv) {
     app.setApplicationName("Open Power Menu Configure");
     app.setApplicationVersion(OPM_NATIVE_VERSION);
     app.setOrganizationDomain("openpowermenu.org");
+    // Bind this process to the Configure desktop entry on Wayland and use the
+    // bundled, official OPM artwork (not a desktop theme's generic fallback).
+    QGuiApplication::setDesktopFileName(QStringLiteral("org.openpowermenu.configure"));
+    const QIcon editorIcon(QStringLiteral(":/editor/open-power-menu.svg"));
+    QGuiApplication::setWindowIcon(editorIcon);
     QCommandLineParser parser;
     parser.addHelpOption();
     parser.addVersionOption();
@@ -32,7 +38,15 @@ int main(int argc, char **argv) {
                   "QML runtime modules.");
         return 2;
     }
-    if (parser.isSet("smoke-test"))
+    auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+    if (window)
+        window->setIcon(editorIcon);
+    if (parser.isSet("smoke-test")) {
+        if (!window || window->icon().isNull() ||
+            QGuiApplication::desktopFileName() != QStringLiteral("org.openpowermenu.configure")) {
+            qCritical("Native Configure window icon or desktop identity is missing");
+            return 4;
+        }
         QTimer::singleShot(250, &app, [&] {
             if (parser.isSet("screenshot")) {
                 auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
@@ -43,5 +57,6 @@ int main(int argc, char **argv) {
             }
             app.quit();
         });
+    }
     return app.exec();
 }

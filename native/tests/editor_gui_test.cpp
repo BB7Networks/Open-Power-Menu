@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QJsonDocument>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -165,6 +166,13 @@ class EditorGuiTests : public QObject {
         return 0;
     }
   private slots:
+    void embeddedEditorWindowIconIsRenderable() {
+        // Avoid theme-dependent generic titlebar and taskbar icons.
+        const QIcon icon(QStringLiteral(":/editor/open-power-menu.svg"));
+        QVERIFY(!icon.isNull());
+        QVERIFY2(!icon.pixmap(QSize(32, 32)).isNull(),
+                 "The bundled OPM SVG must be renderable with Qt's image plugins");
+    }
     void customizationControlsPersistThroughKeyboardInput() {
         QTemporaryDir temp;
         Storage store(temp.filePath("menu.json"));

@@ -34,7 +34,7 @@ def flyout(tmp_path, request):
         font = app.font(); font.setPixelSize(size); app.setFont(font)
     modules = {
         'org/kde/kirigami': {
-            'Icon': 'import QtQuick\nItem { property string source; property color color }',
+            'Icon': 'import QtQuick\nItem { property string source; property color color; property bool isMask: false }',
             'Separator': 'import QtQuick\nRectangle { implicitHeight: 1 }',
             'Theme': 'pragma Singleton\nimport QtQuick\nQtObject { property font defaultFont: Qt.application.font; property color textColor: "black"; property color backgroundColor: "white"; property color highlightColor: "blue" }',
         },
@@ -64,7 +64,7 @@ Window {
         (folder / 'qmldir').write_text('\n'.join(('singleton ' if name == 'Theme' else '') + f'{name} 1.0 {name}.qml' for name in files))
         for name, content in files.items():
             (folder / (name + '.qml')).write_text(content)
-    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'LayoutDraft.js', 'AccessKeys.js', 'MenuMetrics.js', 'HoverOpen.qml'):
+    for name in ('SideFlyout.qml', 'MenuEntryContent.qml', 'IconContrast.js', 'LayoutDraft.js', 'AccessKeys.js', 'MenuMetrics.js', 'HoverOpen.qml'):
         shutil.copyfile(UI / name, tmp_path / name)
     engine = QQmlEngine()
     engine.addImportPath(str(tmp_path))
@@ -83,6 +83,58 @@ Window {
     engine.deleteLater()
     app.processEvents()
     app.setFont(old_font)
+
+
+def test_aero_light_masks_mono_icons_without_tinting_apps(flyout):
+    evaluate(flyout, """appearance='aero-light'; entries=[
+        {kind:'command',title:'Logs',icon:'view-list-details'},
+        {kind:'command',title:'Computer',icon:'computer'},
+        {kind:'command',title:'Files',icon:'system-file-manager'},
+        {kind:'command',title:'Power',icon:'battery'},
+        {kind:'command',title:'Custom',icon:'file:///tmp/custom-icon.svg'}
+    ];""")
+    QTest.qWait(30)
+    def icon_at(index):
+        row = evaluate(flyout, f'flyoutRows.itemAt({index})')
+        item = next(c for c in row.childItems() if c.metaObject().indexOfProperty('opensLeft') >= 0)
+        return next(c for c in item.childItems() if c.objectName() == 'entryIcon')
+    assert [icon_at(i).property('isMask') for i in range(5)] == [True,True,False,False,False]
+    assert icon_at(0).property('color').name() == '#24394b'
+    evaluate(flyout, "appearance='native';")
+    QTest.qWait(20)
+    assert not icon_at(0).property('isMask')
+    evaluate(flyout, "appearance='aero';")
+    QTest.qWait(20)
+    assert not icon_at(1).property('isMask')
+    evaluate(flyout, """appearance='aero-light'; entries=[
+        {kind:'submenu',title:'Remote',icon:'network-server',
+            items:[{kind:'command',title:'Lock',icon:'system-lock-screen'}]}
+    ];""")
+    QTest.qWait(20)
+    assert icon_at(0).property('isMask')
+    evaluate(flyout,'flyoutRows.itemAt(0).openChild();')
+    child = evaluate(flyout, 'activeChild')
+    assert child.property('appearance') == 'aero-light'
+    row = evaluate(child, 'flyoutRows.itemAt(0)')
+    item = next(c for c in row.childItems() if c.metaObject().indexOfProperty('opensLeft') >= 0)
+    icon = next(c for c in item.childItems() if c.objectName() == 'entryIcon')
+    assert icon.property('isMask')
+
+
+def test_aero_light_toolbar_icons_use_dark_masks(main_popup):
+    from PySide6.QtQuick import QQuickItem
+    evaluate(main_popup, "menuAppearance='aero-light';")
+    QTest.qWait(30)
+    for name in ('aeroLightLockIcon', 'aeroLightRefreshIcon', 'aeroLightConfigureIcon'):
+        icon = main_popup.findChild(QQuickItem, name)
+        assert icon is not None, name
+        assert icon.property('isMask') is True
+        assert icon.property('visible') is True
+        assert icon.property('color').name() == '#24394b'
+    evaluate(main_popup, "menuAppearance='native';")
+    QTest.qWait(20)
+    for name in ('aeroLightLockIcon', 'aeroLightRefreshIcon', 'aeroLightConfigureIcon'):
+        assert main_popup.findChild(QQuickItem, name).property('visible') is False
 
 
 def test_reset_on_model_hide_and_nested_reopen(flyout):
