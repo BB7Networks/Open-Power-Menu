@@ -502,9 +502,20 @@ class EditorGuiTests : public QObject {
                 QVERIFY(qAbs(column->width() - scroll->property("availableWidth").toReal()) <= 1.5);
                 const auto check = [&](const char *name) {
                     auto *control = window->findChild<QQuickItem *>(name);
-                    if (!control || !control->isVisible()) return false;
+                    if (!control) {
+                        qWarning() << "Entry form missing control" << name << kind << size;
+                        return false;
+                    }
                     const qreal x = control->mapToScene(QPointF()).x();
-                    return qAbs(x - formX) <= 1.5 && x + control->width() <= formRight + 1.5;
+                    const bool ok = control->isVisible() && qAbs(x - formX) <= 1.5 &&
+                        x + control->width() <= formRight + 1.5;
+                    if (!ok)
+                        qWarning() << "Entry form geometry mismatch" << name << "kind" << kind
+                                   << "window" << size << "visible" << control->isVisible()
+                                   << "controlX" << x << "controlWidth" << control->width()
+                                   << "columnX" << formX << "columnWidth" << column->width()
+                                   << "scrollX" << scrollX << "scrollWidth" << scroll->width();
+                    return ok;
                 };
                 for (const char *name : {"entryNameLabel", "entryName", "entryIconLabel",
                                          "entryIcon", "entryAccessKeyLabel", "entryAccessKey"})
