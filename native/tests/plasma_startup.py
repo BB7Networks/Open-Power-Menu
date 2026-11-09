@@ -64,6 +64,27 @@ def backend():
 
 
 PROBE = '''
+    property bool startupPanelPainted: false
+    property bool startupPopupPainted: false
+    property int startupPhase: 0
+    function startupDriveWayland() {
+        const popup=root.fullRepresentationItem;
+        const window=popup ? popup.Window.window : null;
+        if(startupPhase===0 && startupPanelPainted && root.Window.window && root.Window.window.visible) {
+            startupPhase=1;
+            root.activatePowerShortcut();
+        } else if(startupPhase===1 && root.expanded && startupPopupPainted) {
+            startupPhase=2;
+            root.activatePowerShortcut();
+        } else if(startupPhase===2 && !root.expanded && (!window || !window.visible)) {
+            startupPhase=3;
+            root.activatePowerShortcut();
+        }
+    }
+    Connections {
+        target: root.Window.window
+        function onFrameSwapped() { root.startupPanelPainted=true; }
+    }
     function startupProbe(event) {
         const p = root.fullRepresentationItem;
         const w = p ? p.Window.window : null;
@@ -73,6 +94,8 @@ PROBE = '''
             fetching:root.fetching,density:root.menuDensity,icons:root.menuIconSize,mode:root.menuHeightMode,
             saved:root.menuCustomHeight,area:root.menuWorkArea.height,
             button:center ? [center.x,center.y] : null,
+            panelPainted:root.startupPanelPainted,popupPainted:root.startupPopupPainted,
+            panelVisible:root.Window.window ? root.Window.window.visible : false,
             natural:p ? p.naturalHeight : null,preferred:p ? p.Layout.preferredHeight : null,
             min:p ? p.Layout.minimumHeight : null,max:p ? p.Layout.maximumHeight : null,
             padding:p ? p.themeVerticalPadding : null,actual:p ? p.height : null,
@@ -92,7 +115,7 @@ PROBE = '''
 '''
 
 
-def instrument(case, platform, second_click):
+def instrument(case, platform):
     widget = case/'data/plasma/plasmoids/org.openpowermenu.start'
     shutil.copytree(ROOT/'plasmoid', widget)
     path = widget/'contents/ui/main.qml'
@@ -113,16 +136,24 @@ def instrument(case, platform, second_click):
         }
         Connections {
             target: popup.Window.window
-            function onVisibleChanged() { console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("visibility"))); }
+            property int frames: 0
+            function onVisibleChanged() {
+                frames=0;
+                root.startupPopupPainted=false;
+                console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("visibility")));
+            }
+            function onFrameSwapped() {
+                if(root.expanded && frames++<2) {
+                    root.startupPopupPainted=true;
+                    console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("frame")));
+                }
+            }
         }
 ''')
     if platform == 'wayland':
-        source = source.replace('    property var menuEntries: []', '''
-    Timer { interval:200; running:true; onTriggered: root.activatePowerShortcut() }
-    Timer { interval:3800; running:true; onTriggered: root.activatePowerShortcut() }
-    Timer { interval:4100; running:true; onTriggered: root.activatePowerShortcut() }
-    property var menuEntries: []''')
-    source=source.replace('interval:3800;',f'interval:{second_click};').replace('interval:4100;',f'interval:{second_click+300};')
+        # Drive activation from actual exposure/paint/hide transitions, not
+        # timers that can overtake a backend response on a loaded CI runner.
+        source=source.replace('previous=compare; }','previous=compare; }\n            root.startupDriveWayland();')
     path.write_text(source)
 
 
@@ -201,7 +232,14 @@ def session(args):
                     return result.returncode == 0
                 wait_for(panel)
             if args.platform == 'xcb':
-                state = wait_for(lambda: next((s for s in reversed(read_states(log)) if s['button'] and s['area']>0 and time.time()*1000-s['time']>80), None))
+                def panel_ready():
+                    states=read_states(log)
+                    if not states: return None
+                    state=states[-1]
+                    # Use the latest geometry and a painted window. Earlier
+                    # animation samples can already have plausible coordinates.
+                    return state if state['button'] and state['area']>0 and state['panelPainted'] and state['panelVisible'] else None
+                state = wait_for(panel_ready)
                 x,y=map(round,state['button'])
                 # The normal panel MouseArea handles these real pointer events.
                 for opening in range(2):
@@ -210,15 +248,21 @@ def session(args):
                     time.sleep(.1)
                     subprocess.run(['xdotool','click','3'],check=True)
                     wait_for(lambda: sum(s['event']=='visibility' and s['window'] and s['window'][4] for s in read_states(log)) > opening)
+                    wait_for(lambda: read_states(log)[-1]['popupPainted'])
                     if opening == 0:
                         subprocess.run(['xdotool','click','3'],check=True)
-                        wait_for(lambda: read_states(log)[-1]['open'] is False)
+                        wait_for(lambda: not read_states(log)[-1]['open'] and
+                            not (read_states(log)[-1]['window'] and read_states(log)[-1]['window'][4]))
             else:
                 wait_for(lambda: sum(s['event']=='visibility' and s['window'] and s['window'][4] for s in read_states(log)) >= 2, timeout=25)
             time.sleep(.15) # Observation after exposure; never controls the production opening.
             states = read_states(log)
             first = [s for s in states if s['event']=='visibility' and s['window'] and s['window'][4]]
             assert len(first) == 2, first
+            frames=[state for state in states if state['event']=='frame']
+            assert len(frames)>=2, states
+            for frame in frames:
+                assert frame['actual']==frame['preferred'], frame
             for state in first:
                 assert state['entries']==12 and not state['fetching'], state
                 assert state['density']==os.environ['OPM_DENSITY'] and state['icons']==os.environ['OPM_ICON_SIZE'], state
@@ -275,7 +319,7 @@ def main():
             case=output/f'{platform}-{name}'
             case.mkdir() # Refuse to overwrite evidence or reuse an unknown profile.
             for key in ['config','data','cache','state','runtime']: (case/key).mkdir(mode=0o700)
-            instrument(case,platform,max(3800,max(menu_delay,pref_delay)+1200))
+            instrument(case,platform)
             runtime=tempfile.TemporaryDirectory(prefix='opm-plasma-')
             (case/'runtime-path.txt').write_text(runtime.name)
             env={**os.environ,'XDG_CONFIG_HOME':str(case/'config'),'XDG_DATA_HOME':str(case/'data'),
@@ -297,7 +341,17 @@ def main():
                     process.wait(timeout=10)
                     raise
             runtime.cleanup()
-            assert result==0, f'{case}: see session.log'
+            if result != 0:
+                # Failed Docker RUN layers are not downloadable artifacts. Keep
+                # useful fixture diagnostics in the CI log itself.
+                for filename in ['session.log','kwin.log','backend.jsonl']:
+                    path=case/filename
+                    if path.exists():
+                        print(f'{case.name}/{filename}:',flush=True)
+                        print('\n'.join(path.read_text(errors='replace').splitlines()[-40:]),flush=True)
+                for phase in ['fresh','shell-restart']:
+                    print(phase,json.dumps(read_states(case/f'{phase}.log')[-12:]),flush=True)
+            assert result==0, f'{case}: see diagnostics above and session.log'
             print('PASS',case.name,flush=True)
 
 

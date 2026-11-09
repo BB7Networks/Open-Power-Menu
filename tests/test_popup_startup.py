@@ -48,7 +48,7 @@ for(const order of ['preferences-first','menu-first']) for(const mode of ['auto'
  else {entries();f.drain();assert.equal(c.expanded,false);prefs()}
  assert.equal(c.expanded,false);assert.equal(c.preloadFullRepresentation,true);
  f.drain();assert.equal(c.expanded,true);assert.equal(c.menuDensity,'comfortable');assert.equal(c.menuIconSize,'large');
- assert.equal(c.menuHeightMode,mode);assert.equal(c.menuCustomHeight,910);assert.equal(c.fullRepresentationItem.prepared,1);
+ assert.equal(c.menuHeightMode,mode);assert.equal(c.menuCustomHeight,910);assert.equal(c.fullRepresentationItem.prepared,2);
  assert.equal(c.visibleEntries.length,1);assert.equal(f.calls.length,0);
  c.openMenu();assert.equal(c.expanded,false);
  c.openMenu();c.finishOpeningPower(c.menuSwitchEpoch);

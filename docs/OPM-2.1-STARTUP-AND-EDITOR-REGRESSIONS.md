@@ -19,11 +19,20 @@ removed the loading-status row. Thus this startup defect predates the grip.
 A permanently stuck minimum-size window on the user's Manjaro session has not
 been reproduced; the virtual session corrected itself after the reply.
 
+First-frame assertions subsequently reproduced a second initialization issue:
+Plasma's host item could still be 375 pixels tall while the native window and
+OPM's preferred content height already required 404. This could clip the first
+paint. The full representation now follows the actual window's content rectangle
+after attachment, rather than the host's delayed resize events. Only OPM's own
+item loses its fill anchors; panel/container dimensions are not written, and
+compositor constraints still apply through the actual window size.
+
 The opening transaction now waits for launcher closure, menu contents, and
 preferences. Existing bounded capability discovery completes before initial
 exposure. It creates the full representation while hidden, drains QML bindings,
-forces the row positioner to lay out, and then expands. There is no startup
-sleep or new timer. A later launcher activation or toggle cancels preparation.
+forces the row positioner to lay out, and then expands. After native attachment
+it binds the content rectangle and polishes its layout before painting. There
+is no startup sleep or new timer. A later launcher activation or toggle cancels preparation.
 The ordinary preference poll shares an outstanding request, so a reply slower
 than five seconds cannot be continually superseded by newer polls.
 
@@ -112,10 +121,16 @@ Xvfb display or virtual KWin, and creates a private bus. It records timestamps
 for backend requests/replies, entries, preferences, natural/preferred/minimum/
 maximum dimensions, actual content/window size and visibility. Every first
 visibility event must already have the complete model and saved preferences.
-No backend write or launch method is accepted.
+The driver waits for a painted panel and a fully hidden previous popup; Wayland
+activation follows state transitions rather than fixed timers. First rendered
+frames must also have the correct content height. Failure diagnostics are
+printed into CI logs as well as saved in the disposable profile. No backend
+write or launch method is accepted.
 
 Six scenarios each run twice (fresh isolated startup and owned shell restart),
-with two openings per phase: **24 checked exposures**. They include default
+with two openings per phase: **24 checked exposures**, including first-frame
+content assertions. The ready X11 case also passed three concurrent repeat runs
+(12 additional openings) against the exact CI dependency image. They include default
 preferences, custom preferences, both response orders, a 5.6-second preference
 reply crossing the poll interval, a ready backend, all densities, 1024×640,
 1280×800 and 1600×1000 displays, and Wayland with two outputs at 125% scaling.
@@ -130,8 +145,7 @@ X screens; those checks belong to the virtual Wayland cases.
 
 Local validation before CI:
 
-- Python: **494 passed, 8 optional skips, 18 subtests**; startup/handoff tests
-  rerun after the final external-launcher guard: **10 passed**.
+- Python on the final source: **494 passed, 8 optional skips, 18 subtests**.
 - Native CTest: **8/8**; KDE-style editor GUI rerun: **passed**. Editor interaction
   covers 620×480, 960×720 and 1280×900, Save/reopen, reset, keyboard scrolling,
   personal commands, Undo/Redo, import/export and recovery.

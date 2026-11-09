@@ -257,6 +257,10 @@ PlasmoidItem {
             openingPower = false;
             powerIsOpen = true;
             expanded = true;
+            // setExpanded attaches our item to Plasma's popup host, which can
+            // initially impose its provisional size. Restore the calculated
+            // content geometry synchronously after attachment, before painting.
+            popup.prepareForOpen();
             launcherCloseFollowup.restart();
         });
     }
@@ -981,9 +985,20 @@ PlasmoidItem {
         id: popup
         focus: true
         function prepareForOpen() {
-            width = Layout.preferredWidth;
+            // Plasma anchors this item to its host during attachment. The host
+            // can process a stale resize event after QWindow already has its
+            // final size. Follow the actual window's content rectangle directly
+            // so the first rendered frame cannot inherit that provisional size.
+            anchors.fill = null;
+            width = Qt.binding(() => popup.Window.window
+                ? Math.max(0, popup.Window.window.width - themeHorizontalPadding)
+                : popup.Layout.preferredWidth);
+            height = Qt.binding(() => popup.Window.window
+                ? Math.max(0, popup.Window.window.height - themeVerticalPadding)
+                : fittedHeight);
+            menuContent.ensurePolished();
+            menuScroll.ensurePolished();
             menuColumn.forceLayout();
-            height = fittedHeight;
         }
         property int activeIndex: -1
         FontMetrics { id: menuFont; font: Kirigami.Theme.defaultFont }
@@ -1149,6 +1164,7 @@ PlasmoidItem {
         Layout.maximumHeight: fittedHeight
 
         ColumnLayout {
+            id: menuContent
             anchors.fill: parent
             spacing: 0
             RowLayout {
