@@ -466,6 +466,72 @@ class EditorGuiTests : public QObject {
         QCOMPARE(engine.evaluate("Object.keys(profileWindow.layoutDraft.views).length").toInt(), 1);
     }
 
+    void entryDialogUsesConsistentGuttersAtSmallAndNormalSizes() {
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        store.save(defaults(), {});
+        EditorSession session(store);
+        EditorCatalog catalog;
+        catalog.refresh();
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(window && QTest::qWaitForWindowExposed(window));
+        QVERIFY(click(window, "layoutTab"));
+        auto *dialog = window->findChild<QObject *>("entryDialog");
+        auto *scroll = window->findChild<QQuickItem *>("entryFormScroll");
+        auto *column = window->findChild<QQuickItem *>("entryFormColumn");
+        QVERIFY(dialog && scroll && column);
+        for (const auto size : {QSize(620, 480), QSize(960, 720)}) {
+            window->resize(size);
+            QTest::qWait(50);
+            for (const char *kind : {"builtin", "command", "submenu"}) {
+                QVERIFY(QMetaObject::invokeMethod(dialog, "begin",
+                    Q_ARG(QVariant, kind), Q_ARG(QVariant, ""), Q_ARG(QVariant, "")));
+                QTRY_VERIFY(dialog->property("opened").toBool());
+                QTest::qWait(20);
+                const qreal scrollX = scroll->mapToScene(QPointF()).x();
+                const qreal formX = column->mapToScene(QPointF()).x();
+                const qreal formRight = formX + column->width();
+                QVERIFY2(formX >= scrollX + 16, "Form is flush against the dialog edge");
+                QVERIFY2(formRight <= scrollX + scroll->width() - 16,
+                         "Form overlaps the right dialog gutter or scroll bar");
+                QVERIFY(qAbs(column->width() - scroll->property("availableWidth").toReal()) <= 1.5);
+                const auto check = [&](const char *name) {
+                    auto *control = window->findChild<QQuickItem *>(name);
+                    if (!control || !control->isVisible()) return false;
+                    const qreal x = control->mapToScene(QPointF()).x();
+                    return qAbs(x - formX) <= 1.5 && x + control->width() <= formRight + 1.5;
+                };
+                for (const char *name : {"entryNameLabel", "entryName", "entryIconLabel",
+                                         "entryIcon", "entryAccessKeyLabel", "entryAccessKey"})
+                    QVERIFY2(check(name), name);
+                if (QString::fromLatin1(kind) == "builtin") {
+                    for (const char *name : {"entryActionLabel", "entryAction",
+                                             "entryEffectiveCommandLabel", "builtinFallbacks",
+                                             "customizeBuiltin"})
+                        QVERIFY2(check(name), name);
+                }
+                if (QString::fromLatin1(kind) == "command") {
+                    for (const char *name : {"entryProgramLabel", "entryProgram"})
+                        QVERIFY2(check(name), name);
+                }
+                const auto output = qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
+                if (!output.isEmpty() && QString::fromLatin1(kind) == "builtin") {
+                    QDir().mkpath(output);
+                    QVERIFY(window->grabWindow().save(output +
+                        QString("/editor-entry-gutters-%1x%2.png").arg(size.width()).arg(size.height())));
+                }
+                QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+                QTRY_VERIFY(!dialog->property("opened").toBool());
+            }
+        }
+        window->setProperty("closingApproved", true);
+        window->close();
+    }
     void actualWindowEditsUndoesAndSaves() {
         QTemporaryDir temp;
         Storage store(temp.filePath("menu.json"));

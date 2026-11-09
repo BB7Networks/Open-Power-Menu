@@ -127,12 +127,22 @@ Controls.Dialog {
         id: argumentModel
     }
     contentItem: Controls.ScrollView {
+        id: formScroll
+        objectName: "entryFormScroll"
         clip: true
+        // A custom Dialog.contentItem does not inherit the style's title
+        // padding. Keep the scrollable form aligned with the inset header.
+        leftPadding: 20
+        rightPadding: 20
+        topPadding: 8
+        bottomPadding: 8
         Controls.ScrollBar.vertical.policy: Controls.ScrollBar.AsNeeded
         Controls.ScrollBar.horizontal.policy: Controls.ScrollBar.AlwaysOff
         contentWidth: availableWidth
         ColumnLayout {
-            width: parent.width
+            id: formColumn
+            objectName: "entryFormColumn"
+            width: formScroll.availableWidth
             spacing: 10
             Controls.Label {
                 text: dialog.problem
@@ -142,6 +152,7 @@ Controls.Dialog {
                 color: "#da4453"
             }
             Controls.Label {
+                objectName: "entryActionLabel"
                 text: "Built-in action"
                 visible: dialog.entryKind === "builtin"
             }
@@ -153,7 +164,8 @@ Controls.Dialog {
                 textRole: "title"
                 Layout.fillWidth: true
             }
-            Controls.Label {
+"            Controls.Label {
+                objectName: "entryEffectiveCommandLabel"
                 visible: dialog.entryKind === "builtin"
                 text: "Runs on this PC: " + (dialog.builtin.effective || "")
                 textFormat: Text.PlainText
@@ -178,6 +190,7 @@ Controls.Dialog {
                 onClicked: dialog.customizeBuiltin()
             }
             Controls.Label {
+                objectName: "entryNameLabel"
                 text: dialog.entryKind === "builtin" ? "Name (leave empty to use the action's name)" : "Name"
                 visible: dialog.entryKind !== "separator"
             }
@@ -189,6 +202,7 @@ Controls.Dialog {
                 Accessible.name: "Menu entry name"
             }
             Controls.Label {
+                objectName: "entryIconLabel"
                 text: "Theme icon or local image path"
                 visible: dialog.entryKind !== "separator"
             }
@@ -199,7 +213,11 @@ Controls.Dialog {
                 Layout.fillWidth: true
                 Accessible.name: "Menu entry icon"
             }
-            Controls.Label { text: "Access key (A–Z or 0–9; empty disables this entry)"; visible: dialog.entryKind !== "separator" }
+            Controls.Label {
+                objectName: "entryAccessKeyLabel"
+                text: "Access key (A–Z or 0–9; empty disables this entry)"
+                visible: dialog.entryKind !== "separator"
+            }
             Controls.TextField {
                 id: accessKeyField
                 objectName: "entryAccessKey"
@@ -209,6 +227,7 @@ Controls.Dialog {
                 Accessible.name: "Entry access key"
             }
             Controls.Label {
+                objectName: "entryProgramLabel"
                 text: "Program"
                 visible: dialog.entryKind === "command"
             }
@@ -277,6 +296,9 @@ Controls.Dialog {
         }
     }
     footer: Controls.DialogButtonBox {
+        leftPadding: 20
+        rightPadding: 20
+        bottomPadding: 8
         Controls.Button {
             text: "Apply"
             objectName: "applyEntry"
