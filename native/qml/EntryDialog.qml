@@ -200,6 +200,9 @@ Controls.Dialog {
                 visible: dialog.entryKind !== "separator"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
+                // Keep the control within the live ScrollView width on resize.
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
                 Accessible.name: "Menu entry name"
             }
             Controls.Label {
@@ -213,6 +216,9 @@ Controls.Dialog {
                 visible: dialog.entryKind !== "separator"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
+                // Keep the control within the live ScrollView width on resize.
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
                 Accessible.name: "Menu entry icon"
             }
             Controls.Label {
@@ -239,6 +245,9 @@ Controls.Dialog {
                 visible: dialog.entryKind === "command"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
+                // Keep the control within the live ScrollView width on resize.
+                Layout.preferredWidth: formScroll.availableWidth
+                Layout.maximumWidth: formScroll.availableWidth
                 Accessible.name: "Program to run"
             }
             RowLayout {
