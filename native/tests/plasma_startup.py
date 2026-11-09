@@ -226,7 +226,7 @@ def session(args):
                 def panel():
                     result = subprocess.run(['qdbus6', 'org.kde.plasmashell', '/PlasmaShell',
                         'org.kde.PlasmaShell.evaluateScript',
-                        'panels().forEach(p => p.remove()); var p=new Panel; p.location="bottom"; p.height=48; '
+                        f'panels().forEach(p => p.remove()); var p=new Panel; p.location="{args.panel_edge}"; p.height=48; '
                         'var w=p.addWidget("org.openpowermenu.start"); w.writeConfig("opmDefaultShortcutTried",true);'],
                         capture_output=True)
                     return result.returncode == 0
@@ -301,6 +301,7 @@ def main():
     parser.add_argument('--session',action='store_true')
     parser.add_argument('--backend',action='store_true')
     parser.add_argument('--platform',choices=['xcb','wayland'],default='xcb')
+    parser.add_argument('--panel-edge',choices=['bottom','top','left','right'],default='bottom')
     parser.add_argument('--width',type=int,default=1280)
     parser.add_argument('--height',type=int,default=800)
     parser.add_argument('--scale',type=float,default=1)
@@ -311,10 +312,11 @@ def main():
     output=Path(args.output).resolve();output.mkdir(parents=True,exist_ok=True)
     # Delays alter reply order, never readiness correctness. Third case is warm.
     for platform in ['xcb','wayland']:
-        for name,mode,density,theme,menu_delay,pref_delay,width,height,scale,outputs in [
-            ('slow-menu','auto','standard','native',1400,50,1280,800,1,1),
-            ('slow-preferences','custom','comfortable','aero-light',50,5600,1024,640,1,1),
-            ('ready','auto','compact','aero',0,0,1600,1000,1.25,2)]:
+        for name,mode,density,theme,menu_delay,pref_delay,width,height,scale,outputs,edge in [
+            ('slow-menu','auto','standard','native',1400,50,1280,800,1,1,args.panel_edge),
+            ('slow-preferences','custom','comfortable','aero-light',50,5600,1024,640,1,1,args.panel_edge),
+            ('ready','auto','compact','aero',0,0,1600,1000,1.25,2,args.panel_edge),
+            ('ready-left','auto','compact','aero',0,0,1600,1000,1.25,2,'left')]:
             if args.only and args.only!=f'{platform}-{name}': continue
             case=output/f'{platform}-{name}'
             case.mkdir() # Refuse to overwrite evidence or reuse an unknown profile.
@@ -332,7 +334,7 @@ def main():
                  'OPM_HEIGHT_MODE':mode,'OPM_DENSITY':density,'OPM_APPEARANCE':theme}
             with (case/'session.log').open('w') as log:
                 process=subprocess.Popen(['dbus-run-session','--',sys.executable,str(SCRIPT),'--session','--output',str(case),
-                    '--platform',platform,'--width',str(width),'--height',str(height),'--scale',str(scale),'--outputs',str(outputs)],
+                    '--platform',platform,'--panel-edge',edge,'--width',str(width),'--height',str(height),'--scale',str(scale),'--outputs',str(outputs)],
                     env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
                 try:
                     result=process.wait(timeout=90)

@@ -989,12 +989,14 @@ PlasmoidItem {
             // can process a stale resize event after QWindow already has its
             // final size. Follow the actual window's content rectangle directly
             // so the first rendered frame cannot inherit that provisional size.
+            // Theme-padding changes can briefly leave extra window space; they
+            // must not stretch our content beyond its calculated dimensions.
             anchors.fill = null;
             width = Qt.binding(() => popup.Window.window
-                ? Math.max(0, popup.Window.window.width - themeHorizontalPadding)
+                ? Math.min(popup.Layout.preferredWidth, Math.max(0, popup.Window.window.width - themeHorizontalPadding))
                 : popup.Layout.preferredWidth);
             height = Qt.binding(() => popup.Window.window
-                ? Math.max(0, popup.Window.window.height - themeVerticalPadding)
+                ? Math.min(fittedHeight, Math.max(0, popup.Window.window.height - themeVerticalPadding))
                 : fittedHeight);
             menuContent.ensurePolished();
             menuScroll.ensurePolished();

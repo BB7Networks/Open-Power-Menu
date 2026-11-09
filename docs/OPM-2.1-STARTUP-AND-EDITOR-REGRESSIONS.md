@@ -26,6 +26,12 @@ paint. The full representation now follows the actual window's content rectangle
 after attachment, rather than the host's delayed resize events. Only OPM's own
 item loses its fill anchors; panel/container dimensions are not written, and
 compositor constraints still apply through the actual window size.
+Content is also bounded by its requested dimensions. A supplemental left-panel
+test caught Plasma changing theme padding from 12 to 8 pixels while its outer
+window still had the earlier size, briefly stretching the menu by four pixels.
+That extra space can no longer stretch OPM's content. The native decoration's
+own transition remains controlled by Plasma and is a physical acceptance check;
+this does not establish that every compositor/theme frame is invariant.
 
 The opening transaction now waits for launcher closure, menu contents, and
 preferences. Existing bounded capability discovery completes before initial
@@ -127,8 +133,8 @@ frames must also have the correct content height. Failure diagnostics are
 printed into CI logs as well as saved in the disposable profile. No backend
 write or launch method is accepted.
 
-Six scenarios each run twice (fresh isolated startup and owned shell restart),
-with two openings per phase: **24 checked exposures**, including first-frame
+Eight scenarios each run twice (fresh isolated startup and owned shell restart),
+with two openings per phase: **32 checked exposures**, including first-frame
 content assertions. The ready X11 case also passed three concurrent repeat runs
 (12 additional openings) against the exact CI dependency image. They include default
 preferences, custom preferences, both response orders, a 5.6-second preference
@@ -136,6 +142,9 @@ reply crossing the poll interval, a ready backend, all densities, 1024×640,
 1280×800 and 1600×1000 displays, and Wayland with two outputs at 125% scaling.
 The X11 scale/output parameters do not emulate fractional scaling or multiple
 X screens; those checks belong to the virtual Wayland cases.
+The matrix includes a left-panel case on both platforms. Supplemental top/right
+panel probes also passed, using the same driver against the final geometry code
+before the additional content bounds were applied.
 
 | Case, on X11 and Wayland | Natural content | Preferred content | Actual window at first and later exposure |
 | --- | ---: | ---: | ---: |
