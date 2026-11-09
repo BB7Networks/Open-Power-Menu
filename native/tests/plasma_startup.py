@@ -40,6 +40,10 @@ def backend():
                 entries[0] = {'kind':'submenu', 'key':'group', 'title':'Safe test group', 'enabled':True,
                               'icon':'folder', 'items':[entries[1], entries[3],
                               {'kind':'submenu','key':'nested','title':'Nested group','items':[entries[2]]}]}
+                if os.environ.get('OPM_POINTER_REGRESSION') == '1':
+                    # Gaps between interactive rows must remain inside the popup.
+                    entries[5] = {'kind': 'separator', 'title': 'Divider 5'}
+                    entries[8] = {'kind': 'separator', 'title': 'Divider 8'}
                 value = json.dumps(entries)
                 delay = int(os.environ['OPM_MENU_DELAY'])
             elif name == 'GetIntegration':
@@ -102,6 +106,9 @@ PROBE = '''
             padding:p ? p.themeVerticalPadding : null,actual:p ? p.height : null,
             firstRow:p ? p.startupRowCenter() : null,
             flyout:p ? p.startupFlyoutState() : null,
+            rows:p ? p.startupPointerRows() : null,
+            pointerHover:p ? p.startupPointerHover() : null,
+            popupActive:w ? w.active : null,
             window:w ? [w.x,w.y,w.width,w.height,w.visible] : null};
     }
     Timer {
@@ -127,10 +134,31 @@ def instrument(case, platform):
     source = source.replace('    property var menuEntries: []', PROBE+'\n    property var menuEntries: []')
     source = source.replace('        id: popup\n', '''        id: popup
         onFittedHeightChanged: console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("height")))
+        Connections {
+            target: root
+            function onExpandedChanged() {
+                console.info("OPM_X11_POPUP_EVENT",
+                    JSON.stringify(root.startupProbe("expanded-change")));
+            }
+        }
         function startupRowCenter() {
             const row=normalRows.itemAt(0);
             const point=row ? row.mapToGlobal(row.width/2,row.height/2) : Qt.point(0,0);
             return [point.x,point.y];
+        }
+        function startupPointerRows() {
+            const rows=[];
+            for(let index=0;index<normalRows.count;index++) {
+                const row=normalRows.itemAt(index);
+                if(!row) continue;
+                const p=row.mapToGlobal(row.width/2,row.height/2);
+                rows.push({index:index,kind:String(row.entry.kind),point:[p.x,p.y]});
+            }
+            return rows;
+        }
+        function startupPointerHover() {
+            return {main:popupHover.hovered,child:flyout.pointerInside,
+                    configuredAutoClose:root.autoCloseOnPointerLeave};
         }
         function startupFlyoutState() {
             return {visible:flyout.visible,appearance:flyout.appearance,width:flyout.width,height:flyout.height,
@@ -143,6 +171,10 @@ def instrument(case, platform):
                 frames=0;
                 root.startupPopupPainted=false;
                 console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("visibility")));
+            }
+            function onActiveChanged() {
+                console.info("OPM_X11_POPUP_EVENT",
+                    JSON.stringify(root.startupProbe("window-active-change")));
             }
             function onFrameSwapped() {
                 if(root.expanded && frames++<2) {
@@ -280,6 +312,30 @@ def session(args):
                 assert state['window'][3] <= state['area'], state
             (case/f'{phase}-states.json').write_text(json.dumps(states,indent=2))
             if args.platform=='xcb':
+                if os.environ.get('OPM_POINTER_REGRESSION') == '1':
+                    # Travel from the panel button through actual command rows,
+                    # noninteractive separators and back up to the submenu.
+                    # No clicks or command execution. Check after every dwell.
+                    rows=states[-1]['rows']
+                    assert len(rows)==12 and rows[5]['kind']=='separator' and rows[8]['kind']=='separator', rows
+                    last=tuple(map(round,states[-1]['button']))
+                    for index in (2,5,6,8,9,11,0):
+                        goal=tuple(map(round,rows[index]['point']))
+                        segments=max(1,int(max(abs(goal[0]-last[0]),abs(goal[1]-last[1]))/18))
+                        for segment in range(1,segments+1):
+                            cursor=[round(last[i]+(goal[i]-last[i])*segment/segments) for i in (0,1)]
+                            subprocess.run(['xdotool','mousemove',str(cursor[0]),str(cursor[1])],
+                                           check=True,stdout=subprocess.DEVNULL)
+                            time.sleep(.01)
+                        time.sleep(.30 if index in (5,8) else .16)
+                        snapshot=read_states(log)[-1]
+                        assert snapshot['open'] and snapshot['window'] and snapshot['window'][4], {
+                            'kind':rows[index]['kind'],'row':index,'cursor':goal,
+                            'last_state':snapshot,
+                            'recent_events':[line for line in log.read_text(errors='replace').splitlines()
+                                if 'OPM_X11_POPUP_EVENT' in line][-15:]}
+                        last=goal
+                    print('X11 pointer traversal passed across separators and command rows',flush=True)
                 x,y=map(round,states[-1]['firstRow'])
                 subprocess.run(['xdotool','mousemove',str(x),str(y)],check=True)
                 shown=wait_for(lambda: next((s for s in reversed(read_states(log)) if s['flyout'] and s['flyout']['visible']),None))
@@ -339,7 +395,8 @@ def main():
                  'OPM_MENU_DELAY':str(menu_delay),'OPM_PREF_DELAY':str(pref_delay),
                  'OPM_ICON_SIZE':'standard' if name=='slow-menu' else 'large',
                  'OPM_CUSTOM_HEIGHT':'600' if name=='slow-menu' else '460',
-                 'OPM_HEIGHT_MODE':mode,'OPM_DENSITY':density,'OPM_APPEARANCE':theme}
+                 'OPM_HEIGHT_MODE':mode,'OPM_DENSITY':density,'OPM_APPEARANCE':theme,
+                 'OPM_POINTER_REGRESSION':'1' if platform=='xcb' and name=='ready' else '0'}
             with (case/'session.log').open('w') as log:
                 process=subprocess.Popen(['dbus-run-session','--',sys.executable,str(SCRIPT),'--session','--output',str(case),
                     '--platform',platform,'--panel-edge',edge,'--width',str(width),'--height',str(height),'--scale',str(scale),'--outputs',str(outputs)],
