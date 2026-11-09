@@ -37,6 +37,10 @@ class InteractionTests : public QObject {
     Q_OBJECT
   private slots:
     void appearanceAndHoverValidation() {
+        auto light = defaults(); light["appearance"] = "aero-light";
+        validate(light);
+        QCOMPARE(decode(QJsonDocument(light).toJson())["appearance"].toString(), "aero-light");
+        QCOMPARE(integration(light)["appearance"].toString(), "aero-light");
         const auto legacy = decode(QByteArray(R"({"menu":[{"action":"files"}],"future":true})"));
         QCOMPARE(submenuHoverDelay(legacy), -1);
         QCOMPARE(legacy["menu_density"].toString(), "standard");

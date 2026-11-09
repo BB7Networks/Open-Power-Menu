@@ -29,6 +29,10 @@ PlasmaCore.PopupPlasmaWindow {
     property var entries: []
     property var activeChild: null
     property string appearance: "native"
+    readonly property color textColor: appearance === "aero" ? "#eff3f8" : appearance === "aero-light" ? "#24394b" : Kirigami.Theme.textColor
+    readonly property color surfaceColor: appearance === "aero" ? "#27313D" : appearance === "aero-light" ? "#eaf1f7" : Kirigami.Theme.backgroundColor
+    readonly property color borderColor: appearance === "aero" ? "#53718A" : appearance === "aero-light" ? "#9ab1c4" : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.25)
+    readonly property color accentColor: appearance === "aero-light" ? "#648eac" : Kirigami.Theme.highlightColor
     property int activeIndex: -1
     property string menuDensity: "standard"
     property string menuWidth: "auto"
@@ -169,8 +173,8 @@ PlasmaCore.PopupPlasmaWindow {
 
     mainItem: Rectangle {
         id: flyoutSurface
-        color: flyout.appearance === "aero" ? "#27313D" : Kirigami.Theme.backgroundColor
-        border.color: flyout.appearance === "aero" ? "#53718A" : Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.25)
+        color: flyout.surfaceColor
+        border.color: flyout.borderColor
         border.width: 1
         radius: 3
         focus: true
@@ -319,7 +323,7 @@ PlasmaCore.PopupPlasmaWindow {
                             anchors.leftMargin: 3
                             anchors.rightMargin: 3
                             radius: 2
-                            color: Kirigami.Theme.highlightColor
+                            color: flyout.accentColor
                             opacity: ((flyout.activeIndex === row.index) && row.entry.kind !== "separator") ? 0.28 : 0
                         }
                         MenuEntryContent {
@@ -330,7 +334,7 @@ PlasmaCore.PopupPlasmaWindow {
                             showIcons: flyout.showMenuIcons
                             showHints: Metrics.hasHints(flyout.entries)
                             iconSize: flyout.entryIconSize
-                            foreground: flyout.appearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                            foreground: flyout.textColor
                             opensLeft: (row.childPopup && row.childPopup.visible
                                 ? row.childPopup.indicatorDirection : flyout.chooseSide(row, row.menuScreen)) === Qt.LeftEdge
                         }

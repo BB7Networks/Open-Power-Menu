@@ -268,7 +268,7 @@ void validate(const QJsonObject &config) {
          {"auto_close_on_pointer_leave", "show_menu_icons", "hide_original_launcher"})
         if (!config[key].isBool())
             throw Error(QString(key) + " must be a boolean");
-    if (!QStringList{"native", "aero"}.contains(config["appearance"].toString()))
+    if (!QStringList{"native", "aero", "aero-light"}.contains(config["appearance"].toString()))
         throw Error("Invalid appearance");
     if (!QStringList{"cursor", "bottom-left", "bottom-right"}.contains(config["anchor"].toString()))
         throw Error("Invalid anchor");

@@ -26,7 +26,8 @@ namespace Opm {
 // surface. Keep the original engine's sizes, DPI and colored/multitone artwork.
 class AeroIconEngine final : public QIconEngine {
     const QIcon source;
-    static QPixmap readable(QPixmap pixmap, QIcon::Mode mode) {
+    const bool lightSurface;
+    static QPixmap readable(QPixmap pixmap, QIcon::Mode mode, bool lightSurface) {
         if (pixmap.isNull()) return pixmap;
         auto image = pixmap.toImage().convertToFormat(QImage::Format_ARGB32);
         int low = 255, high = 0;
@@ -40,8 +41,9 @@ class AeroIconEngine final : public QIconEngine {
                 if (maximum - minimum > 16) return pixmap;
                 low = std::min(low, minimum); high = std::max(high, maximum); seen = true;
             }
-        if (!seen || high > 112 || high - low > 16) return pixmap;
-        const QColor foreground = mode == QIcon::Disabled ? QColor("#89939c") : QColor("#e4ebf2");
+        if (!seen || high - low > 16 || (lightSurface ? low < 180 : high > 112)) return pixmap;
+        const QColor foreground = mode == QIcon::Disabled ? QColor("#89939c") :
+            lightSurface ? QColor("#24394b") : QColor("#e4ebf2");
         for (int y = 0; y < image.height(); ++y)
             for (int x = 0; x < image.width(); ++x)
                 image.setPixel(x, y, qRgba(foreground.red(), foreground.green(), foreground.blue(), qAlpha(image.pixel(x, y))));
@@ -50,16 +52,16 @@ class AeroIconEngine final : public QIconEngine {
         return result;
     }
   public:
-    explicit AeroIconEngine(QIcon icon) : source(std::move(icon)) {}
-    QIconEngine *clone() const override { return new AeroIconEngine(source); }
+    explicit AeroIconEngine(QIcon icon, bool light = false) : source(std::move(icon)), lightSurface(light) {}
+    QIconEngine *clone() const override { return new AeroIconEngine(source, lightSurface); }
     QSize actualSize(const QSize &size, QIcon::Mode mode, QIcon::State state) override {
         return source.actualSize(size, mode, state);
     }
     QPixmap pixmap(const QSize &size, QIcon::Mode mode, QIcon::State state) override {
-        return readable(source.pixmap(size, mode, state), mode);
+        return readable(source.pixmap(size, mode, state), mode, lightSurface);
     }
     QPixmap scaledPixmap(const QSize &size, QIcon::Mode mode, QIcon::State state, qreal scale) override {
-        return readable(source.pixmap(size, scale, mode, state), mode);
+        return readable(source.pixmap(size, scale, mode, state), mode, lightSurface);
     }
     void paint(QPainter *painter, const QRect &rect, QIcon::Mode mode, QIcon::State state) override {
         painter->drawPixmap(rect, scaledPixmap(rect.size(), mode, state, painter->device()->devicePixelRatioF()));
@@ -113,7 +115,8 @@ QPoint menuPosition(const QRect &area, const QSize &size, const QPoint &cursor,
 Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std::shared_ptr<PowerManager> power, std::function<bool()> stillCurrent)
     : config(std::move(source)), model(std::move(power)), current(std::move(stillCurrent)), traceEnabled(diagnostics),
       wayland(QGuiApplication::platformName().startsWith("wayland")),
-      darkAero((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero") {
+      darkAero((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero"),
+      lightAero((theme.isEmpty() ? config["appearance"].toString() : theme) == "aero-light") {
     validate(config);
     elapsed.start();
     setObjectName("OpenPowerMenu");
@@ -132,6 +135,14 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
             "QMenu::item:selected { background-color:#355B76; color:#FFFFFF; }"
             "QMenu::item:disabled { color:#89939C; }"
             "QMenu::separator { height:1px; background:#445463; margin:5px 10px; }"
+            "QMenu::icon { padding-left:5px; }").arg(config["menu_density"] == "compact" ? 3 : config["menu_density"] == "comfortable" ? 8 : 6));
+    if (lightAero)
+        setStyleSheet(QStringLiteral(
+            "QMenu { menu-scrollable:1; background-color:#EAF1F7; color:#24394B; border:1px solid #9AB1C4; padding:5px 3px; }"
+            "QMenu::item { padding:%1px 25px %1px 13px; border-radius:2px; }"
+            "QMenu::item:selected { background-color:#648EAC; color:#FFFFFF; }"
+            "QMenu::item:disabled { color:#7D91A2; }"
+            "QMenu::separator { height:1px; background:#BACBD9; margin:5px 10px; }"
             "QMenu::icon { padding-left:5px; }").arg(config["menu_density"] == "compact" ? 3 : config["menu_density"] == "comfortable" ? 8 : 6));
     if (config["menu_icon_size"].toString("standard") != "standard") {
         // Some desktop styles paint icons using their own metric rather than
@@ -227,7 +238,7 @@ void Standalone::populate(QMenu *menu, const QJsonArray &entries) {
         if (!entry["access_hint"].toString().isEmpty()) title += '\t' + entry["access_hint"].toString();
         action->setText(title);
         QIcon icon = config["show_menu_icons"].toBool(true) ? QIcon::fromTheme(entry["icon"].toString()) : QIcon();
-        if (darkAero && !icon.isNull()) icon = QIcon(new AeroIconEngine(icon));
+        if ((darkAero || lightAero) && !icon.isNull()) icon = QIcon(new AeroIconEngine(icon, lightAero));
         action->setIcon(icon);
         accessKeys.insert(action, entry["access_key"].toString());
         if (kind == "separator") action->setSeparator(true);

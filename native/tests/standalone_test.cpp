@@ -173,7 +173,7 @@ class StandaloneTest : public QObject {
 
     void appearancePresets_data() {
         QTest::addColumn<QString>("appearance"); QTest::addColumn<QString>("icons");
-        for (const auto &theme : {"native", "aero"})
+        for (const auto &theme : {"native", "aero", "aero-light"})
             for (const auto &size : {"small", "standard", "large"})
                 QTest::newRow(qPrintable(QString(theme) + "-" + size)) << QString(theme) << QString(size);
     }

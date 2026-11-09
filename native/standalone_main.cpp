@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
     parser.addVersionOption();
     parser.addOptions({{"config", "Read local configuration", "file"},
                        {"anchor", "cursor, bottom-left or bottom-right (Wayland placement is compositor controlled)", "anchor"},
-                       {"theme", "native or aero", "theme"},
+                       {"theme", "native, aero or aero-light", "theme"},
                        {"diagnose-launch", "Report exposure, visibility, focus and dismissal"},
                        {"list", "Print normalized menu JSON without opening a GUI"},
                        {"check", "Validate configuration and print normalized menu JSON"},
@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     parser.process(*app);
     for (const auto &name : {"anchor", "theme"}) {
         const QStringList choices = QString(name) == "anchor"
-            ? QStringList{"cursor", "bottom-left", "bottom-right"} : QStringList{"native", "aero"};
+            ? QStringList{"cursor", "bottom-left", "bottom-right"} : QStringList{"native", "aero", "aero-light"};
         if (parser.isSet(name) && !choices.contains(parser.value(name))) {
             QTextStream(stderr) << "Open Power Menu: Invalid --" << name << '\n';
             return 2;

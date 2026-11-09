@@ -78,6 +78,9 @@ PlasmoidItem {
     property bool backendMissing: false
     property int menuFetchEpoch: 0
     property string menuAppearance: "native"
+    readonly property color menuTextColor: menuAppearance === "aero" ? "#eff3f8" : menuAppearance === "aero-light" ? "#24394b" : Kirigami.Theme.textColor
+    readonly property color menuSurfaceColor: menuAppearance === "aero" ? "#27313D" : menuAppearance === "aero-light" ? "#eaf1f7" : "transparent"
+    readonly property color menuAccentColor: menuAppearance === "aero-light" ? "#648eac" : Kirigami.Theme.highlightColor
     property bool showMenuIcons: true
     property bool autoCloseOnPointerLeave: false
     property int autoCloseDelay: 1200
@@ -491,7 +494,7 @@ PlasmoidItem {
                      hideOriginalLauncherRequested = desired;
                      buttonIconMode = cfg.button_icon_mode === "custom" ? "custom" : "launcher";
                      customButtonIcon = String(cfg.button_icon || "");
-                     menuAppearance = cfg.appearance === "aero" ? "aero" : "native";
+                     menuAppearance = cfg.appearance === "aero" || cfg.appearance === "aero-light" ? cfg.appearance : "native";
                      showMenuIcons = cfg.show_menu_icons !== false;
                      autoCloseOnPointerLeave = cfg.auto_close_on_pointer_leave === true;
                      autoCloseDelay = cfg.auto_close_delay_ms === undefined ? 1200 : Number(cfg.auto_close_delay_ms);
@@ -946,7 +949,7 @@ PlasmoidItem {
         }
         Rectangle {
             anchors.fill: parent
-            color: root.menuAppearance === "aero" ? "#27313D" : "transparent"
+            color: root.menuSurfaceColor
             z: -1
         }
 
@@ -1094,12 +1097,12 @@ PlasmoidItem {
                     Layout.fillWidth: true
                     font.bold: true
                     text: "Power User Menu"
-                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    color: root.menuTextColor
                 }
                 PC3.ToolButton {
                     id: lockButton
                     icon.name: root.layoutEditing ? "object-unlocked" : "object-locked"
-                    icon.color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    icon.color: root.menuTextColor
                     text: root.layoutEditing ? "Finish editing layout" : "Unlock menu layout to rearrange items"
                     display: QQC2.AbstractButton.IconOnly
                     Layout.preferredWidth: 29
@@ -1112,7 +1115,7 @@ PlasmoidItem {
                 }
                 PC3.ToolButton {
                     id: refreshButton
-                    icon.color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    icon.color: root.menuTextColor
                     icon.name: "view-refresh"
                     text: "Refresh menu"
                     display: QQC2.AbstractButton.IconOnly
@@ -1125,7 +1128,7 @@ PlasmoidItem {
                 }
                 PC3.ToolButton {
                     id: configureButton
-                    icon.color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    icon.color: root.menuTextColor
                     icon.name: "configure"
                     text: "Configure menu"
                     display: QQC2.AbstractButton.IconOnly
@@ -1152,12 +1155,12 @@ PlasmoidItem {
                 draft: root.layoutDraft
                 busy: root.layoutBusy
                 expired: root.layoutExpired
-                palette.window: root.menuAppearance === "aero" ? "#27313D" : Kirigami.Theme.backgroundColor
+                palette.window: root.menuAppearance === "aero" ? "#27313D" : root.menuAppearance === "aero-light" ? "#eaf1f7" : Kirigami.Theme.backgroundColor
                 palette.base: palette.window
-                palette.text: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                palette.text: root.menuTextColor
                 palette.windowText: palette.text
                 palette.buttonText: palette.text
-                palette.button: root.menuAppearance === "aero" ? "#344659" : Kirigami.Theme.backgroundColor
+                palette.button: root.menuAppearance === "aero" ? "#344659" : root.menuAppearance === "aero-light" ? "#dae7f0" : Kirigami.Theme.backgroundColor
                 palette.highlight: Kirigami.Theme.highlightColor
                 palette.highlightedText: Kirigami.Theme.highlightedTextColor
                 onEdited: value => root.layoutDraft = value
@@ -1201,7 +1204,7 @@ PlasmoidItem {
                                 anchors.rightMargin: 4
                                 radius: 3
                                 visible: menuRow.entry.kind !== "separator" && (rowMouse.containsMouse || rowMouse.pressed || popup.activeIndex === menuRow.index)
-                                color: Kirigami.Theme.highlightColor
+                                color: root.menuAccentColor
                                 opacity: 0.30
                             }
                             MenuEntryContent {
@@ -1212,7 +1215,7 @@ PlasmoidItem {
                                 showIcons: root.showMenuIcons
                                 showHints: Metrics.hasHints(root.visibleEntries)
                                 iconSize: popup.entryIconSize
-                                foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                                foreground: root.menuTextColor
                                 opensLeft: (flyout.visible && popup.activeFlyoutKey === menuRow.entry.key
                                     ? flyout.indicatorDirection : flyout.chooseSide(menuRow, menuRow.menuScreen)) === Qt.LeftEdge
                             }
@@ -1271,7 +1274,7 @@ PlasmoidItem {
                 BackendSetup {
                     id: backendSetup
                     width: setupScroll.availableWidth
-                    foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    foreground: root.menuTextColor
                     onRetryRequested: { root.fetchMenu(); root.fetchIntegration(); }
                 }
             }
@@ -1291,7 +1294,7 @@ PlasmoidItem {
                     id: menuStatusLabel
                     width: statusScroll.availableWidth
                     text: root.layoutEditing || root.layoutBusy ? root.layoutStatus : root.commandError || root.menuStatus
-                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    color: root.menuTextColor
                     wrapMode: Text.WordWrap
                     opacity: 0.75
                 }

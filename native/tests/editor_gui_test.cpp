@@ -189,7 +189,7 @@ class EditorGuiTests : public QObject {
                 QTest::keyClick(window, Qt::Key_End);
                 return true;
             };
-            for (const char *name : {"menu_density", "menu_width", "menu_height_mode", "menu_custom_height", "menu_icon_size", "hoverMode", "hoverDelay"}) {
+            for (const char *name : {"menuTheme", "menu_density", "menu_width", "menu_height_mode", "menu_custom_height", "menu_icon_size", "hoverMode", "hoverDelay"}) {
                 auto *item = control(name);
                 QVERIFY(item);
                 auto *accessible = QAccessible::queryAccessibleInterface(item);
