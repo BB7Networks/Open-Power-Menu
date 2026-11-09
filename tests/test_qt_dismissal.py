@@ -28,6 +28,7 @@ def policy():
 def leave(obj):
     obj.setProperty('menuOpen',True)
     obj.setProperty('pointerInside',True)
+    QTest.qWait(170)  # establish a visit after opening geometry settles
     obj.setProperty('pointerInside',False)
 
 
@@ -175,3 +176,32 @@ def test_hover_timer_cancellation_and_destruction(cancel):
         QTest.qWait(150)
         assert calls == [True]
         obj.deleteLater(); app.processEvents()
+
+
+def test_opening_and_geometry_hover_noise_does_not_arm(policy):
+    obj,calls=policy; obj.setProperty('enabled',True)
+    for _ in range(20):
+        obj.setProperty('menuOpen',True)
+        obj.setProperty('pointerInside',True) # window initially overlaps launcher pointer
+        obj.setProperty('pointerInside',False) # moved by panel/compositor layout
+        QTest.qWait(210)
+        assert not calls and not obj.property('pending')
+        obj.setProperty('pointerInside',True)
+        obj.geometryChanged() # async content/monitor change moves it away
+        obj.setProperty('pointerInside',False)
+        QTest.qWait(210)
+        assert not calls and not obj.property('pending')
+        obj.setProperty('menuOpen',False)
+
+
+def test_stationary_global_pointer_does_not_cancel_keyboard_protection(policy):
+    obj,calls=policy; obj.setProperty('enabled',True)
+    leave(obj)
+    obj.observePointer(100,100)
+    obj.keyboardUsed()
+    obj.observePointer(100,100)
+    QTest.qWait(70)
+    assert not calls and obj.property('keyboardMode')
+    obj.observePointer(101,100)
+    QTest.qWait(70)
+    assert calls == [True]

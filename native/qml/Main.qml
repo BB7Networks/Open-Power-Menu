@@ -325,6 +325,37 @@ Kirigami.ApplicationWindow {
                                 }
                             }
                             RowLayout {
+                                Controls.Label { text: "Widget menu height" }
+                                Controls.ComboBox {
+                                    objectName: "menu_height_mode"
+                                    Accessible.name: "Widget menu height"
+                                    Layout.fillWidth: true
+                                    model: ["Auto-fit", "Custom"]
+                                    currentIndex: window.settings.menu_height_mode === "custom" ? 1 : 0
+                                    onActivated: index => window.preference("menu_height_mode", index ? "custom" : "auto")
+                                }
+                                Controls.SpinBox {
+                                    objectName: "menu_custom_height"
+                                    Accessible.name: "Custom height in logical pixels"
+                                    from: 120; to: 10000; stepSize: 10
+                                    editable: true
+                                    enabled: window.settings.menu_height_mode === "custom"
+                                    value: window.settings.menu_custom_height || 600
+                                    onValueModified: window.preference("menu_custom_height", value)
+                                }
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                text: "Auto-fit follows the contents. Custom uses a saved height in logical pixels, limited by the current screen. Flyouts always fit their contents."
+                            }
+                            Controls.Button {
+                                objectName: "resetMenuHeight"
+                                text: "Reset to automatic"
+                                enabled: window.settings.menu_height_mode === "custom"
+                                onClicked: window.preference("menu_height_mode", "auto")
+                            }
+                            RowLayout {
                                 Controls.Label { text: "Icon size" }
                                 Controls.ComboBox {
                                     objectName: "menu_icon_size"

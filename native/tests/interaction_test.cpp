@@ -57,6 +57,24 @@ class InteractionTests : public QObject {
             cfg[key] = false; QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
         }
     }
+    void customHeightValidationAndMigration() {
+        const auto legacy = decode(QByteArray(R"({"menu":[],"unknown":"kept"})"));
+        QCOMPARE(legacy["menu_height_mode"].toString(), "auto");
+        QCOMPARE(legacy["menu_custom_height"].toInt(), 600);
+        for (const auto value : {QJsonValue(119), QJsonValue(10001), QJsonValue(600.5), QJsonValue("600"), QJsonValue(true), QJsonValue()}) {
+            auto cfg = legacy; cfg["menu_custom_height"] = value;
+            QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
+        }
+        for (const auto value : {QJsonValue("dragged"), QJsonValue(true), QJsonValue()}) {
+            auto cfg = legacy; cfg["menu_height_mode"] = value;
+            QVERIFY_EXCEPTION_THROWN(validate(cfg), Error);
+        }
+        auto cfg = legacy; cfg["menu_height_mode"] = "custom"; cfg["menu_custom_height"] = 950;
+        validate(cfg);
+        QCOMPARE(integration(cfg)["menu_custom_height"].toInt(), 950);
+        QCOMPARE(integration(cfg)["menu_height_mode"].toString(), "custom");
+        QCOMPARE(decode(QJsonDocument(cfg).toJson()), cfg);
+    }
     void migrateWithoutReplacingLayout() {
         const auto cfg = decode(QByteArray(R"({"auto_close_on_pointer_leave":false,"menu":[{"action":"files","label":"My files","icon":"custom"},{"action":"terminal"},{"action":"terminal"},{"label":"Custom","command":["true"],"access_key":"e"}]})"));
         const auto menu = cfg["menu"].toArray();

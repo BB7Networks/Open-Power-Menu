@@ -253,7 +253,7 @@ bool EditorSession::preference(const QString &text) {
     return perform([&] {
         const auto changes = object(text);
         auto state = history[position];
-        const QSet<QString> allowed{"appearance", "menu_density", "menu_width", "menu_icon_size", "submenu_hover_delay_ms",
+        const QSet<QString> allowed{"appearance", "menu_density", "menu_width", "menu_height_mode", "menu_custom_height", "menu_icon_size", "submenu_hover_delay_ms",
                                     "anchor",
                                     "hide_original_launcher",
                                     "launcher_applet_id",

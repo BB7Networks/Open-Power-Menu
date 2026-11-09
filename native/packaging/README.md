@@ -41,6 +41,26 @@ are supported. Relative XDG paths and mismatching OS/version/CPU are refused.
     open-power-menu --recover
     open-power-menu --uninstall
 
+When an install, native update or rollback changes the widget files, the installer
+prints an activation notice and sends a best-effort passive desktop notification.
+Plasma can keep its previous QML in memory even though the backend and files have
+updated. Sign out and back in when convenient to load the installed interface;
+you may defer. The installer never restarts Plasma or logs you out. It does not
+claim that `reloadConfig()` reloads widget code. No widget recreation, panel edits
+or session commands are used. An identical widget reinstall needs no notice.
+
+The native service retains the released `Run` contract for an older loaded
+frontend. This frontend probes for the request-specific API before dispatch and
+can use released `Run` after rollback. No uncertain invocation is retried. A
+frontend already cached from the earlier `88db27b` checkpoint cannot acquire
+this fallback in memory: after rollback to 1.0.1 it needs logout/login before
+commands work. The installer explains this transition limitation. Keep the legacy
+Python/PySide6 runtime available for that rollback, as before.
+
+Ordinary settings Save needs no session or backend restart. An active 2.1 widget
+refreshes preferences on opening and every five seconds. This includes Auto-fit,
+Custom height, density, icons and hints; installing new QML is a different step.
+
 The last three commands can also be passed directly to the bundle's installer.
 That copy remains usable after uninstall or rollback to legacy. Remove the OPM
 applet through Plasma before uninstall; its existing destruction handler restores

@@ -189,7 +189,7 @@ class EditorGuiTests : public QObject {
                 QTest::keyClick(window, Qt::Key_End);
                 return true;
             };
-            for (const char *name : {"menu_density", "menu_width", "menu_icon_size", "hoverMode", "hoverDelay"}) {
+            for (const char *name : {"menu_density", "menu_width", "menu_height_mode", "menu_custom_height", "menu_icon_size", "hoverMode", "hoverDelay"}) {
                 auto *item = control(name);
                 QVERIFY(item);
                 auto *accessible = QAccessible::queryAccessibleInterface(item);
@@ -197,7 +197,7 @@ class EditorGuiTests : public QObject {
                 QVERIFY(!accessible->text(QAccessible::Name).isEmpty());
             }
             if (pass == 0) {
-                for (const char *name : {"menu_density", "menu_width", "menu_icon_size", "hoverMode"})
+                for (const char *name : {"menu_density", "menu_width", "menu_height_mode", "menu_icon_size", "hoverMode"})
                 {
                     QVERIFY(chooseLast(control(name)));
                     auto *view = control("generalPreferences");
@@ -209,6 +209,15 @@ class EditorGuiTests : public QObject {
                     };
                     QTRY_VERIFY(visible());
                 }
+                auto *height = control("menu_custom_height");
+                QVERIFY(height->isEnabled());
+                height->forceActiveFocus(); QTest::keyClick(window, Qt::Key_Up);
+                QCOMPARE(session.configuration()["menu_custom_height"].toInt(), 610);
+                auto *reset = control("resetMenuHeight");
+                reset->forceActiveFocus(); QTest::keyClick(window, Qt::Key_Space);
+                QVERIFY(!height->isEnabled());
+                QCOMPARE(session.configuration()["menu_height_mode"].toString(), "auto");
+                QCOMPARE(session.configuration()["menu_custom_height"].toInt(), 610);
                 auto *delay = control("hoverDelay");
                 QVERIFY(delay->isEnabled());
                 delay->forceActiveFocus();

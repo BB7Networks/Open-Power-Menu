@@ -96,9 +96,9 @@ for(let i=0;i<5;i++){
  assert.equal(root.layoutDraft,null);
 }
 '''
-    code += '\n' + function((UI / 'main.qml').read_text(), 'finishRun') + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
+    code += '\n' + function((UI / 'main.qml').read_text(), 'finishRun') + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'startNativeRun') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
 let layoutEditing=true,layoutBusy=false,launchPending=false,menuSwitchEpoch=0,commandError='',expanded=true;
-function send(...args){root.send(...args)}
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else root.send(...args)}
 let activationPoll={restarts:0,restart(){this.restarts++}};
 launchItem('0'); assert.equal(requests.length,0);
 layoutEditing=false;layoutBusy=true;launchItem('0');assert.equal(requests.length,0);
@@ -195,14 +195,14 @@ def test_desktop_dispatch_waits_for_popup_close_and_cancels_stale_request():
     from test_v0416_popup_handoff import timer_handler
     source=(UI/'main.qml').read_text()
     code='const assert=require("node:assert/strict");\n'
-    code+=function(source,'finishRun')+function(source,'runItem')+function(source,'launchItem')
+    code+=function(source,'finishRun')+function(source,'runItem')+function(source,'startNativeRun')+function(source,'launchItem')
     code+=timer_handler(source,'desktopCloseSettle').replace('function settleTick()', 'function desktopTick()')
     code+=r'''
 let layoutEditing=false,layoutBusy=false,launchPending=false,commandError='',expanded=true,menuSwitchEpoch=1;
 let sent=[],waiting=0;
 const root={runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
 const desktopCloseSettle={key:'',epoch:-1,restart(){waiting++}};
-function send(...args){sent.push(args)}
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else sent.push(args)}
 launchItem('desktop',true);assert.equal(expanded,false);assert.equal(sent.length,0);assert.equal(waiting,1);
 let {key,epoch}=desktopCloseSettle;desktopTick();assert.equal(sent.length,1);
 sent.shift().at(-1)(true,JSON.stringify({state:'finished',ok:true}));assert.equal(launchPending,false);
@@ -225,7 +225,7 @@ def test_async_activation_poll_reports_only_its_operation_and_never_retries():
 let launchPending=true, menuSwitchEpoch=7, expanded=true, commandError='';
 let operation='request-a', epoch=7, deadline=Date.now()+10000, sent=[];
 const activationPoll={restarts:0,restart(){this.restarts++}};
-function send(...args){sent.push(args)}
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else sent.push(args)}
 activationTick(); assert.equal(sent[0][3],'RunResult'); assert.deepEqual(sent[0][4],['request-a']);
 sent.shift().at(-1)(true,JSON.stringify({state:'pending'}));
 assert.equal(activationPoll.restarts,1); assert.equal(launchPending,true);
@@ -240,3 +240,50 @@ assert.equal(launchPending,false); assert.match(commandError,/Invalid/);
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_frontend_protocol_probe_and_legacy_rollback_never_retry():
+    if not shutil.which('node'): pytest.skip('Node required')
+    source = (UI/'main.qml').read_text()
+    code = 'const assert=require("node:assert/strict");\n'
+    for name in ['runItem','startNativeRun','finishRun']:
+        code += function(source,name)
+    code += r'''
+let launchPending=true,menuSwitchEpoch=1,expanded=true,commandError='';
+let requests=[];
+function send(...args){requests.push(args)}
+runItem('protected-key',1);assert.equal(requests[0][3],'Introspect');
+requests.shift().at(-1)(true, '<interface name="org.openpowermenu.Service"><method name="Run"/></interface>');
+assert.equal(requests[0][3],'Run');assert.deepEqual(requests[0][4],['protected-key']);
+requests.shift().at(-1)(true,true);assert.equal(expanded,false);
+expanded=true;launchPending=true;
+runItem('key',1);requests.shift().at(-1)(true, '<method name="StartRun"/>');
+assert.equal(requests[0][3],'StartRun');requests.shift().at(-1)(false,'owner disappeared');
+assert.equal(requests.length,0);assert.equal(expanded,true);assert.match(commandError,/do not automatically retry/);
+for(const reply of [[false,''],[true,'<interface/>']]) {
+ runItem('key',1);requests.shift().at(-1)(...reply);assert.equal(requests.length,0);
+}
+runItem('stale',1);menuSwitchEpoch=2;
+requests.shift().at(-1)(true,'<method name="Run"/>');assert.equal(requests.length,0);
+'''
+    result = subprocess.run(['node','-e',code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_saved_height_preferences_poll_without_restart():
+    if not shutil.which('node'): pytest.skip('Node required')
+    source=(UI/'main.qml').read_text()
+    code='const assert=require("node:assert/strict");\n'+function(source,'fetchIntegration')
+    code+=r'''
+let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
+let menuHeightMode='auto',menuCustomHeight=600,menuDensity='standard';
+let response={menu_height_mode:'custom',menu_custom_height:910,menu_density:'compact'};
+function send(service,path,iface,method,args,callback){assert.equal(method,'GetIntegration');callback(true,JSON.stringify(response))}
+function synchronizeLauncherVisibility(){} function releaseMask(){}
+fetchIntegration();assert.equal(menuHeightMode,'custom');assert.equal(menuCustomHeight,910);
+response.menu_density='comfortable';fetchIntegration();assert.equal(menuDensity,'comfortable');assert.equal(menuCustomHeight,910);
+response.menu_height_mode='auto';fetchIntegration();assert.equal(menuHeightMode,'auto');assert.equal(menuCustomHeight,910);
+response={};fetchIntegration();assert.equal(menuHeightMode,'auto');assert.equal(menuCustomHeight,600);
+'''
+    result=subprocess.run(['node','-e',code],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr

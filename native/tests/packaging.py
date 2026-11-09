@@ -89,10 +89,41 @@ class Packaging(unittest.TestCase):
         self.assertIn('restore the runtime first',failed.stdout)
         self.assertTrue((self.app/'bin/open-power-menu-native').exists())
         self.assertFalse((self.data/'open-power-menu-recovery/native-installs/active.json').exists())
-        self.invoke('--rollback')
+        rollback=self.invoke('--rollback')
+        self.assertIn('Sign out and back in', rollback.stdout)
+        self.assertIn('Sign out and back in', upgrade.stdout)
         self.assertEqual((self.app/'run.py').read_bytes(),legacy_bytes)
         self.assertEqual((embedded/'keep').read_text(),'older history');self.assertEqual((recovery/'keep').read_text(),'history')
         self.assertEqual(self.original,self.settings())
+    def test_widget_activation_detection_and_deferred_update(self):
+        # Two widgets and unrelated panel state survive every action byte-for-byte.
+        panel=self.config/'plasma-org.kde.plasma.desktop-appletsrc'
+        panel.write_text(panel.read_text()+'[Containments][2][Applets][88]\nplugin=org.openpowermenu.start\n')
+        self.original=self.settings()
+        initial=self.install()
+        self.assertIn('OPM updated successfully',initial.stdout)
+        self.assertIn('No desktop reload or logout has been performed',initial.stdout)
+        unchanged=self.install()
+        self.assertNotIn('OPM updated successfully',unchanged.stdout)
+        changed=self.root/'updated-bundle';shutil.copytree(BUNDLE,changed)
+        qml=changed/'plasmoid/contents/ui/main.qml'
+        if not qml.exists():
+            qml=next(changed.glob('*/contents/ui/main.qml'))
+        qml.write_text(qml.read_text()+'\n// Test fixture: updated widget code.\n')
+        (changed/'bundle.json').unlink()
+        subprocess.run([str(INSTALLER),'--seal-bundle',str(changed)],check=True,env=self.env)
+        update=self.invoke('--install',changed)
+        self.assertIn("Later: I'll log out and back in myself",update.stdout)
+        self.assertIsNotNone(self.pid())
+        # Missing notifications are normal on this private bus, not install failure.
+        rollback=self.invoke('--rollback')
+        self.assertIn('OPM updated successfully',rollback.stdout)
+        self.assertIsNotNone(self.pid())
+        failed=self.invoke('--install',changed,ok=False,extra={'OPM_INSTALL_CRASH_COMMIT':'1'})
+        self.assertEqual(failed.returncode,86)
+        recovered=self.invoke('--recover')
+        self.assertIn('Sign out and back in',recovered.stdout)
+        self.assertNotIn('Sign out and back in',self.invoke('--recover').stdout)
     def test_interrupted_and_partial_failure(self):
         self.install();before=(self.data/'dbus-1/services/org.openpowermenu.Service.service').read_bytes()
         for fault,index in [('OPM_INSTALL_CRASH_AFTER','2'),('OPM_INSTALL_CRASH_GAP','0')]:

@@ -9,6 +9,7 @@ RowLayout {
     property var entry: ({})
     property real iconSize: 18
     property bool showIcons: true
+    property bool showHints: !!entry.access_hint
     property bool opensLeft: false
     property color foreground: Kirigami.Theme.textColor
     visible: entry.kind !== "separator"
@@ -38,19 +39,33 @@ RowLayout {
     }
     PC3.Label {
         objectName: "entryLabel"
+        font: Kirigami.Theme.defaultFont
         Layout.fillWidth: true
         text: content.entry.title || ""
         color: content.foreground
         elide: Text.ElideRight
         opacity: content.entry.enabled === false ? 0.5 : 1
     }
-    PC3.Label {
-        objectName: "accessKeyHint"
-        text: content.entry.access_hint || ""
-        visible: text.length > 0
-        color: content.foreground
-        opacity: content.entry.enabled === false ? 0.4 : 0.7
-        Accessible.name: "Access key " + text
+    Item {
+        objectName: "accessKeyColumn"
+        visible: content.showHints
+        Layout.preferredWidth: Math.ceil("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split("").reduce((width, key) => Math.max(width, hintFont.advanceWidth(key)), 0)) + Math.ceil(hintFont.height / 4)
+        Layout.minimumWidth: Layout.preferredWidth
+        Layout.maximumWidth: Layout.preferredWidth
+        Layout.preferredHeight: hint.implicitHeight
+        FontMetrics { id: hintFont; font: hint.font }
+        PC3.Label {
+            id: hint
+            objectName: "accessKeyHint"
+            font: Kirigami.Theme.defaultFont
+            anchors.fill: parent
+            text: content.entry.access_hint || ""
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            color: content.foreground
+            opacity: content.entry.enabled === false ? 0.4 : 0.7
+            Accessible.name: text ? "Access key " + text : ""
+        }
     }
     Item {
         Layout.preferredWidth: 14

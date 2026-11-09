@@ -24,6 +24,24 @@
 using namespace Opm;
 using namespace Opm::Install;
 static const QString busName = "org.openpowermenu.Service";
+static void activationNotice(const QJsonObject &journal) {
+    const auto previous = journal["old"].toObject().value("1");
+    const auto installed = journal["new"].toObject().value("1");
+    if (previous == installed || installed.toString().isEmpty()) return;
+    const QString title = "OPM updated successfully";
+    const QString message = "Updated widget code is installed. Your running Plasma session may still be using the previous interface. "
+        "Sign out and back in when convenient to activate it. You can defer and keep working. "
+        "No desktop reload or logout has been performed. Ordinary settings changes need no restart. "
+        "After rollback to 1.0.1, an older cached 2.1 frontend may need that sign-in before commands work.";
+    QTextStream(stdout) << title << "\n" << message << "\nLater: I'll log out and back in myself.\n";
+    // A passive, best-effort notification. There are no shell/session actions,
+    // no dependency on a notification service, and no effect on the transaction.
+    auto request = QDBusMessage::createMethodCall("org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+        "org.freedesktop.Notifications", "Notify");
+    request.setArguments({QString("Open Power Menu"), uint(0), QString("system-shutdown"), title, message,
+                          QStringList{}, QVariantMap{}, int(0)});
+    QDBusConnection::sessionBus().call(request, QDBus::NoBlock);
+}
 static QString xdg(const char *key, const QString &fallback) {
     return qEnvironmentVariable(key, fallback);
 }
@@ -369,6 +387,7 @@ int main(int argc, char **argv) {
             }
             remove(recovery, "active.json");
             QTextStream(stdout) << "Recovered interrupted transaction " << id << '\n';
+            if (j["committed"].toBool()) activationNotice(j);
         }
         if (args[1] == "--recover")
             return 0;
@@ -539,6 +558,7 @@ int main(int argc, char **argv) {
             QTextStream(stdout)
                 << "Native transaction committed: " << id
                 << "\nSnapshots retained; configuration, panels and shortcuts preserved.\n";
+            activationNotice(j);
         } catch (...) {
             if (committed) {
                 QTextStream(stderr)

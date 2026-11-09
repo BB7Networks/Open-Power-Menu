@@ -39,6 +39,8 @@ QJsonObject defaults() {
         config["submenu_hover_delay_ms"] = -1;
         config["menu_density"] = "standard";
         config["menu_width"] = "auto";
+        config["menu_height_mode"] = "auto";
+        config["menu_custom_height"] = 600;
         config["menu_icon_size"] = "standard";
         auto menu = config["menu"].toArray();
         for (qsizetype i = 0; i < menu.size(); ++i) {
@@ -309,6 +311,13 @@ void validate(const QJsonObject &config) {
             : QString(key) == "menu_width" ? QStringList{"auto", "narrow", "wide"} : QStringList{"small", "standard", "large"};
         if (config.contains(key) && !choices.contains(config[key].toString())) throw Error(QString("Invalid ") + key);
     }
+    if (config.contains("menu_height_mode") && !QStringList{"auto", "custom"}.contains(config["menu_height_mode"].toString()))
+        throw Error("Invalid menu_height_mode");
+    if (config.contains("menu_custom_height")) {
+        const auto height = config["menu_custom_height"];
+        if (!height.isDouble() || height.toDouble() != height.toInt() || height.toInt() < 120 || height.toInt() > 10000)
+            throw Error("Custom height must be an integer from 120 to 10000 logical pixels");
+    }
     validateMenu(config["menu"]);
     validateAccessKeys(config["menu"].toArray());
 }
@@ -333,7 +342,8 @@ QJsonObject integration(const QJsonObject &config) {
          {"hide_original_launcher", "launcher_applet_id", "button_icon_mode", "button_icon",
           "appearance", "show_menu_icons", "auto_close_on_pointer_leave",
           "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints",
-          "submenu_hover_delay_ms", "menu_density", "menu_width", "menu_icon_size"})
+          "submenu_hover_delay_ms", "menu_density", "menu_width", "menu_icon_size",
+          "menu_height_mode", "menu_custom_height"})
         result[key] = config[key];
     return result;
 }

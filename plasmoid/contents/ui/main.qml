@@ -84,6 +84,12 @@ PlasmoidItem {
     property int submenuHoverDelay: -1
     property string menuDensity: "standard"
     property string menuWidth: "auto"
+    property string menuHeightMode: "auto"
+    property int menuCustomHeight: 600
+    readonly property rect menuWorkArea: {
+        const area = Metrics.workArea(root.screenGeometry, root.availableScreenRect);
+        return Qt.rect(area.x, area.y, area.width, area.height);
+    }
     property string menuIconSize: "standard"
     property string commandError: ""
     property bool launchPending: false
@@ -492,6 +498,8 @@ PlasmoidItem {
                      submenuHoverDelay = cfg.submenu_hover_delay_ms === undefined ? -1 : Number(cfg.submenu_hover_delay_ms);
                      menuDensity = cfg.menu_density || "standard";
                      menuWidth = cfg.menu_width || "auto";
+                     menuHeightMode = cfg.menu_height_mode === "custom" ? "custom" : "auto";
+                     menuCustomHeight = cfg.menu_custom_height === undefined ? 600 : Number(cfg.menu_custom_height);
                      menuIconSize = cfg.menu_icon_size || "standard";
                      synchronizeLauncherVisibility();
                  } catch (e) {
@@ -797,6 +805,21 @@ PlasmoidItem {
         else commandError = result.error || "Could not start this item. Reopen the menu to refresh it.";
     }
     function runItem(key, epoch) {
+        send("org.openpowermenu.Service", "/OpenPowerMenu", "org.freedesktop.DBus.Introspectable",
+             "Introspect", [], (ok, value) => {
+                 if (epoch !== menuSwitchEpoch) { launchPending = false; return; }
+                 const xml = String(value);
+                 if (!ok) { finishRun({error: "Could not inspect the backend. Reopen the menu to refresh it."}, epoch); return; }
+                 if (/<method\s+name=["']StartRun["']/.test(xml)) startNativeRun(key, epoch);
+                 else if (/<method\s+name=["']Run["']/.test(xml)) {
+                     send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service", "Run", [key], (ran, result) => {
+                         if (ran && result === true) finishRun({ok:true}, epoch);
+                         else finishRun({error: "The previous backend did not confirm success. Reopen the menu; do not automatically retry."}, epoch);
+                     });
+                 } else finishRun({error: "Unsupported backend. Sign out and back in after the update."}, epoch);
+             });
+    }
+    function startNativeRun(key, epoch) {
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
              "StartRun", [key], (ok, value) => {
                  if (!ok) {
@@ -895,7 +918,7 @@ PlasmoidItem {
         id: popup
         focus: true
         property int activeIndex: -1
-        FontMetrics { id: menuFont; font: Qt.application.font }
+        FontMetrics { id: menuFont; font: Kirigami.Theme.defaultFont }
         readonly property int entryIconSize: Metrics.iconSize(root.menuIconSize, menuFont.height)
         readonly property int entryHeight: Metrics.rowHeight(root.menuDensity, menuFont.height, root.showMenuIcons ? entryIconSize : 0)
         PointerDismissal {
@@ -909,7 +932,17 @@ PlasmoidItem {
         }
         HoverHandler {
             id: popupHover
-            onPointChanged: autoDismiss.pointerMoved()
+            onPointChanged: {
+                const global = popup.mapToGlobal(point.position.x, point.position.y);
+                autoDismiss.observePointer(global.x, global.y);
+            }
+        }
+        onWidthChanged: autoDismiss.geometryChanged()
+        onHeightChanged: autoDismiss.geometryChanged()
+        Connections {
+            target: popup.Window.window
+            function onXChanged() { autoDismiss.geometryChanged(); flyout.geometrySettling(); }
+            function onYChanged() { autoDismiss.geometryChanged(); flyout.geometrySettling(); }
         }
         Rectangle {
             anchors.fill: parent
@@ -929,7 +962,7 @@ PlasmoidItem {
                     && flyout.visualParent === flyoutAnchor) return;
             flyout.visible = false;
             flyout.entries = entry.items || [];
-            flyout.screenRect = sourceRow.menuScreen;
+            flyout.screenRect = Qt.binding(() => root.menuWorkArea);
             // Plasma side popups center vertically on visualParent. A slim
             // proxy lets the flyout's BOTTOM meet the parent row's bottom.
             flyout.positionAtRow(sourceRow, flyoutAnchor, sourceRow.menuScreen);
@@ -961,7 +994,8 @@ PlasmoidItem {
                 popup.forceActiveFocus();
             }
             onKeyboardUsed: autoDismiss.keyboardUsed()
-            onPointerMoved: autoDismiss.pointerMoved()
+            onPointerMoved: (globalX, globalY) => autoDismiss.observePointer(globalX, globalY)
+            onGeometryChanged: autoDismiss.geometryChanged()
             onTriggered: (key, closeBeforeRun) => {
                 flyout.visible = false;
                 root.launchItem(key, closeBeforeRun);
@@ -986,7 +1020,9 @@ PlasmoidItem {
                     });
                 }
             }
+            function onVisibleEntriesChanged() { autoDismiss.geometryChanged(); }
             function onLayoutEditingChanged() {
+                autoDismiss.geometryChanged();
                 flyout.visible = false;
                 Qt.callLater(() => {
                     if (!root.expanded) return;
@@ -1006,20 +1042,42 @@ PlasmoidItem {
             return menuHeader.implicitHeight + 10
                 + Math.max(1, menuDivider.implicitHeight)
                 + (root.layoutEditing ? layoutEditor.implicitHeight : menuColumn.implicitHeight)
-                + (menuStatusLabel.visible ? menuStatusLabel.implicitHeight : 0)
-                + (backendSetup.visible ? backendSetup.implicitHeight : 0)
+                + (statusScroll.visible ? menuStatusLabel.implicitHeight : 0)
+                + (setupScroll.visible ? backendSetup.implicitHeight : 0)
                 + 4;
         }
-        readonly property real heightCap: Math.min(590,
-            Screen.desktopAvailableHeight > 140
-                ? Screen.desktopAvailableHeight - 48 : 590)
+        readonly property real themeVerticalPadding: {
+            const window = popup.Window.window;
+            if (window && typeof window.topPadding === "number") return window.topPadding + window.bottomPadding;
+            if (window && window.margins) return window.margins.top + window.margins.bottom;
+            return 2 * Kirigami.Units.smallSpacing;
+        }
+        readonly property real themeHorizontalPadding: {
+            const window = popup.Window.window;
+            if (window && typeof window.leftPadding === "number") return window.leftPadding + window.rightPadding;
+            if (window && window.margins) return window.margins.left + window.margins.right;
+            return 2 * Kirigami.Units.smallSpacing;
+        }
+        // A small custom preference still needs room for navigation and a row,
+        // especially while editing. This runtime minimum never changes the save.
+        readonly property real minimumUsableHeight: (menuHeader.implicitHeight + 10
+            + Math.max(1, menuDivider.implicitHeight)
+            + (root.layoutEditing ? layoutEditor.minimumUsableHeight : entryHeight) + 4)
+            / (1 - (statusScroll.visible ? 0.25 : 0) - (setupScroll.visible ? 0.5 : 0))
+        readonly property real fittedHeight: Metrics.menuHeight(root.menuHeightMode, Math.max(root.menuCustomHeight, minimumUsableHeight),
+            naturalHeight, root.menuWorkArea.height || Screen.desktopAvailableHeight, themeVerticalPadding)
 
         // The unlocked layout editor stays in this single Plasma popup.
         // Spring-loaded submenu navigation does not create native child windows.
-        Layout.preferredWidth: Metrics.menuWidth(root.menuWidth, 328, menuFont.height, Screen.desktopAvailableWidth)
-        Layout.preferredHeight: Math.max(76, Math.min(heightCap, naturalHeight))
-        Layout.minimumWidth: Math.min(285, Layout.preferredWidth)
-        Layout.minimumHeight: 76
+        Layout.preferredWidth: Metrics.menuWidth(root.menuWidth, 328, menuFont.height,
+            Math.max(1, (root.menuWorkArea.width || Screen.desktopAvailableWidth) - themeHorizontalPadding))
+        Layout.preferredHeight: fittedHeight
+        Layout.minimumWidth: Layout.preferredWidth
+        Layout.maximumWidth: Layout.preferredWidth
+        // Plasma may restore its own cached popupHeight. Equal bounds make the
+        // explicit OPM sizing mode authoritative without writing panel config.
+        Layout.minimumHeight: fittedHeight
+        Layout.maximumHeight: fittedHeight
 
         ColumnLayout {
             anchors.fill: parent
@@ -1085,6 +1143,7 @@ PlasmoidItem {
             }
             LayoutEditor {
                 id: layoutEditor
+                font: Kirigami.Theme.defaultFont
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: 6
@@ -1128,11 +1187,7 @@ PlasmoidItem {
                             required property var modelData
                             required property int index
                             property var entry: modelData
-                            // Screen attached to a visible row in the main Plasma popup.
-                            // virtualX/Y also cover non-primary monitors.
-                            readonly property rect menuScreen: Qt.rect(
-                                Screen.virtualX, Screen.virtualY,
-                                Screen.width, Screen.height)
+                            readonly property rect menuScreen: root.menuWorkArea
                             width: menuColumn.width
                             height: entry.kind === "separator" ? 13 : popup.entryHeight
                             Kirigami.Separator {
@@ -1155,6 +1210,7 @@ PlasmoidItem {
                                 anchors.rightMargin: 8
                                 entry: menuRow.entry
                                 showIcons: root.showMenuIcons
+                                showHints: Metrics.hasHints(root.visibleEntries)
                                 iconSize: popup.entryIconSize
                                 foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
                                 opensLeft: (flyout.visible && popup.activeFlyoutKey === menuRow.entry.key
@@ -1200,25 +1256,45 @@ PlasmoidItem {
                     }
                 }
             }
-            BackendSetup {
-                id: backendSetup
-                foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+            QQC2.ScrollView {
+                id: setupScroll
                 visible: root.backendMissing && !root.layoutEditing
                 Layout.fillWidth: true
                 Layout.leftMargin: 12
                 Layout.rightMargin: 12
-                onRetryRequested: { root.fetchMenu(); root.fetchIntegration(); }
+                Layout.preferredHeight: backendSetup.implicitHeight
+                Layout.maximumHeight: popup.naturalHeight <= popup.fittedHeight ? backendSetup.implicitHeight : popup.height * 0.5
+                Layout.minimumHeight: 0
+                clip: true
+                contentWidth: availableWidth
+                contentHeight: backendSetup.implicitHeight
+                BackendSetup {
+                    id: backendSetup
+                    width: setupScroll.availableWidth
+                    foreground: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    onRetryRequested: { root.fetchMenu(); root.fetchIntegration(); }
+                }
             }
-            PC3.Label {
-                id: menuStatusLabel
-                visible: text.length > 0
+            QQC2.ScrollView {
+                id: statusScroll
+                visible: menuStatusLabel.text.length > 0
                 Layout.fillWidth: true
                 Layout.leftMargin: 12
                 Layout.rightMargin: 12
-                text: root.layoutEditing || root.layoutBusy ? root.layoutStatus : root.commandError || root.menuStatus
-                color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
-                wrapMode: Text.WordWrap
-                opacity: 0.75
+                Layout.preferredHeight: menuStatusLabel.implicitHeight
+                Layout.maximumHeight: popup.naturalHeight <= popup.fittedHeight ? menuStatusLabel.implicitHeight : popup.height * 0.25
+                Layout.minimumHeight: 0
+                clip: true
+                contentWidth: availableWidth
+                contentHeight: menuStatusLabel.implicitHeight
+                PC3.Label {
+                    id: menuStatusLabel
+                    width: statusScroll.availableWidth
+                    text: root.layoutEditing || root.layoutBusy ? root.layoutStatus : root.commandError || root.menuStatus
+                    color: root.menuAppearance === "aero" ? "#eff3f8" : Kirigami.Theme.textColor
+                    wrapMode: Text.WordWrap
+                    opacity: 0.75
+                }
             }
         }
         Keys.onPressed: event => {

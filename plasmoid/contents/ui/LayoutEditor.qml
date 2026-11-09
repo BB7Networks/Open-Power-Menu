@@ -38,7 +38,13 @@ QQC2.Control {
     signal saveRequested()
     signal cancelRequested()
     signal closeRequested()
-    implicitHeight: 356
+    readonly property real chromeHeight: topPadding + bottomPadding + Math.max(48, navigationBar.implicitHeight)
+        + instructions.implicitHeight + (rows.length ? 24 : 32)
+        + (showActions ? actions.implicitHeight : 0) + 12
+    readonly property real minimumUsableHeight: chromeHeight + (rows.length ? rowHeight : 0)
+    implicitHeight: chromeHeight + rows.length * rowHeight
+    FontMetrics { id: layoutFont; font: control.font }
+    readonly property real rowHeight: Math.max(36, layoutFont.height + 12)
     implicitWidth: 304
     focusPolicy: Qt.StrongFocus
     Accessible.name: "Power User Menu layout editing. Commands are inactive."
@@ -331,7 +337,7 @@ QQC2.Control {
             id: navigationBar
             objectName: "layoutBack"
             Layout.fillWidth: true
-            Layout.preferredHeight: 48
+            Layout.preferredHeight: Math.max(48, implicitHeight)
             enabled: !!control.draft && !!control.draft.parentId && !control.busy
             text: control.draft && control.draft.parentId
                 ? "Go Back · " + Draft.find(control.draft.entries, control.draft.parentId).entry.title
@@ -346,6 +352,7 @@ QQC2.Control {
             QQC2.ToolTip.text: "Click to go back, or drag here and hold to move up one level"
         }
         QQC2.Label {
+            id: instructions
             Layout.fillWidth: true
             text: "Drag an item onto a submenu and hold to open it. Drag onto Go Back to move up."
             wrapMode: Text.WordWrap
@@ -370,7 +377,7 @@ QQC2.Control {
                 property var entry: ({id: itemId, title: itemTitle, kind: itemKind})
                 objectName: "layoutRow-" + entry.id
                 width: list.width
-                height: 36
+                height: control.rowHeight
                 leftPadding: 12
                 rightPadding: 30
                 text: entry.title
@@ -415,6 +422,7 @@ QQC2.Control {
             }
         }
         RowLayout {
+            id: actions
             visible: control.showActions
             Layout.fillWidth: true
             QQC2.Button {

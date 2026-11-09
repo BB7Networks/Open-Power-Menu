@@ -5,6 +5,7 @@
 #include "launch.hpp"
 #include <QApplication>
 #include <QCursor>
+#include <QMouseEvent>
 #include <QEvent>
 #include <QIcon>
 #include <QIconEngine>
@@ -156,12 +157,18 @@ Standalone::Standalone(QJsonObject source, QString theme, bool diagnostics, std:
         if (presentation.isEmpty() && !model.powerCapabilities()->discoveryPending() && isVisible()) close();
         if (isVisible()) adjustSize();
     });
+    transitionTimer.setSingleShot(true);
+    transitionTimer.setInterval(150);
+    connect(&transitionTimer, &QTimer::timeout, this, [this] {
+        entered = isVisible() && !inside.isEmpty();
+        updateDismissal();
+    });
     leaveTimer.setSingleShot(true);
     leaveTimer.setTimerType(Qt::PreciseTimer);
     leaveTimer.setInterval(pointerLeaveDelay(config));
     connect(&leaveTimer, &QTimer::timeout, this, [this] {
-        updateDismissal();
-        if (isVisible() && !keyboard && inside.isEmpty()) {
+        if (config["auto_close_on_pointer_leave"].toBool() && isVisible() && entered &&
+                !transitionTimer.isActive() && !keyboard && inside.isEmpty()) {
             report("pointer-dismissed");
             close();
         }
@@ -262,7 +269,7 @@ void Standalone::updateDismissal() {
             ++it;
     }
     if (!config["auto_close_on_pointer_leave"].toBool() || !isVisible() ||
-        !entered || keyboard || !inside.isEmpty())
+        transitionTimer.isActive() || !entered || keyboard || !inside.isEmpty())
         leaveTimer.stop();
     else if (!leaveTimer.isActive())
         leaveTimer.start();
@@ -278,7 +285,14 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
         if (menu == this && event->type() == QEvent::Show && windowHandle())
             windowHandle()->installEventFilter(this);
         switch (event->type()) {
-        case QEvent::Enter: inside.insert(menu); entered = true; break;
+        case QEvent::Show: case QEvent::Move: case QEvent::Resize:
+            if (isVisible()) {
+                leaveTimer.stop();
+                entered = false;
+                transitionTimer.start();
+            }
+            break;
+        case QEvent::Enter: inside.insert(menu); if (!transitionTimer.isActive()) entered = true; break;
         case QEvent::Leave: case QEvent::Hide: inside.remove(menu); break;
         case QEvent::KeyPress: {
             keyboard = true;
@@ -306,12 +320,20 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
             }
             break;
         }
-        case QEvent::MouseMove: keyboard = false; break;
+        case QEvent::MouseMove: {
+            const auto position = static_cast<QMouseEvent *>(event)->globalPosition();
+            if ((!pointerKnown || position != lastPointer) && !transitionTimer.isActive()) keyboard = false;
+            lastPointer = position;
+            pointerKnown = true;
+            break;
+        }
         default: break;
         }
         if (menu == this && event->type() == QEvent::Hide) {
             leaveTimer.stop();
             focusTimer.stop();
+            transitionTimer.stop();
+            pointerKnown = false;
             inside.clear();
             entered = false;
         } else

@@ -26,13 +26,17 @@ def evaluate(obj, code):
 
 
 @pytest.fixture
-def flyout(tmp_path):
+def flyout(tmp_path, request):
     app = QApplication.instance() or QApplication([])
+    old_font = app.font()
+    size = getattr(getattr(request.node, 'callspec', None), 'params', {}).get('font_size')
+    if size:
+        font = app.font(); font.setPixelSize(size); app.setFont(font)
     modules = {
         'org/kde/kirigami': {
             'Icon': 'import QtQuick\nItem { property string source; property color color }',
             'Separator': 'import QtQuick\nRectangle { implicitHeight: 1 }',
-            'Theme': 'pragma Singleton\nimport QtQuick\nQtObject { property color textColor: "black"; property color backgroundColor: "white"; property color highlightColor: "blue" }',
+            'Theme': 'pragma Singleton\nimport QtQuick\nQtObject { property font defaultFont: Qt.application.font; property color textColor: "black"; property color backgroundColor: "white"; property color highlightColor: "blue" }',
         },
         'org/kde/plasma/components': {'Label': 'import QtQuick.Controls as C\nC.Label {}'},
         'org/kde/plasma/core': {'PopupPlasmaWindow': '''import QtQuick
@@ -78,6 +82,7 @@ Window {
     app.processEvents()
     engine.deleteLater()
     app.processEvents()
+    app.setFont(old_font)
 
 
 def test_reset_on_model_hide_and_nested_reopen(flyout):
@@ -293,3 +298,231 @@ def test_delayed_sibling_replacement_and_return_to_child(flyout):
     QTest.keyClick(child, Qt.Key_Left)
     assert not child.property('visible')
     assert flyout.property('activeIndex') == 1
+
+@pytest.mark.parametrize('density', ['compact', 'standard', 'comfortable'])
+def test_rendered_natural_height_and_work_area_clamp(flyout, density):
+    evaluate(flyout, f'''menuDensity='{density}'; screenRect=Qt.rect(-1920,40,1920,1600);
+        topPadding=11; bottomPadding=13;
+        entries=Array.from({{length:30}}, (_,i)=>({{kind:i%7===0?'separator':'command',title:'Entry '+i}}));''')
+    QTest.qWait(30)
+    natural = evaluate(flyout, 'rowsHeight(entries)+topPadding+bottomPadding')
+    assert flyout.height() == natural and natural > 540
+    evaluate(flyout, 'screenRect=Qt.rect(-1280,-900,1280,500);')
+    QTest.qWait(30)
+    assert flyout.height() == 492
+    assert evaluate(flyout, 'column.height > viewport.availableHeight')
+    # The real ScrollView must make its final row reachable, not just clip it.
+    evaluate(flyout, 'viewport.contentItem.contentY = column.height - viewport.availableHeight;')
+    assert evaluate(flyout, 'flyoutRows.itemAt(29).y + flyoutRows.itemAt(29).height <= viewport.contentItem.contentY + viewport.availableHeight + 1')
+    evaluate(flyout, 'screenRect=Qt.rect(0,0,1920,1600); entries=entries.slice(0,3);')
+    QTest.qWait(30)
+    assert flyout.height() == evaluate(flyout, 'rowsHeight(entries)+topPadding+bottomPadding')
+
+
+def test_nested_open_menu_tracks_preferences_without_losing_selection(flyout):
+    evaluate(flyout, 'flyoutRows.itemAt(0).openChild(); activeChild.focusFirst();')
+    before = evaluate(flyout, 'activeChild.height')
+    evaluate(flyout, "menuDensity='comfortable'; menuIconSize='large';")
+    QTest.qWait(30)
+    assert evaluate(flyout, 'activeChild.height') > before
+    assert evaluate(flyout, 'activeChild.activeIndex') == 0
+    evaluate(flyout, 'screenRect=Qt.rect(-900,32,900,100);')
+    QTest.qWait(30)
+    assert evaluate(flyout, 'activeChild.screenRect.y') == 32
+    assert evaluate(flyout, 'activeChild.height <= 92')
+
+
+@pytest.mark.parametrize('appearance', ['native', 'aero'])
+@pytest.mark.parametrize('icons', [True, False])
+@pytest.mark.parametrize('font_size', [12, 24])
+def test_rendered_hint_column_centers_and_empty_keys(flyout, appearance, icons, font_size, tmp_path):
+    from PySide6.QtGui import QFont
+    import json
+    app = QApplication.instance()
+    old_font = app.font()
+    font = QFont(old_font); font.setPixelSize(font_size)
+    app.setFont(font)
+    try:
+        evaluate(flyout, f'''appearance='{appearance}'; showMenuIcons={str(icons).lower()};
+            screenRect=Qt.rect(0,0,1600,1600); menuDensity='comfortable';
+            entries='IMWPOUEV '.split('').map(key=>({{kind:'command',title:'A very long menu entry that must elide before its key', access_hint:key.trim()}}));''')
+        QTest.qWait(50)
+        positions = []
+        for i in range(9):
+            row = evaluate(flyout, f'flyoutRows.itemAt({i})')
+            content = next(c for c in row.childItems() if c.metaObject().indexOfProperty('opensLeft') >= 0)
+            column = next(c for c in content.childItems() if c.objectName() == 'accessKeyColumn')
+            label = next(c for c in content.childItems() if c.objectName() == 'entryLabel')
+            hint = next(c for c in column.childItems() if c.objectName() == 'accessKeyHint')
+            assert evaluate(hint, 'horizontalAlignment === Qt.AlignHCenter')
+            assert hint.property('font').pixelSize() == font_size
+            assert label.x() + label.width() <= column.x()
+            positions.append({'key':hint.property('text'), 'x':column.x(), 'width':column.width(), 'center':column.x()+column.width()/2})
+        assert len({round(p['center'], 3) for p in positions}) == 1
+        assert len({round(p['width'], 3) for p in positions}) == 1
+        output = Path(os.environ.get('OPM_RENDER_OUTPUT', str(tmp_path)))
+        output.mkdir(parents=True, exist_ok=True)
+        stem = f'hints-{appearance}-{icons}-{font_size}'
+        (output/(stem+'.json')).write_text(json.dumps(positions, indent=2))
+        assert flyout.grabWindow().save(str(output/(stem+'.png')))
+        old_label_width = label.width()
+        evaluate(flyout, 'entries=entries.map(entry=>Object.assign({}, entry, {access_hint:""}));')
+        QTest.qWait(30)
+        row = evaluate(flyout, 'flyoutRows.itemAt(0)')
+        content = next(c for c in row.childItems() if c.metaObject().indexOfProperty('opensLeft') >= 0)
+        column = next(c for c in content.childItems() if c.objectName() == 'accessKeyColumn')
+        label = next(c for c in content.childItems() if c.objectName() == 'entryLabel')
+        assert not column.isVisible()
+        assert label.width() > old_label_width
+    finally:
+        app.setFont(old_font)
+
+@pytest.fixture
+def main_popup(flyout, tmp_path):
+    """Render the shipped fullRepresentation with controlled applet state.
+
+    Window/work-area transport is a fixture; all menu/layout/control bindings
+    below it are the production QML, not a second implementation of sizing.
+    """
+    for name in ('LayoutEditor.qml','PointerDismissal.qml','BackendSetup.qml','LayoutController.js'):
+        shutil.copyfile(UI/name, tmp_path/name)
+    folder=tmp_path/'org/kde/plasma/components'
+    (folder/'ToolButton.qml').write_text('import QtQuick.Controls as C\nC.ToolButton {}')
+    with (folder/'qmldir').open('a') as f: f.write('\nToolButton 1.0 ToolButton.qml\n')
+    folder=tmp_path/'org/kde/kirigami'
+    (folder/'Units.qml').write_text('pragma Singleton\nimport QtQuick\nQtObject { property int smallSpacing: 4 }')
+    with (folder/'qmldir').open('a') as f:f.write('\nsingleton Units 1.0 Units.qml\n')
+    p=folder/'Theme.qml';p.write_text(p.read_text().replace('property color textColor:', 'property color highlightedTextColor: "white"; property color textColor:'))
+    item=(UI/'main.qml').read_text().split('fullRepresentation: ',1)[1].rsplit('\n}',1)[0]
+    item=item.replace('id: popup','''id: popup
+        objectName: "actualMainPopup"
+        x: root.leftPadding; y: root.topPadding
+        width: Layout.preferredWidth; height: Layout.preferredHeight''',1)
+    source='''import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls as QQC2
+import org.kde.kirigami as Kirigami
+import org.kde.plasma.components as PC3
+import "MenuMetrics.js" as Metrics
+import "AccessKeys.js" as AccessKeys
+import "LayoutDraft.js" as LayoutDraft
+import "LayoutController.js" as LayoutController
+Window {
+ id: root
+ visible: true
+ property real topPadding: 10
+ property real bottomPadding: 14
+ property real leftPadding: 8
+ property real rightPadding: 8
+ width: popup.width+leftPadding+rightPadding
+ height: popup.height+topPadding+bottomPadding
+ property bool expanded: true
+ property bool autoCloseOnPointerLeave: false
+ property int autoCloseDelay: 500
+ property int submenuHoverDelay: -1
+ property bool backendMissing: false
+ property bool showMenuIcons: true
+ property bool launchPending: false
+ property bool layoutBusy: false
+ property bool layoutExpired: false
+ property var layoutDraft: null
+ readonly property bool layoutEditing: layoutDraft !== null
+ property bool powerIsOpen: true
+ property string commandError: ""
+ property string layoutStatus: ""
+ property string menuStatus: ""
+ property string menuAppearance: "native"
+ property string menuDensity: "standard"
+ property string menuHeightMode: "auto"
+ property int menuCustomHeight: 600
+ property string menuWidth: "auto"
+ property string menuIconSize: "standard"
+ property rect menuWorkArea: Qt.rect(-1920,40,1920,1600)
+ property var visibleEntries: []
+ function fetchMenu() {}
+ function fetchIntegration() {}
+ function launchItem() { throw new Error("No command execution in sizing fixture") }
+ function openEditor() {}
+'''+item+'\n}'
+    path=tmp_path/'MainFixture.qml';path.write_text(source)
+    engine=QQmlEngine();engine.addImportPath(str(tmp_path))
+    component=QQmlComponent(engine,QUrl.fromLocalFile(str(path)))
+    window=component.create()
+    assert window,[str(e) for e in component.errors()]
+    QTest.qWait(30)
+    yield window
+    window.setVisible(False);window.deleteLater();QApplication.instance().processEvents()
+    engine.deleteLater();QApplication.instance().processEvents()
+
+
+def test_rendered_main_natural_custom_and_clamping(main_popup):
+    window=main_popup
+    evaluate(window, "visibleEntries=Array.from({length:25},(_,i)=>({kind:'command',title:'Command '+i,key:'fixture'+i}));")
+    QTest.qWait(40)
+    assert window.height() > 590
+    assert evaluate(window, 'menuScroll.availableHeight >= menuColumn.implicitHeight')
+    evaluate(window, "menuDensity='comfortable'; menuIconSize='large';")
+    QTest.qWait(40)
+    assert evaluate(window, 'menuScroll.availableHeight >= menuColumn.implicitHeight')
+    evaluate(window, "menuHeightMode='custom'; menuCustomHeight=370;")
+    QTest.qWait(40)
+    assert evaluate(window, 'popup.height') == 370
+    evaluate(window, "menuWorkArea=Qt.rect(-1280,-1000,1280,300); menuDensity='compact';")
+    QTest.qWait(40)
+    assert window.height() <= 292
+    assert window.property('menuCustomHeight') == 370
+    evaluate(window, "menuWorkArea=Qt.rect(0,40,1920,1600);")
+    QTest.qWait(40)
+    assert evaluate(window, 'popup.height') == 370
+    evaluate(window, "menuHeightMode='auto';")
+    QTest.qWait(40)
+    assert evaluate(window, 'menuScroll.availableHeight >= menuColumn.implicitHeight')
+    evaluate(window, "menuWorkArea=Qt.rect(0,40,1920,400); popup.forceActiveFocus();")
+    QTest.qWait(40)
+    for _ in range(25):QTest.keyClick(window,Qt.Key_Down)
+    assert evaluate(window, 'popup.activeIndex') == 24
+    assert evaluate(window, 'normalRows.itemAt(24).y+normalRows.itemAt(24).height <= menuScroll.contentItem.contentY+menuScroll.availableHeight+1')
+
+
+def test_long_status_cannot_starve_menu_scroll_area(main_popup):
+    window=main_popup
+    evaluate(window, "visibleEntries=Array.from({length:20},(_,i)=>({kind:'command',title:'Entry '+i})); menuWorkArea=Qt.rect(0,0,1000,500); menuStatus='A long error message. '.repeat(200);")
+    QTest.qWait(40)
+    assert evaluate(window, 'menuScroll.availableHeight > popup.entryHeight')
+    assert evaluate(window, 'statusScroll.contentHeight > statusScroll.availableHeight')
+    assert window.height() <= 492
+
+
+def test_rendered_main_editing_height_and_narrow_work_area(main_popup):
+    window=main_popup
+    evaluate(window, "layoutDraft=LayoutDraft.start({token:'fixture',entries:Array.from({length:25},(_,i)=>({id:'id'+i,kind:'command',title:'Entry '+i}))});")
+    QTest.qWait(50)
+    assert evaluate(window, 'layoutEditor.height >= layoutEditor.implicitHeight')
+    before=window.height()
+    evaluate(window, "menuHeightMode='custom'; menuCustomHeight=120;")
+    QTest.qWait(40)
+    assert evaluate(window, 'layoutEditor.height >= layoutEditor.minimumUsableHeight')
+    assert window.property('menuCustomHeight') == 120
+    evaluate(window, "menuHeightMode='auto';")
+    evaluate(window, "layoutDraft=LayoutDraft.start({token:'smaller',entries:[{id:'one',kind:'command',title:'Only entry'}]});")
+    QTest.qWait(50)
+    assert window.height() < before
+    evaluate(window, "layoutDraft=null; menuWidth='wide'; menuWorkArea=Qt.rect(-300,32,300,900);")
+    QTest.qWait(50)
+    assert window.width() < 300
+
+
+def test_font_change_updates_live_row_and_hint_metrics(flyout):
+    # KDE's notifying Theme font changes on settings updates. Qt.application.font
+    # is a CONSTANT QML property and cannot drive live metric bindings.
+    evaluate(flyout, "screenRect=Qt.rect(0,0,1200,1600); entries=[{kind:'command',title:'Font test',access_hint:'W'}];")
+    QTest.qWait(30)
+    row=evaluate(flyout,'flyoutRows.itemAt(0)')
+    content=next(c for c in row.childItems() if c.metaObject().indexOfProperty('showHints')>=0)
+    column=next(c for c in content.childItems() if c.objectName()=='accessKeyColumn')
+    width,height=column.width(),flyout.height()
+    evaluate(flyout, "Kirigami.Theme.defaultFont = Qt.font({pixelSize:36});")
+    QTest.qWait(40)
+    assert column.width()>width
+    assert flyout.height()>height

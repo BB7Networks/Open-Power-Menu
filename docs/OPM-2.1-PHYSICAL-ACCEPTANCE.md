@@ -6,20 +6,14 @@ complete any physical row below. Stable 1.0.1 remains the public release.
 
 ## Obtain and verify the controlled development candidate
 
-Final code-qualified candidate: [Manjaro artifact 13635987400](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/42527140249/artifacts/13635987400),
-source `8f6cb93712cf2f402d4faef5892c297c90f1f53e`, PR workflow 42527140249
-(all eight jobs passed; implementation `462a351`). GitHub reports outer ZIP SHA-256
-`3aaac6cf3c80e28afe20ccf514644cc804efe4971e26871ffcf29f7c95463fd2`;
-Cloud could not download it to verify those bytes. It expires November 15, 2026.
-Earlier `4d0ec86`/`69409d7` artifacts lack the final narrow-editor focus correction.
-
-Use the exact Manjaro artifact linked in the latest
-[feature qualification](OPM-2.1-FEATURE-QUALIFICATION.md), after its corrected-source
-workflow has passed all eight jobs. Download through authenticated GitHub, unpack
-into an otherwise empty directory, and retain the complete download. The baseline
-November 8 artifacts expire November 15; a baseline artifact does not contain the
-later Breeze/import-feedback corrections. Cloud artifact downloads were blocked;
-the report must distinguish remote metadata from downloaded, verified bytes.
+For the UI/upgrade refinement candidate, use the exact Manjaro artifact and
+source commit in the current [draft PR #10](https://github.com/BB7Networks/Open-Power-Menu/pull/10)
+qualification report, together with [the focused refinement checklist](OPM-2.1-UI-UPGRADE-REFINEMENT.md).
+Earlier `8f6cb93` and `88db27b` artifacts do not contain these refinements.
+Check that all eight jobs for the candidate source passed; a successful older run
+does not qualify a newer source. Download through authenticated GitHub into an
+empty directory and retain the complete download. Artifacts expire after seven
+days. Remote metadata and downloaded, locally verified bytes are distinct evidence.
 
 From the unpacked artifact directory, before installation:
 

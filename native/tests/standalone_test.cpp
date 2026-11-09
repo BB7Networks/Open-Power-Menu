@@ -33,6 +33,7 @@ static QJsonObject configuration() {
     return config;
 }
 static void enter(QWidget *widget) {
+    QTest::qWait(170);
     QEnterEvent event(QPointF(2, 2), QPointF(2, 2), QPointF(2, 2));
     QApplication::sendEvent(widget, &event);
 }
@@ -331,6 +332,59 @@ class StandaloneTest : public QObject {
         QTimer::singleShot(50,&disabled,[&]{ QTest::keyClick(&disabled,Qt::Key_X); QVERIFY(disabled.isVisible()); disabled.close(); });
         QCOMPARE(openWithTimeout(disabled),0);
         for(const auto &event:spy) QVERIFY(event[0].toString()!="command-launched");
+    }
+    void repeatedPointerTiming_data() {
+        QTest::addColumn<int>("delay");
+        for (int delay : {500, 1200, 5000}) QTest::newRow(qPrintable(QString::number(delay))) << delay;
+    }
+    void repeatedPointerTiming() {
+        QFETCH(int, delay);
+        const int cycles = std::max(1, qEnvironmentVariableIntValue("OPM_POINTER_CYCLES"));
+        auto cfg = configuration(); cfg["auto_close_delay_ms"] = delay;
+        Standalone menu(cfg);
+        const auto area = QGuiApplication::primaryScreen()->availableGeometry();
+        for (int cycle = 0; cycle < cycles; ++cycle) {
+            const QPoint anchor = cycle % 4 == 0 ? area.topLeft() : cycle % 4 == 1 ? area.topRight()
+                : cycle % 4 == 2 ? area.bottomLeft() : area.bottomRight();
+            menu.popup(anchor);
+            // Reproduce the opening Enter/Leave pair without a stable visit.
+            QEnterEvent noise(QPointF(2,2), QPointF(2,2), QPointF(2,2));
+            QApplication::sendEvent(&menu, &noise); leave(&menu);
+            QTest::qWait(190);
+            QVERIFY(menu.isVisible()); QVERIFY(!menu.pointerTimerActive());
+            enter(&menu); leave(&menu);
+            QVERIFY(menu.pointerTimerActive());
+            // A late genuine re-entry must cancel even at the shortest delay.
+            QTest::qWait(delay - 100);
+            QApplication::sendEvent(&menu, &noise);
+            QVERIFY(!menu.pointerTimerActive());
+            auto *child = menu.actions()[2]->menu();
+            child->popup(menu.mapToGlobal(QPoint(menu.width(),0)));
+            leave(&menu); enter(child);
+            QVERIFY(menu.isVisible()); QVERIFY(!menu.pointerTimerActive());
+            child->close(); enter(&menu);
+            menu.resize(menu.width()+1,menu.height()); leave(&menu);
+            QTest::qWait(190); // async layout must not turn into a pointer exit
+            QVERIFY(menu.isVisible()); QVERIFY(!menu.pointerTimerActive());
+            enter(&menu);
+            moveTo(&menu, QPoint(5,5));
+            QTest::keyClick(&menu, Qt::Key_Home); leave(&menu);
+            QVERIFY(menu.keyboardNavigation()); QVERIFY(!menu.pointerTimerActive());
+            moveTo(&menu, menu.mapFromGlobal(area.center()));
+            QVERIFY(!menu.keyboardNavigation());
+            leave(&menu);
+            QVERIFY(menu.pointerTimerActive());
+            QElapsedTimer elapsed; elapsed.start();
+            qint64 measured = -1;
+            const auto measurement = connect(&menu, &QMenu::aboutToHide, &menu, [&] { measured = elapsed.elapsed(); });
+            QTRY_VERIFY_WITH_TIMEOUT(!menu.isVisible(), delay + 1500);
+            disconnect(measurement);
+            QVERIFY2(measured >= delay - 30, qPrintable(QString("Early dismissal: %1ms for %2ms").arg(measured).arg(delay)));
+            QVERIFY(measured < delay + 1500);
+            QVERIFY(!menu.pointerTimerActive());
+            qInfo().noquote() << QString("POINTER_TIMING platform=%1 delay=%2 cycle=%3 measured=%4 unexpected=0")
+                .arg(QGuiApplication::platformName()).arg(delay).arg(cycle).arg(measured);
+        }
     }
     void configurableDelayAndReopening() {
         auto cfg=configuration();cfg["auto_close_delay_ms"]=500;

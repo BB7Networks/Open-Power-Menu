@@ -35,7 +35,9 @@ class Standalone : public QMenu {
     std::function<bool()> current;
     QHash<QAction *, QString> selections, accessKeys;
     QSet<QMenu *> inside;
-    QTimer leaveTimer, focusTimer;
+    QTimer leaveTimer, focusTimer, transitionTimer;
+    QPointF lastPointer;
+    bool pointerKnown = false;
     QElapsedTimer elapsed;
     bool keyboard = false, entered = false, wasActive = false;
     bool traceEnabled, wayland;

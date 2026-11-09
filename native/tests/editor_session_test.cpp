@@ -82,6 +82,23 @@ class EditorTests : public QObject {
         QVERIFY(!editor.previewImport(url).isEmpty());
         QVERIFY(editor.applyImport()); // A new preview recovers after failure.
     }
+    void customHeightSurvivesDensityResetAndReopen() {
+        QTemporaryDir dir; Storage store(dir.filePath("menu.json"));
+        store.save(fixture(), {});
+        EditorSession editor(store);
+        QVERIFY(editor.preference(R"({"menu_height_mode":"custom","menu_custom_height":750})"));
+        QVERIFY(editor.save());
+        QVERIFY(editor.preference(R"({"menu_density":"compact","menu_icon_size":"small"})"));
+        QVERIFY(editor.save());
+        QCOMPARE(store.load()["menu_custom_height"].toInt(), 750);
+        QVERIFY(editor.preference(R"({"menu_height_mode":"auto"})"));
+        QVERIFY(editor.save());
+        EditorSession reopened(store);
+        QCOMPARE(reopened.configuration()["menu_height_mode"].toString(), "auto");
+        QCOMPARE(reopened.configuration()["menu_custom_height"].toInt(), 750);
+        QVERIFY(reopened.preference(R"({"menu_height_mode":"custom"})"));
+        QCOMPARE(reopened.configuration()["menu_custom_height"].toInt(), 750);
+    }
     void portableRoundTripAndProtectedImport() {
         QTemporaryDir dir;
         Storage store(dir.filePath("menu.json"));
@@ -89,7 +106,7 @@ class EditorTests : public QObject {
         original["launcher_applet_id"] = 987;
         store.save(original, {});
         EditorSession editor(store);
-        QVERIFY(editor.preference(R"({"menu_density":"comfortable","menu_width":"wide","menu_icon_size":"large","submenu_hover_delay_ms":600})"));
+        QVERIFY(editor.preference(R"({"menu_density":"comfortable","menu_width":"wide","menu_height_mode":"custom","menu_custom_height":950,"menu_icon_size":"large","submenu_hover_delay_ms":600})"));
         const auto exported = QUrl::fromLocalFile(dir.filePath("portable.json"));
         QVERIFY(editor.exportConfiguration(exported));
         QFile file(exported.toLocalFile()); QVERIFY(file.open(QIODevice::ReadOnly));
@@ -107,6 +124,8 @@ class EditorTests : public QObject {
         QVERIFY(preview.contains("No command has been executed"));
         QVERIFY(editor.applyImport());
         QCOMPARE(store.load()["menu_density"].toString(), "comfortable");
+        QCOMPARE(store.load()["menu_height_mode"].toString(), "custom");
+        QCOMPARE(store.load()["menu_custom_height"].toInt(), 950);
         QCOMPARE(store.load()["launcher_applet_id"].toInt(), 987);
         QCOMPARE(store.load()["backup_retention"].toInt(), 0);
         QCOMPARE(store.load()["unknown"], original["unknown"]);
