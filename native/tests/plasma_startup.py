@@ -206,7 +206,7 @@ def read_states(path):
             try:
                 rows.append(json.loads(line.split('OPM_STARTUP ',1)[1]))
             except json.JSONDecodeError:
-                if index==len(lines)-1 and not line.endswith('\\n'):
+                if index==len(lines)-1 and not line.endswith('\n'):
                     break
                 raise
     return rows
