@@ -415,6 +415,9 @@ def main():
             with tempfile.TemporaryDirectory(prefix='opm-keyboard-') as runtime:
                 env={**os.environ,'DISPLAY':'','WAYLAND_DISPLAY':'opm-keyboard-test' if platform=='wayland' else '',
                      'XDG_RUNTIME_DIR':runtime,'QT_QPA_PLATFORM':platform,'QT_QUICK_BACKEND':'software',
+                     # Read the private shell's diagnostics even on Qt builds
+                     # whose default log sink is journald instead of stderr.
+                     'QT_FORCE_STDERR_LOGGING':'1',
                      'KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6','QML_XHR_ALLOW_FILE_READ':'1',
                      'PATH':str(case/'bin')+os.pathsep+os.environ['PATH'],'OPM_POWER_RECORD':str(case/'requests.jsonl')}
                 if args.manual_seconds:
@@ -428,7 +431,16 @@ def main():
                         '--output',case,'--backend',args.backend]+(['--hidden'] if hidden else [])+(['--held-repeat'] if args.held_repeat else [])+
                         (['--manual-seconds',str(args.manual_seconds)] if args.manual_seconds else []),
                         env=env,stdout=log,stderr=subprocess.STDOUT,timeout=max(180,args.manual_seconds+60))
-                assert run.returncode==0,(case/'session.log').read_text()
+                if run.returncode:
+                    # A failed Docker layer is not available for later artifact
+                    # collection. Preserve the component diagnostics in its log.
+                    for name in ('session.log', 'plasma.log', 'kwin.log', 'backend.log',
+                                 'fixture.log', 'application.log', 'shortcuts.log'):
+                        path = case/name
+                        if path.exists():
+                            print('\nPRIVATE FIXTURE '+name+'\n'+path.read_text(errors='replace')[-14000:],
+                                  file=sys.stderr, flush=True)
+                    raise AssertionError('Private keyboard seat failed: '+str(case))
             print('PASS',case,flush=True)
 
 
