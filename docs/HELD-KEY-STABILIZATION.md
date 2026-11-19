@@ -1,10 +1,13 @@
-# Held-key stabilization candidate
+# Held-key stabilization evidence and mock acceptance
 
-This continues the latest **51-file power/keyboard candidate**, preserving its
+The original 64-file patch continued the **51-file power/keyboard candidate**, preserving its
 contents before making these changes. Base: `5b1384832c19d3d1d9a5dbadf8421f6e9b612811`,
-branch `feature/native-architecture-v1.1`. No commit, push, release, PR change or
-workstation installation was performed. PR #10 remains draft. X11 taskbar text
-ghosting is still deferred.
+branch `feature/native-architecture-v1.1`. That patch delivery performed no commit,
+push, release, PR change or workstation installation. The release candidate now
+incorporates that complete patch; see [RC1 release notes](../RELEASE-NOTES-v2.1.0-rc1.md)
+for artifact provenance and current qualification. The results below describe the
+original held-key qualification, and the mock acceptance procedure still applies.
+PR #10 remains draft. X11 taskbar text ghosting is still deferred.
 
 ## Cause and correction
 

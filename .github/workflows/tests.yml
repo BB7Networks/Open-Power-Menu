@@ -16,9 +16,12 @@ jobs:
           - distro: Arch
             image: archlinux:base
             runtime_python: absent
+            # Current Arch Plasma 6.8 repositories no longer ship kwin-x11.
+            test_x11: 'OFF'
           - distro: Manjaro
             image: manjarolinux/base:latest
             runtime_python: distro
+            test_x11: 'ON'
     steps:
       - uses: actions/checkout@v4
       - name: Prepare checksum-pinned native source and released upgrade baseline
@@ -33,17 +36,23 @@ jobs:
           set -o pipefail
           docker build --progress=plain --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
             --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} \
+            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
             -f native/tests/pacman.Dockerfile -t opm-native-pacman:test . 2>&1 | tee work/pacman-build.log
       - name: Expose failed qualification details in the check result
         if: failure()
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
           log = Path('work/pacman-build.log')
           if log.exists():
-              message = '\n'.join(log.read_text(errors='replace').splitlines()[-180:])[-25000:]
-              message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-              print('::error title=Native package qualification failed::' + message)
+              lines = log.read_text(errors='replace').splitlines()
+              errors = [line for line in lines if re.search(r'error:|FAIL!|Exception|AssertionError|not found|failed to', line, re.I)]
+              # GitHub truncates individual check annotations at 4 KiB.
+              for title, message in [('Native package failure details', '\n'.join(errors)[-3000:]),
+                                     ('Native package final output', '\n'.join(lines[-45:])[-3000:])]:
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::error title=' + title + '::' + message)
           PY
       - name: Install sealed package, activate and roll back without PySide6 or a compiler
         run: docker run --rm --network none opm-native-pacman:test

@@ -2,11 +2,16 @@
 # The runtime stage is intentionally independent of build and legacy Python tools.
 ARG OPM_BASE_IMAGE=archlinux:base
 FROM ${OPM_BASE_IMAGE} AS build
+ARG OPM_TEST_X11=ON
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
-    plasma-desktop plasma-workspace kwin kwin-x11 && \
-    command -v kwin_x11 && command -v kwin_wayland && \
+    plasma-desktop plasma-workspace kwin && \
+    case "$OPM_TEST_X11" in \
+        ON) pacman -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
+        OFF) :;; \
+        *) exit 1;; \
+    esac && command -v kwin_wayland && \
     (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 WORKDIR /src
 COPY --chown=1000:1000 . /src
@@ -20,9 +25,15 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
     printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; immediate power actions are the default.' > artifacts/CANDIDATE.txt
-RUN python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
-    --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-    --output /tmp/plasma-keyboard --held-repeat && \
+RUN if [ "$OPM_TEST_X11" = ON ]; then \
+        python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-keyboard --held-repeat; \
+    else \
+        python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-keyboard --held-repeat --platform wayland; \
+    fi && \
     cp -r /tmp/plasma-keyboard artifacts/keyboard-tests
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
