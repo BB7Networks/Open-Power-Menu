@@ -491,7 +491,7 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand, const QString &
             continue; // Respect Hidden/OnlyShowIn/TryExec; do not bypass via PATH.
         }
         if (!executable(args[0])) continue;
-        if (truth(options["dbus_service"])) {
+        if (!action.isEmpty() && truth(options["dbus_service"])) {
             const auto name = options["dbus_service"].toString();
             const auto names = probe(args[0], {"org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus.ListNames"}) + '\n' +
                 probe(args[0], {"org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus.ListActivatableNames"});

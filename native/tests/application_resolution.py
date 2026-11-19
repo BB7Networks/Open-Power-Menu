@@ -60,6 +60,8 @@ class ApplicationResolution(unittest.TestCase):
         self.binary('chosen'); self.binary('dolphin')
         self.assertEqual(self.resolve(item={'label': 'File Manager', 'command': ['chosen', 'literal'],
                                            'future': {'keep': True}, 'builtin_id': 'files'}), ['chosen', 'literal'])
+        self.assertEqual(self.resolve(item={'commands': [{'argv': ['chosen', 'literal'],
+                                           'dbus_service': 'org.test.FutureMetadata'}]}), ['chosen', 'literal'])
 
     def test_default_directory_handler_beats_fallback(self):
         self.binary('dolphin'); self.binary('chosen-files')
