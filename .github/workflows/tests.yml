@@ -28,7 +28,23 @@ jobs:
           mkdir -p work/package-legacy
           git archive FETCH_HEAD | tar -x -C work/package-legacy
       - name: Build pacman package and test legacy upgrades on the target distro
-        run: docker build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} -f native/tests/pacman.Dockerfile -t opm-native-pacman:test .
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --progress=plain --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} \
+            -f native/tests/pacman.Dockerfile -t opm-native-pacman:test . 2>&1 | tee work/pacman-build.log
+      - name: Expose failed qualification details in the check result
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          log = Path('work/pacman-build.log')
+          if log.exists():
+              message = '\n'.join(log.read_text(errors='replace').splitlines()[-180:])[-25000:]
+              message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+              print('::error title=Native package qualification failed::' + message)
+          PY
       - name: Install sealed package, activate and roll back without PySide6 or a compiler
         run: docker run --rm --network none opm-native-pacman:test
       - name: Collect development artifacts and distribution snapshot
