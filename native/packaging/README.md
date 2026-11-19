@@ -1,7 +1,9 @@
-# Complete native development bundle
+# Complete native v2.1.0-rc1 bundle
 
-This is a development installation, not a published 2.1 release. Back up your
-personal configuration and complete the physical Plasma release gates first.
+This is a prerelease for controlled physical testing. Stable 1.0.1 is unchanged.
+Read the [release notes](../../RELEASE-NOTES-v2.1.0-rc1.md), including the warning
+that Shutdown, Restart and Sign out are immediate by default. Back up your
+personal configuration and use private mocks for keyboard power stress tests.
 Never run the installer as root. It does not install system dependencies.
 
 GUI interaction tests use `xvfb-run` and `xauth` in the disposable build image.
@@ -13,6 +15,12 @@ Build with CMake 3.22+ on the target distribution (Debian 13 amd64 is the tested
 
     cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON
     cmake --build build/package --target native-package --parallel 2
+
+Distribution builds record the exact Git commit in `bundle.json` and
+`SOURCE-COMMIT`. CMake discovers it from a checkout; archive builders must pass
+`-DOPM_SOURCE_COMMIT=<40-character-commit>`. The pacman preparation helper pins
+both the source checksum and commit automatically. The prerelease workflow
+verifies the source tree and packaged bundle before publishing persistent assets.
 
 The bundle includes all three native applications, native CLI/installer,
 Plasma 6 widget, icon and documentation. Desktop and D-Bus entries are generated
@@ -83,7 +91,7 @@ No automatic history pruning occurs. Review snapshots before deleting them.
 
 Runtime on Debian 13 amd64: libqt6core6t64, libqt6dbus6, libqt6gui6,
 libqt6widgets6, libqt6qml6, libqt6quick6, libqt6quickcontrols2-6,
-libkf6service6, libkf6configcore6, kde-cli-tools, dbus, qt6-qpa-plugins,
+libkf6service6, libkf6configcore6, libxcb-xinput0, kde-cli-tools, dbus, qt6-qpa-plugins,
 qt6-wayland, qml6-module-org-kde-kirigami, qml6-module-qtquick-controls,
 qml6-module-qtquick-dialogs, qml6-module-qtquick-layouts,
 qml6-module-qtquick-window, qml6-module-qtqml-workerscript, and their distro
@@ -140,9 +148,11 @@ the base image's Python used by pacman-mirrors, while requiring PySide6 to be ab
 all three require no compiler for native installation and operation. This preserves
 unrelated system dependencies and does not make Python an OPM runtime dependency.
 
-CI retains development packages, bundles, the separate Store widget, checksums,
+CI retains candidate packages, bundles, the separate Store widget, checksums,
 source commit, os-release and build/runtime package inventories for seven days.
-These are development artifacts, not public releases or physical Plasma certification.
+Tag qualification publishes the verified Manjaro package, complete native bundle,
+source archive, checksums and qualification inventory as a GitHub prerelease.
+Actions artifacts alone are not public releases or physical Plasma certification.
 See [qualification results](../../docs/OPM-2.1-RESULTS.md) for the tested snapshots.
 Keep distribution/version/CPU, hash, ELF, plugin and activation checks intact.
 Platform validation uses the plugins' advertised xcb/wayland capabilities and still

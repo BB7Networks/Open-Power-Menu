@@ -1,6 +1,7 @@
 # Disposable Debian 13 build/test image, followed by a no-Python GUI runtime.
 # The resulting ELF is a Debian 13 development artifact, not a universal package.
 FROM debian:trixie-slim AS build
+ARG OPM_SOURCE_COMMIT
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     useradd --uid 1000 --create-home builder
 RUN chown builder:builder /src
 USER 1000:1000
-RUN umask 022 && cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON -DOPM_INSTALL_TEST_HOOKS=ON && \
+RUN umask 022 && cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON -DOPM_INSTALL_TEST_HOOKS=ON -DOPM_SOURCE_COMMIT=${OPM_SOURCE_COMMIT} && \
     cmake --build /tmp/build --parallel 2 && \
     ctest --test-dir /tmp/build --output-on-failure && \
     cmake --build /tmp/build --target native-bundle && \

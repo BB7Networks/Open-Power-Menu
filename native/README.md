@@ -1,9 +1,14 @@
-# Native v2.1 development preview
+# Native v2.1.0-rc1
 
 The native backend, recovery operations and Qt Quick/Kirigami configuration
 editor and an optional Qt Widgets standalone frontend are implemented.
-The normal installer and production standalone entry point still use Python/PySide6 and remain at **1.0.1**. This preview identifies itself as
-**2.1.0-dev**; it is not a complete native replacement installation.
+The native release identifies itself as **2.1.0-rc1**. Use its complete native
+bundle or Manjaro package, not the legacy Python/source installer retained for
+1.0.1 compatibility tests. All shipped native executables, bundle metadata and
+the packaged widget use `native/VERSION`; the legacy Python and source-widget
+metadata remain 1.0.1 and are not the native distribution metadata.
+See the [RC notes](../RELEASE-NOTES-v2.1.0-rc1.md), including the immediate-power
+warning, tested runtime limits and rollback instructions.
 
 See the [architecture and dependency inventory](../docs/architecture/0001-native-runtime.md),
 [migration status](../docs/architecture/native-migration-status.md) and

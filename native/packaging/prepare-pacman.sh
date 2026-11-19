@@ -19,8 +19,9 @@ git -C "$repository" archive --format=tar.gz --prefix=Open-Power-Menu/ \
     -o "$out/open-power-menu-source.tar.gz" HEAD
 checksum=$(sha256sum < "$out/open-power-menu-source.tar.gz")
 checksum=${checksum%% *}
+commit=$(git -C "$repository" rev-parse HEAD)
 git -C "$repository" show HEAD:native/packaging/PKGBUILD |
-    sed "s/SOURCE_SHA256/$checksum/" > "$out/PKGBUILD"
-git -C "$repository" rev-parse HEAD > "$out/SOURCE-COMMIT"
+    sed -e "s/SOURCE_SHA256/$checksum/" -e "s/'SOURCE_COMMIT'/'$commit'/" > "$out/PKGBUILD"
+printf '%s\n' "$commit" > "$out/SOURCE-COMMIT"
 printf '%s  %s\n' "$checksum" 'open-power-menu-source.tar.gz' > "$out/SOURCE.sha256"
 printf 'Prepared %s\n' "$out"

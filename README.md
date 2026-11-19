@@ -1,10 +1,16 @@
 # Open Power Menu
 
-Native development targets **2.1.0-dev**, combining the C++/Qt rewrite and usability
-features in the next public **2.1.0** release directly from **1.0.1**. Stable remains
-1.0.1. The internal `2.0.0-dev` milestone will not be published. See the
-[2.1 roadmap and acceptance gates](docs/OPM-2.1.md) and
-[optional PySide6 review](docs/DEPENDENCY-CLEANUP.md).
+**Native v2.1.0-rc1** is a prerelease for controlled physical testing. Stable
+**v1.0.1** remains unchanged. Use the [RC release notes and native installation
+instructions](RELEASE-NOTES-v2.1.0-rc1.md) and the
+[GitHub prerelease](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc1).
+The legacy Python/source installer documentation below applies to stable 1.0.1;
+use the native package or complete native bundle for this candidate.
+
+**Warning: Shutdown, Restart and Sign out are immediate by default.** Enable
+**Confirm power actions** in native Configure before exploring power entries on
+a real workstation. Perform held-key stress tests only with the private mocks
+described in the release notes. Physical acceptance is required before final 2.1.0.
 
 **One launcher button. Two useful menus.**
 

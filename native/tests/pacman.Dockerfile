@@ -4,7 +4,8 @@ ARG OPM_BASE_IMAGE=archlinux:base
 FROM ${OPM_BASE_IMAGE} AS build
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
-    dbus python pyside6 xorg-server-xvfb xorg-xauth && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
+    dbus python pyside6 xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
+    plasma-desktop plasma-workspace kwin && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 USER 1000:1000
@@ -12,11 +13,15 @@ ENV LANG=C.UTF-8
 WORKDIR /src/work/pacman-source
 RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     mkdir artifacts && \
-    cp ./*.pkg.tar.zst SOURCE-COMMIT SOURCE.sha256 artifacts/ && \
+    cp ./*.pkg.tar.zst SOURCE-COMMIT SOURCE.sha256 open-power-menu-source.tar.gz artifacts/ && \
     sha256sum ./*.pkg.tar.zst > artifacts/PACKAGE.sha256 && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
-    printf '%s\n' '2.1.0-dev development artifacts. Physical Plasma acceptance and explicit release approval are still required.' > artifacts/DEVELOPMENT-ONLY.txt
+    printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; immediate power actions are the default.' > artifacts/CANDIDATE.txt
+RUN python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
+    --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+    --output /tmp/plasma-keyboard --held-repeat && \
+    cp -r /tmp/plasma-keyboard artifacts/keyboard-tests
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
 RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \

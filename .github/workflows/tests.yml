@@ -1,8 +1,10 @@
 name: Tests
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 jobs:
   native-pacman:
     name: Native ${{ matrix.distro }} package and upgrades
@@ -36,7 +38,7 @@ jobs:
           docker rm "$container"
       - uses: actions/upload-artifact@v4
         with:
-          name: opm-2.1-dev-${{ matrix.distro }}-${{ github.sha }}
+          name: opm-native-${{ matrix.distro }}-${{ github.sha }}
           path: work/qualified-dev/
           retention-days: 7
   native-packaging:
@@ -50,7 +52,7 @@ jobs:
           mkdir -p work/package-legacy
           git archive FETCH_HEAD | tar -x -C work/package-legacy
       - name: Build complete native package and test transactions
-        run: docker build -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+        run: docker build --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test .
       - name: Install, activate, reinstall, remove and roll back without Python
         run: docker run --rm --network none opm-native-package:test
   native-standalone:

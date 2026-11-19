@@ -335,6 +335,7 @@ int main(int argc, char **argv) {
             write(root, "bundle.json",
                   QJsonDocument(QJsonObject{{"format", 1},
                                             {"version", OPM_NATIVE_VERSION},
+                                            {"source_commit", OPM_SOURCE_COMMIT},
                                             {"os", QSysInfo::productType()},
                                             {"os_version", QSysInfo::productVersion()},
                                             {"cpu", QSysInfo::currentCpuArchitecture()},
@@ -417,6 +418,7 @@ int main(int argc, char **argv) {
             inventory(bundle, files, {}, true);
             files.remove("bundle.json");
             if (spec["format"] != 1 || spec["version"] != OPM_NATIVE_VERSION ||
+                spec["source_commit"] != OPM_SOURCE_COMMIT ||
                 spec["files"].toObject() != files)
                 throw Error("Invalid/corrupt native bundle");
             if (spec["os"] != QSysInfo::productType() ||
