@@ -257,9 +257,8 @@ Kirigami.ApplicationWindow {
                         Layout.fillWidth: true
                         ColumnLayout {
                             anchors.fill: parent
-                            Controls.ComboBox {
+                            ChoiceBox {
                                 model: ["Use original launcher icon", "Custom icon"]
-                                implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                 Layout.preferredWidth: implicitWidth
                                 currentIndex: window.settings.button_icon_mode === "custom" ? 1 : 0
                                 onActivated: index => window.preference("button_icon_mode", index === 1 ? "custom" : "launcher")
@@ -318,11 +317,10 @@ Kirigami.ApplicationWindow {
                                     text: "Menu theme"
                                     Layout.preferredWidth: 155
                                 }
-                                Controls.ComboBox {
+                                ChoiceBox {
                                     objectName: "menuTheme"
                                     Accessible.name: "Menu theme"
                                     model: ["Use the desktop theme", "Aero Dark", "Aero Light"]
-                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                     Layout.preferredWidth: implicitWidth
                                     currentIndex: window.settings.appearance === "aero" ? 1 : window.settings.appearance === "aero-light" ? 2 : 0
                                     onActivated: index => window.preference("appearance", ["native", "aero", "aero-light"][index])
@@ -344,11 +342,10 @@ Kirigami.ApplicationWindow {
                                     text: "Menu density"
                                     Layout.preferredWidth: 155
                                 }
-                                Controls.ComboBox {
+                                ChoiceBox {
                                     objectName: "menu_density"
                                     Accessible.name: "menu density"
                                     model: ["Compact", "Standard", "Comfortable"]
-                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                     Layout.preferredWidth: implicitWidth
                                     currentIndex: ["compact", "standard", "comfortable"].indexOf(window.settings.menu_density)
                                     onActivated: index => window.preference("menu_density", ["compact", "standard", "comfortable"][index])
@@ -363,11 +360,10 @@ Kirigami.ApplicationWindow {
                                     text: "Menu width"
                                     Layout.preferredWidth: 155
                                 }
-                                Controls.ComboBox {
+                                ChoiceBox {
                                     objectName: "menu_width"
                                     Accessible.name: "menu width"
                                     model: ["Automatic", "Narrow", "Wide"]
-                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                     Layout.preferredWidth: implicitWidth
                                     currentIndex: ["auto", "narrow", "wide"].indexOf(window.settings.menu_width)
                                     onActivated: index => window.preference("menu_width", ["auto", "narrow", "wide"][index])
@@ -384,11 +380,10 @@ Kirigami.ApplicationWindow {
                                 }
                                 RowLayout {
                                     spacing: 8
-                                    Controls.ComboBox {
+                                    ChoiceBox {
                                         objectName: "menu_height_mode"
                                         Accessible.name: "menu height mode"
                                         model: ["Auto-fit", "Custom"]
-                                        implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                         Layout.preferredWidth: implicitWidth
                                         currentIndex: window.settings.menu_height_mode === "custom" ? 1 : 0
                                         onActivated: index => window.preference("menu_height_mode", index ? "custom" : "auto")
@@ -442,11 +437,10 @@ Kirigami.ApplicationWindow {
                                     text: "Icon size"
                                     Layout.preferredWidth: 155
                                 }
-                                Controls.ComboBox {
+                                ChoiceBox {
                                     objectName: "menu_icon_size"
                                     Accessible.name: "menu icon size"
                                     model: ["Small", "Standard", "Large"]
-                                    implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                     Layout.preferredWidth: implicitWidth
                                     currentIndex: ["small", "standard", "large"].indexOf(window.settings.menu_icon_size)
                                     onActivated: index => window.preference("menu_icon_size", ["small", "standard", "large"][index])
@@ -499,11 +493,10 @@ Kirigami.ApplicationWindow {
                                 }
                                 RowLayout {
                                     spacing: 8
-                                    Controls.ComboBox {
+                                    ChoiceBox {
                                         objectName: "hoverMode"
                                         Accessible.name: "hoverMode"
                                         model: ["Existing / system", "Immediate", "Delayed"]
-                                        implicitContentWidthPolicy: Controls.ComboBox.WidestText
                                         Layout.preferredWidth: implicitWidth
                                         currentIndex: window.settings.submenu_hover_delay_ms < 0 ? 0 : window.settings.submenu_hover_delay_ms === 0 ? 1 : 2
                                         onActivated: index => window.preference("submenu_hover_delay_ms", index === 0 ? -1 : index === 1 ? 0 : 300)

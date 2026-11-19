@@ -10,6 +10,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QTimer>
+#include <QTextStream>
 #include <unistd.h>
 
 namespace Opm {
@@ -116,11 +117,13 @@ EditorEnvironment editorEnvironment(const QProcessEnvironment &base, const QStri
     result.environment.insert("XDG_SESSION_TYPE", type);
     if (base.value("OPM_SESSION_TRACE") == "1") {
         // Deliberately omit cookie contents, environment dumps and startup tokens.
-        qInfo().noquote() << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
-                         << "OPM Configure session:" << result.source << "type=" << type
-                         << "DISPLAY=" << result.environment.value("DISPLAY")
-                         << "WAYLAND_DISPLAY=" << result.environment.value("WAYLAND_DISPLAY")
-                         << "XAUTHORITY=" << result.environment.value("XAUTHORITY");
+        // An explicitly requested CLI trace must survive distro Qt logging
+        // filters/journal routing. Keep this scoped to our opt-in messages.
+        QTextStream(stderr) << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                            << " OPM Configure session: " << result.source << " type=" << type
+                            << " DISPLAY=" << result.environment.value("DISPLAY")
+                            << " WAYLAND_DISPLAY=" << result.environment.value("WAYLAND_DISPLAY")
+                            << " XAUTHORITY=" << result.environment.value("XAUTHORITY") << '\n';
     }
     return result;
 }
@@ -154,10 +157,10 @@ int coordinateEditor(int argc, char **argv) {
     auto report = [&](const QString &error) {
         if (reported) return;
         reported = true;
-        if (!error.isEmpty()) qCritical().noquote() << "Configure could not open:" << error;
+        if (!error.isEmpty()) QTextStream(stderr) << "Configure could not open: " << error << '\n';
         if (qEnvironmentVariable("OPM_SESSION_TRACE") == "1")
-            qInfo().noquote() << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
-                             << "OPM Configure startup:" << (error.isEmpty() ? "first frame ready" : "failed");
+            QTextStream(stderr) << QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)
+                                << " OPM Configure startup: " << (error.isEmpty() ? "first frame ready" : "failed") << '\n';
         reportEditorStartup(parser.value("opm-reply-to"), parser.value("opm-request"), error);
     };
     const auto session = editorEnvironment(QProcessEnvironment::systemEnvironment(), parser.value("opm-session-peer"), parser.isSet("smoke-test"));

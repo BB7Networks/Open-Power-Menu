@@ -292,7 +292,7 @@ class EditorLaunch(unittest.TestCase):
         logs = lambda: '\n'.join(p.read_text() for p in self.root.glob('process-*.log'))
         self.assertNotIn('OPM Configure session:', logs())
         direct = self.start([self.bin / 'open-power-menu-editor', '--config', self.config],
-                            env={**self.env, 'OPM_SESSION_TRACE': '1'})
+                            env={**self.env, 'OPM_SESSION_TRACE': '1', 'QT_LOGGING_RULES': '*.info=false'})
         self.result()
         self.release()
         self.assertEqual(direct.wait(timeout=5), 0)
@@ -311,7 +311,7 @@ class EditorLaunch(unittest.TestCase):
         self.assertIn('before displaying its first frame', p.stderr)
         self.assertNotIn('true', p.stdout)
         direct = subprocess.run([self.bin / 'open-power-menu-editor', '--config', self.config],
-                                env=self.env, capture_output=True, text=True, timeout=20)
+                                env={**self.env, 'QT_LOGGING_RULES': '*.critical=false'}, capture_output=True, text=True, timeout=20)
         self.assertNotEqual(direct.returncode, 0)
         self.assertIn('before displaying its first frame', direct.stderr)
 

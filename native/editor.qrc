@@ -1,5 +1,6 @@
 <RCC><qresource prefix="/editor">
   <file>qml/Main.qml</file>
+  <file>qml/ChoiceBox.qml</file>
   <file>qml/EntryDialog.qml</file>
   <file alias="open-power-menu.svg">../assets/open-power-menu.svg</file>
   <file alias="shared/LayoutEditor.qml">../plasmoid/contents/ui/LayoutEditor.qml</file>

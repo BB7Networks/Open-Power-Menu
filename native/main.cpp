@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     app.setApplicationVersion(OPM_NATIVE_VERSION);
     QCommandLineParser parser;
     parser.setApplicationDescription(
-        "Native backend development preview. The normal 1.0.1 installer and UI remain unchanged.");
+        "Native Open Power Menu backend. See the release notes before testing power actions.");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addOptions(

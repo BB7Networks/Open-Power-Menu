@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     if (gui)
         QApplication::setDesktopFileName("org.openpowermenu");
     QCommandLineParser parser;
-    parser.setApplicationDescription("Native standalone development menu; production activation is unchanged.");
+    parser.setApplicationDescription("Native Open Power Menu standalone menu. Power actions may execute immediately.");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addOptions({{"config", "Read local configuration", "file"},

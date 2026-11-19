@@ -36,6 +36,12 @@ jobs:
           container=$(docker create --network none opm-native-pacman:test)
           docker cp "$container:/opt/opm-artifacts" work/qualified-dev
           docker rm "$container"
+      - name: Verify the Manjaro release asset set before tagging
+        if: matrix.distro == 'Manjaro'
+        run: |
+          python3 scripts/prepare-native-release.py --artifacts work/qualified-dev --output work/release-verified \
+            --commit "$GITHUB_SHA" --tag "v$(cat native/VERSION)"
+          (cd work/release-verified && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: opm-native-${{ matrix.distro }}-${{ github.sha }}

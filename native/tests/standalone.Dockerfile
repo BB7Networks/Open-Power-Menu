@@ -1,7 +1,7 @@
 # Isolated native build and no-Python/no-compiler runtime acceptance.
 FROM debian:trixie-slim AS build
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake ninja-build g++ qt6-base-dev libkf6config-dev libxcb-xinput-dev dbus && rm -rf /var/lib/apt/lists/* && \
+    cmake ninja-build g++ qt6-base-dev libkf6config-dev libxcb-xinput-dev dbus systemd python3 && rm -rf /var/lib/apt/lists/* && \
     useradd --uid 1000 --create-home builder
 WORKDIR /src
 COPY --chown=1000:1000 CMakeLists.txt /src/

@@ -320,6 +320,15 @@ class EditorGuiTests : public QObject {
             QTRY_VERIFY(!popup->property("visible").toBool());
             QCOMPARE(session.configuration()["appearance"].toString(), "native");
         }
+        auto *theme = control("menuTheme");
+        const auto originalFont = theme->property("font").value<QFont>();
+        const auto originalWidth = theme->implicitWidth();
+        auto largeFont = originalFont;
+        largeFont.setPixelSize(32);
+        QVERIFY(theme->setProperty("font", largeFont));
+        QTRY_VERIFY(theme->implicitWidth() > originalWidth);
+        QTRY_VERIFY(theme->width() >= theme->implicitWidth());
+        QVERIFY(theme->setProperty("font", originalFont));
         window->close();
     }
 
