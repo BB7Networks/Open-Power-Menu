@@ -156,7 +156,14 @@ class EditorLaunch(unittest.TestCase):
     def release(self):
         Path(str(self.config) + '.release').touch()
         for pid in self.gui_pids.copy():
-            until(lambda: not Path('/proc/%d/exe' % pid).exists())
+            def exited():
+                try:
+                    return not Path('/proc/%d/exe' % pid).exists()
+                except ProcessLookupError:
+                    # Linux may return ESRCH if the process exits during the procfs
+                    # lookup. Python 3.12 Path.exists() does not swallow this errno.
+                    return True
+            until(exited)
         Path(str(self.config) + '.release').unlink()
         Path(str(self.config) + '.environment.json').unlink()
 

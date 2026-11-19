@@ -67,9 +67,20 @@ Local development initially exposed an inconsistent incremental build after reve
 
 The deferred X11 taskbar ghosting and minor responsiveness issues are unchanged. Physical acceptance and rollback instructions are in the RC2 release notes and the private mock procedure in `HELD-KEY-STABILIZATION.md`.
 
+Expanded Kubuntu tests exposed Qt 6.10's requirement for a real compositor input
+serial before creating a Wayland popup grab. The standalone fixture now supplies
+one harmless native Shift press/release per test window through its isolated
+KWin seat, waits for the release, and models pointer movement when returning to
+pointer tests. The helper refuses ordinary desktop sockets. The permission flag
+applies only to that disposable compositor; production popup/focus code is
+unchanged. All 52 standalone Wayland cases passed locally on Kubuntu after this
+fixture correction. A separate Python 3.12 procfs race in Configure-test cleanup
+is handled by recognizing ESRCH as an already-exited child; no readiness or
+environment assertion is removed.
+
 ## Changed-file inventory
 
-38 files differ from RC1:
+42 files differ from RC1:
 
 - `.dockerignore`
 - `.github/workflows/publish-native-release.yml`
@@ -100,11 +111,15 @@ The deferred X11 taskbar ghosting and minor responsiveness issues are unchanged.
 - `native/tests/application_resolution.py`
 - `native/tests/editor.Dockerfile`
 - `native/tests/editor_gui_test.cpp`
+- `native/tests/editor_launch.py`
 - `native/tests/packaging.Dockerfile`
 - `native/tests/packaging.py`
 - `native/tests/pacman.Dockerfile`
 - `native/tests/plasma_greeter.py`
+- `native/tests/private_wayland_input.py`
 - `native/tests/session_power_test.cpp`
+- `native/tests/standalone-wayland.sh`
+- `native/tests/standalone_test.cpp`
 - `openpowermenu/data/actions.json`
 - `scripts/prepare-native-release.py`
 - `scripts/report-ci-failure.py`

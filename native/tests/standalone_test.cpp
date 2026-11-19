@@ -19,10 +19,32 @@
 #include <utility>
 
 using namespace Opm;
+static void seedPrivateWaylandSeat(QWidget *widget) {
+    const auto helper = qEnvironmentVariable("OPM_TEST_WAYLAND_INPUT");
+    if (!QGuiApplication::platformName().startsWith("wayland") || helper.isEmpty()) return;
+    auto *window = widget->window()->windowHandle();
+    if (!window || !window->isVisible()) return;
+    static QSet<QWindow *> seeded;
+    if (seeded.contains(window)) return;
+    struct Release : QObject {
+        bool seen = false;
+        bool eventFilter(QObject *, QEvent *event) override {
+            if (event->type() == QEvent::KeyRelease && static_cast<QKeyEvent *>(event)->key() == Qt::Key_Shift) seen = true;
+            return false;
+        }
+    } release;
+    qApp->installEventFilter(&release);
+    QTRY_VERIFY_WITH_TIMEOUT(window->isExposed(), 1000);
+    QCOMPARE(QProcess::execute("python3", {helper}), 0);
+    QTRY_VERIFY_WITH_TIMEOUT(release.seen, 1000);
+    seeded.insert(window);
+    QObject::connect(window, &QObject::destroyed, qApp, [window] { seeded.remove(window); });
+}
 // The X11 guard deliberately rejects QTest events with no native evidence.
 // Use actual XTest input in the X11 suite; offscreen/Wayland retain Qt events.
 static void sendKey(QWidget *widget, Qt::Key key, Qt::KeyboardModifiers modifiers, const QString &kind) {
     if (QGuiApplication::platformName() != "xcb") {
+        seedPrivateWaylandSeat(widget);
         if (kind == "key") QTest::keyClick(widget, key, modifiers);
         else if (kind == "keydown") QTest::keyPress(widget, key, modifiers);
         else QTest::keyRelease(widget, key, modifiers);
@@ -58,15 +80,24 @@ static QJsonObject configuration() {
     return config;
 }
 static void enter(QWidget *widget) {
+    seedPrivateWaylandSeat(widget);
     QTest::qWait(170);
     QEnterEvent event(QPointF(2, 2), QPointF(2, 2), QPointF(2, 2));
     QApplication::sendEvent(widget, &event);
+    if (qEnvironmentVariableIsSet("OPM_TEST_WAYLAND_INPUT")) {
+        // The native Shift used to establish a popup serial enters keyboard
+        // mode. Model the pointer movement accompanying this deliberate visit.
+        QMouseEvent move(QEvent::MouseMove, QPointF(2,2), QPointF(widget->mapToGlobal(QPoint(2,2))),
+                         Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QApplication::sendEvent(widget, &move);
+    }
 }
 static void leave(QWidget *widget) {
     QEvent event(QEvent::Leave);
     QApplication::sendEvent(widget, &event);
 }
 static void moveTo(QMenu *menu, const QPoint &point) {
+    seedPrivateWaylandSeat(menu);
     if (!QGuiApplication::platformName().startsWith("wayland"))
         QCursor::setPos(menu->mapToGlobal(point));
     QMouseEvent event(QEvent::MouseMove, QPointF(point), QPointF(menu->mapToGlobal(point)),
