@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QClipboard>
 #include <QIcon>
 #include <QJsonDocument>
 #include <QQmlApplicationEngine>
@@ -653,6 +654,20 @@ class EditorGuiTests : public QObject {
         QTRY_VERIFY(dialog->property("opened").toBool());
         auto *fallbacks = window->findChild<QObject *>("builtinFallbacks");
         QVERIFY(fallbacks && !fallbacks->property("text").toString().isEmpty());
+        // Read-only previews must retain native selection/copy, including when
+        // the distro's editable TextArea style cannot handle a TextEdit target.
+        const auto previewText = fallbacks->property("text").toString();
+        auto *previewContent = qobject_cast<QQuickItem *>(
+            fallbacks->property("contentItem").value<QObject *>());
+        QVERIFY(previewContent);
+        previewContent->forceActiveFocus();
+        QVERIFY(QMetaObject::invokeMethod(previewContent, "selectAll"));
+        QCOMPARE(previewContent->property("selectedText").toString(), previewText);
+        QVERIFY(QMetaObject::invokeMethod(previewContent, "copy"));
+        QTRY_COMPARE(QGuiApplication::clipboard()->text(), previewText);
+        QTest::keyClick(window, Qt::Key_X);
+        QCOMPARE(fallbacks->property("text").toString(), previewText);
+        QVERIFY(QMetaObject::invokeMethod(previewContent, "deselect"));
         QVERIFY(QMetaObject::invokeMethod(dialog, "customizeBuiltin"));
         QCOMPARE(dialog->property("entryKind").toString(), QString("command"));
         QVERIFY(!program->property("text").toString().isEmpty());

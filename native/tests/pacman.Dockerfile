@@ -5,7 +5,9 @@ FROM ${OPM_BASE_IMAGE} AS build
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
-    plasma-desktop plasma-workspace kwin && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
+    plasma-desktop plasma-workspace kwin kwin-x11 && \
+    command -v kwin_x11 && command -v kwin_wayland && \
+    (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 USER 1000:1000

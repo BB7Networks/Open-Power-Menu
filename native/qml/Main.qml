@@ -728,11 +728,13 @@ Kirigami.ApplicationWindow {
                         }
                     }
                     Controls.ScrollView {
+                        id: backupPreviewScroll
                         Controls.ScrollBar.vertical.policy: Controls.ScrollBar.AsNeeded
                         Controls.ScrollBar.horizontal.policy: Controls.ScrollBar.AlwaysOff
                         Controls.SplitView.fillWidth: true
-                        Controls.TextArea {
+                        ReadOnlyText {
                             objectName: "backupPreview"
+                            width: backupPreviewScroll.availableWidth
                             text: editorSession.backupPreview
                             readOnly: true
                             selectByMouse: true
@@ -817,10 +819,12 @@ Kirigami.ApplicationWindow {
         modal: true
         standardButtons: Controls.Dialog.Apply | Controls.Dialog.Cancel
         contentItem: Controls.ScrollView {
+            id: importPreviewScroll
             clip: true
-            Controls.TextArea {
+            ReadOnlyText {
                 id: importText
                 objectName: "importPreviewText"
+                width: importPreviewScroll.availableWidth
                 readOnly: true
                 selectByMouse: true
                 wrapMode: TextEdit.Wrap
@@ -1041,11 +1045,13 @@ Kirigami.ApplicationWindow {
         height: Math.min(500, window.height - 40)
         standardButtons: Controls.Dialog.Yes | Controls.Dialog.Cancel
         Controls.ScrollView {
+            id: overwritePreviewScroll
             Controls.ScrollBar.vertical.policy: Controls.ScrollBar.AsNeeded
             Controls.ScrollBar.horizontal.policy: Controls.ScrollBar.AlwaysOff
             anchors.fill: parent
-            Controls.TextArea {
+            ReadOnlyText {
                 id: overwriteText
+                width: overwritePreviewScroll.availableWidth
                 readOnly: true
                 selectByMouse: true
                 wrapMode: Text.Wrap

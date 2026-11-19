@@ -181,7 +181,7 @@ Controls.Dialog {
                 Layout.preferredWidth: formScroll.availableWidth
                 Layout.maximumWidth: formScroll.availableWidth
             }
-            Controls.TextArea {
+            ReadOnlyText {
                 objectName: "builtinFallbacks"
                 visible: dialog.entryKind === "builtin"
                 text: dialog.builtin.candidates || ""
