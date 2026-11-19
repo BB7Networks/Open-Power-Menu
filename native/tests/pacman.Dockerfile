@@ -1,8 +1,13 @@
 # Build and install a distribution-specific pacman package on a disposable image.
 # The runtime stage is intentionally independent of build and legacy Python tools.
 ARG OPM_BASE_IMAGE=archlinux:base
+ARG OPM_ARCH_SNAPSHOT=""
 FROM ${OPM_BASE_IMAGE} AS build
+ARG OPM_ARCH_SNAPSHOT
 ARG OPM_TEST_X11=ON
+RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
+        printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
+    fi
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
@@ -25,9 +30,8 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
     printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; immediate power actions are the default.' > artifacts/CANDIDATE.txt
-# The workflow runs the keyboard matrix in this build image with networking
-# disabled. Newer KWin needs a software-rendering device, unavailable in build
-# layers; the hosted runner passes only /dev/udmabuf to that private test seat.
+# The workflow runs all four keyboard seats in this build image with networking
+# disabled, then collects their evidence alongside the sealed runtime artifacts.
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
 RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \
@@ -35,8 +39,12 @@ RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \
     python src/Open-Power-Menu/native/tests/packaging.py --bundle src/build/native-bundle --legacy /src/work/package-legacy -v
 
 FROM ${OPM_BASE_IMAGE}
+ARG OPM_ARCH_SNAPSHOT
 ARG OPM_RUNTIME_PYTHON=absent
 ENV OPM_TEST_RUNTIME_PYTHON=${OPM_RUNTIME_PYTHON}
+RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
+        printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
+    fi
 RUN pacman -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
     kirigami kservice kconfig kde-cli-tools dbus && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
 COPY --from=build /src/work/pacman-source/artifacts /opt/opm-artifacts

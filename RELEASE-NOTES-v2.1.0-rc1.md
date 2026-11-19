@@ -101,9 +101,12 @@ native input, model, recovery, session, Configure, GUI, power policy/dispatch an
 installer tests; Python/QML/JavaScript and legacy contracts; private X11 and
 Wayland standalone tests; Debian, Arch and Manjaro package/runtime tests; actual
 1.0.1 upgrade/rollback; startup and popup/dismissal tests; and the full held-key
-matrix on Debian and the target Manjaro build. The additional current Arch build
-runs both Wayland launcher states; its Plasma 6.8 repositories no longer provide
-`kwin-x11`. X11 qualification remains mandatory on Debian and Manjaro.
+matrix on Debian, the target Manjaro build and an **Arch 2026-09-27 compatibility
+snapshot**. Each requires both X11 and Wayland with both launcher states. Current
+Arch Plasma 6.8 is not qualified: it removed `kwin-x11`, and its virtual compositor
+requires a render device unavailable in the hosted fixture. The dated Arch image
+and package repositories keep that supplemental test environment reproducible;
+the published artifacts use current Manjaro, not the Arch snapshot.
 
 The keyboard matrix uses real X11/XTest input with an application behind OPM,
 plus synthetic events with varying repeat flags. It checks held U/R/I/S/H/L,

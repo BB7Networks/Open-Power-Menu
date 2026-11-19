@@ -7,41 +7,26 @@ on:
   workflow_call:
 jobs:
   native-pacman:
-    name: Native ${{ matrix.distro }} package and upgrades
+    name: Native ${{ matrix.label }} package and upgrades
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - distro: Arch
-            image: archlinux:base
+            label: Arch (2026-09-27)
+            image: archlinux:base-20260927.0.600689@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040
+            snapshot: '2026/09/27'
             runtime_python: absent
-            # Current Arch Plasma 6.8 repositories no longer ship kwin-x11.
-            test_x11: 'OFF'
+            test_x11: 'ON'
           - distro: Manjaro
+            label: Manjaro
             image: manjarolinux/base:latest
+            snapshot: ''
             runtime_python: distro
             test_x11: 'ON'
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare a software compositor device for current Arch KWin
-        if: matrix.distro == 'Arch'
-        run: |
-          # Hosted images may omit the optional modules for their running kernel.
-          # Install the matching distro package if the device module is absent.
-          if ! modinfo udmabuf >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)"
-          fi
-          if ! message=$(sudo modprobe udmabuf 2>&1); then
-            echo "::error title=Software compositor device::$message"
-            exit 1
-          fi
-          sudo udevadm settle
-          if ! message=$(sudo chmod a+rw /dev/udmabuf 2>&1); then
-            echo "::error title=Software compositor device::$message"
-            exit 1
-          fi
       - name: Prepare checksum-pinned native source and released upgrade baseline
         run: |
           sh native/packaging/prepare-pacman.sh . work/pacman-source
@@ -53,6 +38,7 @@ jobs:
         run: |
           set -o pipefail
           docker build --progress=plain --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
             --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} \
             --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
             -f native/tests/pacman.Dockerfile -t opm-native-pacman:test . 2>&1 | tee work/pacman-build.log
@@ -84,23 +70,13 @@ jobs:
         run: |
           set -euo pipefail
           docker build --target build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
             --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
             -f native/tests/pacman.Dockerfile -t opm-native-keyboard:test .
-          devices=()
-          platform=()
-          renderer=Q
-          if [ '${{ matrix.distro }}' = Arch ]; then
-            # KWin 6.8 removed the virtual QPainter backend. Give this disposable
-            # hosted-runner seat a software buffer device, never a host GPU.
-            devices=(--device /dev/udmabuf)
-            platform=(--platform wayland)
-            renderer=O2
-          fi
-          container=$(docker create --network none "${devices[@]}" \
-            --env LIBGL_ALWAYS_SOFTWARE=1 --env OPM_TEST_KWIN_COMPOSE="$renderer" \
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
             opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
             --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-            --output /tmp/plasma-keyboard --held-repeat "${platform[@]}")
+            --output /tmp/plasma-keyboard --held-repeat)
           trap 'docker rm -f "$container" >/dev/null' EXIT
           set +e
           docker start --attach "$container" 2>&1 | tee work/pacman-keyboard.log
