@@ -116,8 +116,8 @@ class ApplicationResolution(unittest.TestCase):
 
     def test_default_remote_desktop_and_hardware_fallback(self):
         self.binary('krdc'); self.binary('remmina')
-        entry = self.desktop('org.remmina.Remmina.desktop', 'remmina %U', 'MimeType=application/x-rdp;')
-        (self.root/'config/mimeapps.list').write_text('[Default Applications]\napplication/x-rdp=org.remmina.Remmina.desktop;\n')
+        entry = self.desktop('org.remmina.Remmina.desktop', 'remmina %U', 'MimeType=x-scheme-handler/rdp;')
+        (self.root/'config/mimeapps.list').write_text('[Default Applications]\nx-scheme-handler/rdp=org.remmina.Remmina.desktop;\n')
         self.assertEqual(self.resolve('remote')[-1], str(entry))
         self.binary('konsole')
         self.assertEqual(self.resolve('hardware'), [])

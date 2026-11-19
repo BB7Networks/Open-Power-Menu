@@ -89,7 +89,7 @@ QStringList preferredApplication(const QString &action) {
             return desktopCommand(app);
     }
     if (action == "remote") {
-        const auto app = KApplicationTrader::preferredService(QStringLiteral("application/x-rdp"));
+        const auto app = KApplicationTrader::preferredService(QStringLiteral("x-scheme-handler/rdp"));
         if (app && QStringList{"org.kde.krdc.desktop", "org.remmina.Remmina.desktop", "remmina.desktop"}.contains(app->storageId()))
             return desktopCommand(app);
     }

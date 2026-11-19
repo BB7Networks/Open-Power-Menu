@@ -227,18 +227,18 @@ class SessionPowerTests : public QObject {
         QVERIFY(!store.backups().isEmpty());
     }
     void failuresAndUncertainReplies_data() {
-        QTest::addColumn<QString>("failure"); QTest::addColumn<bool>("uncertain");
-        QTest::newRow("denied") << QString("org.freedesktop.DBus.Error.AccessDenied") << false;
-        QTest::newRow("lost-reply") << QString("org.freedesktop.DBus.Error.NoReply") << true;
-        QTest::newRow("malformed") << QString("malformed") << true;
-        QTest::newRow("timeout") << QString("timeout") << true;
+        QTest::addColumn<QString>("action"); QTest::addColumn<QString>("failure"); QTest::addColumn<bool>("uncertain");
+        for (const auto &action : {"shutdown", "reboot", "logout", "shutdown-confirm", "reboot-confirm", "logout-confirm"})
+            for (const auto &failure : {"org.freedesktop.DBus.Error.AccessDenied", "org.freedesktop.DBus.Error.NoReply", "malformed", "timeout"})
+                QTest::newRow(qPrintable(QString(action)+'-'+failure)) << QString(action) << QString(failure)
+                    << (QString(failure) != "org.freedesktop.DBus.Error.AccessDenied");
     }
     void failuresAndUncertainReplies() {
-        QFETCH(QString, failure); QFETCH(bool, uncertain);
+        QFETCH(QString, action); QFETCH(QString, failure); QFETCH(bool, uncertain);
         Recorder record; record.hold = failure == "timeout"; record.malformed = failure == "malformed";
         if (!record.hold && !record.malformed) record.failure = failure;
         auto manager = record.manager(20); QString error; bool complete = false;
-        manager->executeAsync("shutdown", [&](QString value) { error = value; complete = true; });
+        manager->executeAsync(action, [&](QString value) { error = value; complete = true; });
         QTRY_VERIFY(complete); QVERIFY(!error.isEmpty()); QCOMPARE(record.finals.size(), 1);
         QCOMPARE(manager->executionPending(), uncertain);
         if (uncertain) {

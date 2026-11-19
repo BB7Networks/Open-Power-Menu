@@ -155,7 +155,13 @@ jobs:
           mkdir -p work/package-rc1
           git archive FETCH_HEAD | tar -x -C work/package-rc1
       - name: Build complete native package and test transactions
-        run: docker build --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test . 2>&1 | tee work/packaging-build.log
+      - name: Expose installation qualification failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py work/packaging-build.log
       - name: Install, activate, reinstall, remove and roll back without Python
         run: docker run --rm --network none opm-native-package:test
       - name: Collect independent installation evidence
@@ -206,7 +212,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build and test native editor and distribution desktop
-        run: docker build --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test .
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p work
+          docker build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test . 2>&1 | tee work/editor-build.log
+      - name: Expose desktop qualification failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py work/editor-build.log
       - name: Run GUI without Python or a compiler
         run: docker run --rm --network none opm-native-editor:test
       - name: Collect desktop and power qualification evidence

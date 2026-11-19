@@ -69,7 +69,7 @@ The deferred X11 taskbar ghosting and minor responsiveness issues are unchanged.
 
 ## Changed-file inventory
 
-37 files differ from RC1:
+38 files differ from RC1:
 
 - `.dockerignore`
 - `.github/workflows/publish-native-release.yml`
@@ -107,4 +107,5 @@ The deferred X11 taskbar ghosting and minor responsiveness issues are unchanged.
 - `native/tests/session_power_test.cpp`
 - `openpowermenu/data/actions.json`
 - `scripts/prepare-native-release.py`
+- `scripts/report-ci-failure.py`
 - `tests/test_native_release.py`
