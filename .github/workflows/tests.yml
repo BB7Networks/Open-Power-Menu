@@ -27,8 +27,21 @@ jobs:
       - name: Prepare a software compositor device for current Arch KWin
         if: matrix.distro == 'Arch'
         run: |
-          sudo modprobe udmabuf
-          sudo chmod a+rw /dev/udmabuf
+          # Hosted images may omit the optional modules for their running kernel.
+          # Install the matching distro package if the device module is absent.
+          if ! modinfo udmabuf >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends "linux-modules-extra-$(uname -r)"
+          fi
+          if ! message=$(sudo modprobe udmabuf 2>&1); then
+            echo "::error title=Software compositor device::$message"
+            exit 1
+          fi
+          sudo udevadm settle
+          if ! message=$(sudo chmod a+rw /dev/udmabuf 2>&1); then
+            echo "::error title=Software compositor device::$message"
+            exit 1
+          fi
       - name: Prepare checksum-pinned native source and released upgrade baseline
         run: |
           sh native/packaging/prepare-pacman.sh . work/pacman-source
