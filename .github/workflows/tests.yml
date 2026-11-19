@@ -24,6 +24,11 @@ jobs:
             test_x11: 'ON'
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare a software compositor device for current Arch KWin
+        if: matrix.distro == 'Arch'
+        run: |
+          sudo modprobe udmabuf
+          sudo chmod a+rw /dev/udmabuf
       - name: Prepare checksum-pinned native source and released upgrade baseline
         run: |
           sh native/packaging/prepare-pacman.sh . work/pacman-source
@@ -61,6 +66,52 @@ jobs:
           container=$(docker create --network none opm-native-pacman:test)
           docker cp "$container:/opt/opm-artifacts" work/qualified-dev
           docker rm "$container"
+      - name: Qualify private keyboard seats on the target distro
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --target build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
+            -f native/tests/pacman.Dockerfile -t opm-native-keyboard:test .
+          devices=()
+          platform=()
+          renderer=Q
+          if [ '${{ matrix.distro }}' = Arch ]; then
+            # KWin 6.8 removed the virtual QPainter backend. Give this disposable
+            # hosted-runner seat a software buffer device, never a host GPU.
+            devices=(--device /dev/udmabuf)
+            platform=(--platform wayland)
+            renderer=O2
+          fi
+          container=$(docker create --network none "${devices[@]}" \
+            --env LIBGL_ALWAYS_SOFTWARE=1 --env OPM_TEST_KWIN_COMPOSE="$renderer" \
+            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-keyboard --held-repeat "${platform[@]}")
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          set +e
+          docker start --attach "$container" 2>&1 | tee work/pacman-keyboard.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/tmp/plasma-keyboard" work/qualified-dev/keyboard-tests
+          test "$status" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
+      - name: Expose private seat failures in the check result
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for seat in sorted(Path('work/qualified-dev/keyboard-tests').glob('*')):
+              for name in ('session.log', 'kwin.log', 'plasma.log'):
+                  path = seat/name
+                  if not path.is_file():
+                      continue
+                  lines = [line for line in path.read_text(errors='replace').splitlines()
+                           if 'OPM_POPUP_TRACE' not in line]
+                  message = '\n'.join(lines)[-2800:]
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::error title=Private seat ' + seat.name + ' ' + name + '::' + message)
+          PY
       - name: Verify the Manjaro release asset set before tagging
         if: matrix.distro == 'Manjaro'
         run: |

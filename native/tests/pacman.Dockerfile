@@ -25,16 +25,9 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
     printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; immediate power actions are the default.' > artifacts/CANDIDATE.txt
-RUN if [ "$OPM_TEST_X11" = ON ]; then \
-        python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
-            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-            --output /tmp/plasma-keyboard --held-repeat; \
-    else \
-        python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
-            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-            --output /tmp/plasma-keyboard --held-repeat --platform wayland; \
-    fi && \
-    cp -r /tmp/plasma-keyboard artifacts/keyboard-tests
+# The workflow runs the keyboard matrix in this build image with networking
+# disabled. Newer KWin needs a software-rendering device, unavailable in build
+# layers; the hosted runner passes only /dev/udmabuf to that private test seat.
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
 RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \

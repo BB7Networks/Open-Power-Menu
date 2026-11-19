@@ -236,8 +236,15 @@ def session(args):
             spawn([shortcut_daemon],'shortcuts.log')
         else:
             binary=case/'bin/kwin_wayland'; shutil.copyfile(shutil.which('kwin_wayland'),binary);binary.chmod(0o700)
-            spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen','--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log')
+            compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen','--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log')
             wait_for(lambda:(Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
+            def compositor_ready():
+                assert compositor.poll() is None, 'Private KWin exited before compositing was ready'
+                reply=subprocess.run(['qdbus6','org.kde.KWin','/Compositor',
+                    'org.kde.kwin.Compositing.active'],capture_output=True,text=True)
+                return reply.returncode==0 and reply.stdout.strip()=='true'
+            # A Wayland socket alone can precede a fatal renderer failure.
+            wait_for(compositor_ready)
         plasma=spawn(['plasmashell','--no-respawn'],'plasma.log')
         wait_for(lambda:state() and state()['button'])
         app=spawn([sys.executable,SCRIPT,'--background'],'application.log')
@@ -378,7 +385,7 @@ def session(args):
             stress.append({'case':'held-Escape-returns-one-level-only','requests':0})
             (case/'stress.json').write_text(json.dumps(stress,indent=2)+'\n')
         (case/'results.json').write_text(json.dumps(report,indent=2)+'\n')
-
+        if args.platform=='wayland': assert compositor_ready(), 'Private compositor stopped during keyboard tests'
         print('PASS',args.platform,'hidden',args.hidden,'requests',len(records()),flush=True)
     finally:
         for p in reversed(processes):
@@ -424,7 +431,7 @@ def main():
                     env['OPM_PARENT_DISPLAY']=os.environ['DISPLAY']
                     print('Private mock seat:',case,'— capture the Xephyr keyboard before Meta+X; see HELD-KEY-STABILIZATION.md',flush=True)
                 env.update({f'XDG_{key.upper()}_HOME':str(case/key) for key in ('config','data','cache','state')})
-                if platform=='wayland': env['KWIN_COMPOSE']='Q'
+                if platform=='wayland': env['KWIN_COMPOSE']=os.environ.get('OPM_TEST_KWIN_COMPOSE','Q')
                 else: env.pop('KWIN_COMPOSE',None) # KWin X11 does not support QPainter.
                 with (case/'session.log').open('w') as log:
                     run=subprocess.run(['dbus-run-session','--',sys.executable,SCRIPT,'--session','--platform',platform,
