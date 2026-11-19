@@ -2,9 +2,19 @@
 #include <QDBusMessage>
 #include <QString>
 #include <QObject>
+#include <QJsonObject>
 #include <functional>
 #include <memory>
 namespace Opm {
+struct PowerPreference {
+    QString mode;
+    bool kdeConfirmation = true;
+    bool confirmation = true;
+    QString identity() const { return mode + (confirmation ? ":confirm" : ":immediate"); }
+};
+// Re-read effective layered KConfig policy for every presentation/validation.
+PowerPreference powerPreference(const QJsonObject &config);
+void powerTrace(const QString &event, QJsonObject fields = {});
 // Only these six identifiers select a KDE session-ending request. Confirmation
 // is part of the captured action identity, never a late global preference read.
 QDBusMessage sessionPowerRequest(const QString &action);

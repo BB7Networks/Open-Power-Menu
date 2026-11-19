@@ -3,6 +3,7 @@
 #include <QTimer>
 #include "interaction.hpp"
 #include "launch.hpp"
+#include "applications.hpp"
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -17,6 +18,7 @@
 #include <QUrl>
 #include <QVariant>
 #include <cmath>
+#include <algorithm>
 #include <pwd.h>
 
 static void initCatalog() {
@@ -35,7 +37,10 @@ QJsonObject defaults() {
         auto config = resource("defaults");
         config["access_keys_enabled"] = true;
         config["show_access_key_hints"] = true;
-        config["confirm_power_actions"] = false;
+        config["power_confirmation"] = "system";
+        // Older native releases ignore the enum. Keep a conservative shadow
+        // for rollback: system mode must never become immediate in RC1.
+        config["confirm_power_actions"] = true;
         config["auto_close_delay_ms"] = PointerLeaveDefault;
         config["submenu_hover_delay_ms"] = -1;
         config["menu_density"] = "standard";
@@ -311,6 +316,9 @@ void validate(const QJsonObject &config) {
     for (const auto &key : {"access_keys_enabled", "show_access_key_hints", "confirm_power_actions"})
         if (config.contains(key) && !config[key].isBool())
             throw Error(QString(key) + " must be a boolean");
+    if (config.contains("power_confirmation") &&
+        !QStringList{"system", "always", "immediate"}.contains(config["power_confirmation"].toString()))
+        throw Error("Invalid power_confirmation mode");
     pointerLeaveDelay(config);
     submenuHoverDelay(config);
     for (const auto &key : {"menu_density", "menu_width", "menu_icon_size"}) {
@@ -337,8 +345,11 @@ QJsonObject decode(const std::optional<QByteArray> &bytes) {
         const auto custom = document.object();
         for (auto it = custom.begin(); it != custom.end(); ++it)
             result[it.key()] = it.value();
+        if (!custom.contains("power_confirmation"))
+            result["power_confirmation"] = custom["confirm_power_actions"].toBool() ? "always" : "immediate";
     }
     validate(result); // Reject malformed trees before applying migration defaults.
+    result["confirm_power_actions"] = result["power_confirmation"] != "immediate";
     result["menu"] = defaultAccessKeys(result["menu"].toArray());
     validate(result);
     return result;
@@ -348,10 +359,13 @@ QJsonObject integration(const QJsonObject &config) {
     for (const auto &key :
          {"hide_original_launcher", "launcher_applet_id", "button_icon_mode", "button_icon",
           "appearance", "show_menu_icons", "auto_close_on_pointer_leave",
-          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints", "confirm_power_actions",
+          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints", "confirm_power_actions", "power_confirmation",
           "submenu_hover_delay_ms", "menu_density", "menu_width", "menu_icon_size",
           "menu_height_mode", "menu_custom_height"})
         result[key] = config[key];
+    const auto preference = powerPreference(config);
+    result["confirm_power_actions"] = preference.confirmation;
+    result["kde_confirm_logout"] = preference.kdeConfirmation;
     return result;
 }
 QString expandPart(QString value) {
@@ -402,7 +416,7 @@ static bool desktop(const QJsonValue &allowed) {
             return true;
     return false;
 }
-QString Model::probe(const QString &program, const QStringList &arguments) {
+QString Model::probe(const QString &program, const QStringList &arguments, int cacheMilliseconds) {
     const auto key = program + QChar(0) + arguments.join(QChar(0));
     const auto now = QDateTime::currentMSecsSinceEpoch();
     if (probes.contains(key) && probes[key].expires > now)
@@ -423,10 +437,10 @@ QString Model::probe(const QString &program, const QStringList &arguments) {
     }
     if (probes.size() >= 32)
         probes.clear();
-    probes.insert(key, {now + 30000, output});
+    probes.insert(key, {now + cacheMilliseconds, output});
     return output;
 }
-QStringList Model::resolve(const QJsonObject &spec, bool expand) {
+QStringList Model::resolve(const QJsonObject &spec, bool expand, const QString &action) {
     if (!desktop(spec["desktops"]))
         return {};
     if (spec.contains("requires") && !spec["requires"].isArray())
@@ -439,12 +453,27 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand) {
     for (const auto &required : spec["requires"].toArray())
         if (!executable(required.toString()))
             return {};
-    const auto candidates =
+    if (!spec.contains("command")) {
+        // xdg-terminal-exec's documented --print-id is a read-only resolution
+        // query. Validate its desktop entry before advertising the helper.
+        if (action == "terminal" && executable("xdg-terminal-exec")) {
+            const auto id = probe("xdg-terminal-exec", {"--print-id"}, 0).trimmed();
+            if (!id.isEmpty() && !id.contains('\n') && terminalSelectionAvailable(id))
+                return {"xdg-terminal-exec"}; // Preserve selected desktop-action semantics.
+        }
+        const auto preferred = preferredApplication(action);
+        if (!preferred.isEmpty()) return preferred;
+    }
+    const auto rawCandidates =
         spec.contains("command") ? QJsonArray{spec["command"]} : spec["commands"].toArray();
+    QList<QJsonValue> candidates;
+    for (const auto &candidate : rawCandidates) candidates.append(candidate);
+    if (!action.isEmpty() && !spec.contains("command"))
+        std::stable_sort(candidates.begin(), candidates.end(), [](const auto &left, const auto &right) {
+            return applicationPreference(left.toObject()) > applicationPreference(right.toObject());
+        });
     for (const auto &candidate : candidates) {
         auto args = argv(candidate, expand);
-        if (!executable(args[0]))
-            continue;
         const auto options = candidate.toObject();
         if (!desktop(options["desktops"]))
             continue;
@@ -456,6 +485,18 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand) {
                 available = false;
         if (!available)
             continue;
+        const auto registered = action.isEmpty() ? DesktopApplication{} : desktopApplication(options);
+        if (registered.registered) {
+            if (!registered.command.isEmpty()) return registered.command;
+            continue; // Respect Hidden/OnlyShowIn/TryExec; do not bypass via PATH.
+        }
+        if (!executable(args[0])) continue;
+        if (truth(options["dbus_service"])) {
+            const auto name = options["dbus_service"].toString();
+            const auto names = probe(args[0], {"org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus.ListNames"}) + '\n' +
+                probe(args[0], {"org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus.ListActivatableNames"});
+            if (!names.split('\n').contains(name)) continue;
+        }
         if (truth(options["kwin_shortcut"])) {
             if (!options["kwin_shortcut"].isString())
                 throw Error("kwin_shortcut must be an action name");
@@ -479,7 +520,7 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand) {
     }
     return {};
 }
-QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, bool discoverPower, bool confirmPower) {
+QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, bool discoverPower, bool confirmPower, const QString &powerIdentity) {
     QList<Entry> result;
     for (const auto &value : items) {
         const auto item = value.toObject();
@@ -489,7 +530,7 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
                 continue;
             entry.view = {{"kind", "separator"}};
         } else if (item.contains("submenu")) {
-            entry.children = normalize(item["items"].toArray(), showUnavailable, discoverPower, confirmPower);
+            entry.children = normalize(item["items"].toArray(), showUnavailable, discoverPower, confirmPower, powerIdentity);
             if (entry.children.isEmpty())
                 continue;
             entry.view = {{"kind", "submenu"},
@@ -501,12 +542,14 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
             PowerAvailability powerState;
             if (builtin && spec.contains("native_power")) {
                 entry.powerAction = spec["native_power"].toString();
-                if (confirmPower && sessionPowerRequest(entry.powerAction).type() == QDBusMessage::MethodCallMessage)
-                    entry.powerAction += "-confirm";
+                if (sessionPowerRequest(entry.powerAction).type() == QDBusMessage::MethodCallMessage) {
+                    entry.powerPreference = powerIdentity;
+                    if (confirmPower) entry.powerAction += "-confirm";
+                }
                 powerState = discoverPower ? power->capability(entry.powerAction)
                                            : power->presentedCapability(entry.powerAction);
             } else
-                entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]));
+                entry.argv = resolve(spec, builtin || !truth(item["desktop_file"]), builtin ? item["action"].toString() : QString());
             if (!entry.argv.isEmpty()) entry.program = QStandardPaths::findExecutable(entry.argv.first());
             const bool enabled = !entry.argv.isEmpty() || powerState.available;
             if (!enabled && !showUnavailable)
@@ -556,7 +599,10 @@ static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {
     return result;
 }
 Presentation Model::capture(const QJsonObject &config) {
-    const auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, config["confirm_power_actions"].toBool());
+    const auto preference = powerPreference(config);
+    powerTrace("model.capture", {{"mode", preference.mode}, {"kde_confirm_logout", preference.kdeConfirmation},
+        {"effective_confirmation", preference.confirmation}});
+    const auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, preference.confirmation, preference.identity());
     Presentation shown;
     shown.menu = present(tree, {}, config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
     std::function<void(const QList<Entry> &, QString)> collect = [&](const QList<Entry> &items, QString prefix) {
@@ -573,14 +619,15 @@ Entry Model::selected(const QJsonObject &config, const QString &key, const Prese
     const auto current = selection(config, key, &shown.menu);
     const auto old = shown.entries.constFind(key);
     if (!current || old == shown.entries.cend() || !current->view["enabled"].toBool() ||
-        !old->view["enabled"].toBool() || current->argv != old->argv || current->program != old->program || current->powerAction != old->powerAction)
+        !old->view["enabled"].toBool() || current->argv != old->argv || current->program != old->program || current->powerAction != old->powerAction || current->powerPreference != old->powerPreference)
         throw Error("The item or its availability changed. Reopen the menu to refresh it.", "stale");
     auto selected = *current;
     if (!selected.argv.isEmpty() && !selected.program.isEmpty()) selected.argv[0] = selected.program;
     return selected;
 }
 QJsonArray Model::publicMenu(const QJsonObject &config) {
-    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, config["confirm_power_actions"].toBool()), {},
+    const auto preference = powerPreference(config);
+    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, preference.confirmation, preference.identity()), {},
                    config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
 }
 QJsonArray Model::diagnosticMenu(const QJsonObject &config) {
@@ -603,7 +650,8 @@ std::optional<Entry> Model::selection(const QJsonObject &config, const QString &
     static const QRegularExpression pattern("^[0-9]{1,5}(?:\\.[0-9]{1,5}){0,11}$");
     if (key.size() > 128 || !pattern.match(key).hasMatch())
         return {};
-    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), false, config["confirm_power_actions"].toBool());
+    const auto preference = powerPreference(config);
+    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), false, preference.confirmation, preference.identity());
     if (expectedPresentation && present(tree, {}, config["access_keys_enabled"].toBool(true),
                                         config["show_access_key_hints"].toBool(true)) != *expectedPresentation)
         return {};

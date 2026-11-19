@@ -1,7 +1,7 @@
 # Build inside the target Arch/Manjaro snapshot from a reviewed source checkout.
 # This package stages a matching native bundle; setup is an explicit user action.
 pkgname=open-power-menu-native
-pkgver=2.1.0rc1
+pkgver=2.1.0rc2
 pkgrel=1
 pkgdesc='Open Power Menu 2.1 release candidate with reversible per-user setup'
 arch=('x86_64')

@@ -21,10 +21,14 @@ jobs:
         with:
           name: opm-native-Manjaro-${{ github.sha }}
           path: qualified
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: opm-*-${{ github.sha }}
+          path: qualification-evidence
       - name: Verify source, sealed artifacts and qualification evidence
         run: |
           python3 scripts/prepare-native-release.py --artifacts qualified --output release-assets \
-            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME"
+            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --distribution-evidence qualification-evidence
           (cd release-assets && sha256sum -c SHA256SUMS)
       - name: Publish the qualified assets as a prerelease
         env:

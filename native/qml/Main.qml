@@ -551,16 +551,17 @@ Kirigami.ApplicationWindow {
                                 text: "Power Actions"
                                 font.bold: true
                             }
-                            Controls.CheckBox {
-                                objectName: "confirmPowerActions"
-                                text: "Confirm power actions"
-                                checked: window.settings.confirm_power_actions
-                                onToggled: window.preference("confirm_power_actions", checked)
+                            ChoiceBox {
+                                objectName: "powerConfirmation"
+                                Layout.fillWidth: true
+                                model: ["Follow KDE system settings — recommended", "Always show confirmation", "Execute immediately"]
+                                currentIndex: ["system", "always", "immediate"].indexOf(window.settings.power_confirmation)
+                                onActivated: index => window.preference("power_confirmation", ["system", "always", "immediate"][index])
                             }
                             Controls.Label {
                                 Layout.fillWidth: true
                                 wrapMode: Text.WordWrap
-                                text: "When enabled, show KDE's confirmation screen before shutting down, restarting, or signing out. When disabled, begin the selected action immediately."
+                                text: "Applies to built-in Shutdown, Restart and Sign out. KDE owns the confirmation screen and countdown. Custom commands keep their explicit behavior."
                             }
                         }
                     }

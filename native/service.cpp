@@ -99,6 +99,30 @@ QString Service::GetIntegration() {
         return json(integration(defaults()));
     }
 }
+QString Service::GetPowerDiagnostics() {
+    touch();
+    return reply([&] {
+        const auto config = storage.load();
+        const auto preference = powerPreference(config);
+        QJsonObject routes;
+        for (const auto &name : {"shutdown", "reboot", "logout"}) {
+            const auto request = sessionPowerRequest(QString(name) + (preference.confirmation ? "-confirm" : ""));
+            routes[name] = QJsonObject{{"service", request.service()}, {"method", request.member()}};
+        }
+        const auto bus = QDBusConnection::sessionBus().interface();
+        const auto owner = [&](const QString &service) {
+            if (!bus) return QString();
+            const QDBusReply<QString> result = bus->serviceOwner(service); // Bus daemon only; no service activation.
+            return result.isValid() ? result.value() : QString();
+        };
+        return QJsonObject{{"ok", true}, {"version", OPM_NATIVE_VERSION},
+            {"pid", QCoreApplication::applicationPid()}, {"executable", QCoreApplication::applicationFilePath()},
+            {"configuration", storage.path()}, {"mode", preference.mode},
+            {"kde_confirm_logout", preference.kdeConfirmation}, {"effective_confirmation", preference.confirmation},
+            {"greeter_owner", owner("org.kde.LogoutPrompt")}, {"shutdown_owner", owner("org.kde.Shutdown")},
+            {"routes", routes}};
+    });
+}
 QString Service::SetMenuHeight(int logicalPixels) {
     touch();
     return reply([&] {
@@ -145,6 +169,9 @@ void Service::start(const QString &key, std::function<void(QString)> done, std::
         const auto config = decode(menu.revision.content);
         const auto path = key.mid(slash + 1);
         const auto entry = model.selected(config, path, menu.shown);
+        if (!entry.powerAction.isEmpty()) powerTrace("service.selection", {{"callback", "Service::start"},
+            {"configuration", storage.path()}, {"selection_path", path}, {"action", entry.powerAction},
+            {"preference_identity", entry.powerPreference}});
         if (storage.revision() != menu.revision)
             throw Error("Configuration changed. Reopen the menu to refresh it.", "stale");
         if (entry.powerAction.isEmpty()) {

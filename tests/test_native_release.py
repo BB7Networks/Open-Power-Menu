@@ -12,7 +12,7 @@ spec = importlib.util.spec_from_file_location('native_release', ROOT/'scripts/pr
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 COMMIT = 'a'*40
-VERSION = '2.1.0-rc1'
+VERSION = (ROOT/'native/VERSION').read_text().strip()
 
 
 def archive(files):
@@ -84,3 +84,45 @@ def test_resealed_wrong_widget_version_is_refused():
 def test_archive_traversal_is_refused():
     with pytest.raises(ValueError, match='Unsafe archive path'):
         release.inventory(archive({'../escape': b'bad'}), 'native-bundle/')
+
+
+def greeter_evidence(root):
+    cases = [{'mode': mode, 'kde_confirm': kde, 'action': action,
+              'confirm': mode == 'always' or (mode == 'system' and kde),
+              'visible': mode == 'always' or (mode == 'system' and kde),
+              'countdown': False, 'result': {'ok': True}, 'elapsed': 2.1}
+             for mode in ('system', 'always', 'immediate') for kde in (False, True)
+             for action in ('shutdown', 'reboot', 'logout')]
+    cases.append({'mode': 'always', 'kde_confirm': True, 'action': 'shutdown', 'confirm': True,
+                  'visible': True, 'countdown': True, 'result': {'ok': True}, 'elapsed': 30.1})
+    (root/'results.json').write_text(json.dumps(cases))
+    (root/'requests.jsonl').write_text(''.join(json.dumps({'member': member})+'\n' for member in
+        ['logoutAndShutdown']*4+['logoutAndReboot']*3+['logout']*3))
+    return cases
+
+
+def test_greeter_requires_complete_modes_and_cancelled_requests(tmp_path):
+    cases = greeter_evidence(tmp_path)
+    assert len(release.verify_greeter(tmp_path)['cases']) == 19
+    cases.pop(0)
+    (tmp_path/'results.json').write_text(json.dumps(cases))
+    with pytest.raises(ValueError, match='matrix'):
+        release.verify_greeter(tmp_path)
+    greeter_evidence(tmp_path)
+    with (tmp_path/'requests.jsonl').open('a') as stream:
+        stream.write(json.dumps({'member': 'logout'})+'\n')
+    with pytest.raises(ValueError, match='requests'):
+        release.verify_greeter(tmp_path)
+
+
+def test_greeter_rejects_invisible_confirmation_and_early_countdown(tmp_path):
+    cases = greeter_evidence(tmp_path)
+    cases[-1]['elapsed'] = .5
+    (tmp_path/'results.json').write_text(json.dumps(cases))
+    with pytest.raises(ValueError, match='countdown'):
+        release.verify_greeter(tmp_path)
+    cases = greeter_evidence(tmp_path)
+    cases[-1]['visible'] = False
+    (tmp_path/'results.json').write_text(json.dumps(cases))
+    with pytest.raises(ValueError, match='mismatch'):
+        release.verify_greeter(tmp_path)

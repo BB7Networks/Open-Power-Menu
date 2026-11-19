@@ -1,5 +1,6 @@
 #include "editor_catalog.hpp"
 #include "model.hpp"
+#include "applications.hpp"
 #include <KConfig>
 #include <KConfigGroup>
 #include <KService>
@@ -137,7 +138,7 @@ QVariantMap EditorCatalog::builtinDetails(const QString &actionId) const {
         return words.join(' ');
     };
     Model model;
-    const auto selected = model.normalize(QJsonArray{spec}, true).first().argv;
+    const auto selected = model.normalize(QJsonArray{QJsonObject{{"action", actionId}}}, true).first().argv;
     QStringList candidates;
     QJsonArray first;
     int number = 0;
@@ -148,7 +149,9 @@ QVariantMap EditorCatalog::builtinDetails(const QString &actionId) const {
             first = argv;
         auto single = spec;
         single["commands"] = QJsonArray{candidate};
-        const bool available = !model.normalize(QJsonArray{single}, true).first().argv.isEmpty();
+        const auto registered = desktopApplication(candidate.toObject());
+        const bool available = registered.registered ? !registered.command.isEmpty()
+            : !model.normalize(QJsonArray{single}, true).first().argv.isEmpty();
         QStringList words;
         for (const auto &word : argv)
             words.append(word.toString());

@@ -11,13 +11,19 @@ RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
 RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
-    plasma-desktop plasma-workspace kwin && \
+    plasma-desktop plasma-workspace kwin discover dolphin konsole systemsettings powerdevil plasma-nm print-manager \
+    plasma-systemmonitor kinfocenter ksystemlog partitionmanager virt-manager krdc && \
     case "$OPM_TEST_X11" in \
         ON) pacman -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
         OFF) :;; \
         *) exit 1;; \
     esac && command -v kwin_wayland && \
     (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
+# Qualify the primary Manjaro software manager as well as Discover. This is
+# dependency setup in a disposable test image, never application runtime logic.
+RUN . /etc/os-release && if [ "$ID" = manjaro ]; then \
+      if pacman -Si pamac-gtk >/dev/null 2>&1; then pacman -S --noconfirm --needed pamac-gtk; \
+      else pacman -S --noconfirm --needed pamac-gtk3; fi; fi
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 USER 1000:1000
@@ -29,14 +35,19 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     sha256sum ./*.pkg.tar.zst > artifacts/PACKAGE.sha256 && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
-    printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; immediate power actions are the default.' > artifacts/CANDIDATE.txt
+    XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python src/Open-Power-Menu/native/tests/application_resolution.py \
+      --probe src/build/native/native-application-probe --live-audit artifacts/applications.json && \
+    printf '%s\n' 'Release-candidate artifacts. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt
 # The workflow runs all four keyboard seats in this build image with networking
 # disabled, then collects their evidence alongside the sealed runtime artifacts.
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
+RUN cmake -S /src/work/package-rc1 -B /tmp/rc1-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DOPM_BUILD_PACKAGE=ON -DBUILD_TESTING=OFF -DOPM_SOURCE_COMMIT=2384a9d03947b9a2e5de8f0ef72ae57e556bc29c && \
+    cmake --build /tmp/rc1-build --target native-bundle --parallel 2
 RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \
     cmake --build src/build --target native-bundle --parallel 2 && \
-    python src/Open-Power-Menu/native/tests/packaging.py --bundle src/build/native-bundle --legacy /src/work/package-legacy -v
+    python src/Open-Power-Menu/native/tests/packaging.py --bundle src/build/native-bundle --legacy /src/work/package-legacy --rc1-bundle /tmp/rc1-build/native-bundle -v
 
 FROM ${OPM_BASE_IMAGE}
 ARG OPM_ARCH_SNAPSHOT

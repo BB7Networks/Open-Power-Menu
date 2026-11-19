@@ -1,15 +1,16 @@
 # Open Power Menu
 
-**Native v2.1.0-rc1** is a prerelease for controlled physical testing. Stable
+**Native v2.1.0-rc2** is a prerelease for controlled physical testing. Stable
 **v1.0.1** remains unchanged. Use the [RC release notes and native installation
-instructions](RELEASE-NOTES-v2.1.0-rc1.md) and the
-[GitHub prerelease](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc1).
+instructions](RELEASE-NOTES-v2.1.0-rc2.md) and the
+[GitHub prerelease](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc2).
 The legacy Python/source installer documentation below applies to stable 1.0.1;
 use the native package or complete native bundle for this candidate.
 
-**Warning: Shutdown, Restart and Sign out are immediate by default.** Enable
-**Confirm power actions** in native Configure before exploring power entries on
-a real workstation. Perform held-key stress tests only with the private mocks
+**Warning: Shutdown, Restart and Sign out can execute immediately.** New installs
+follow KDE's confirmation setting; upgrades preserve the existing choice.
+Configure offers **Always show confirmation** for built-in power entries.
+Explicit custom commands retain their own behavior. Perform power and held-key tests only with the private mocks
 described in the release notes. Physical acceptance is required before final 2.1.0.
 
 **One launcher button. Two useful menus.**

@@ -265,6 +265,7 @@ bool EditorSession::preference(const QString &text) {
                                     "access_keys_enabled",
                                     "show_access_key_hints",
                                     "confirm_power_actions",
+                                    "power_confirmation",
                                     "backup_retention",
                                     "show_unavailable"};
         for (auto it = changes.begin(); it != changes.end(); ++it) {
@@ -272,6 +273,10 @@ bool EditorSession::preference(const QString &text) {
                 throw Error("Unknown editable preference", "invalid");
             state.settings[it.key()] = it.value();
         }
+        if (changes.contains("power_confirmation"))
+            state.settings["confirm_power_actions"] = changes["power_confirmation"] != "immediate";
+        else if (changes.contains("confirm_power_actions")) // Older compatible editor clients.
+            state.settings["power_confirmation"] = changes["confirm_power_actions"].toBool() ? "always" : "immediate";
         apply(state);
     });
 }

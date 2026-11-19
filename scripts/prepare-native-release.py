@@ -9,6 +9,7 @@ from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 import tarfile
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -65,12 +66,97 @@ def verify_bundle(data, commit, version):
     return manifest, records
 
 
+def verify_keyboard(root):
+    seats = {}
+    for platform, expected_count in [('xcb', 27), ('wayland', 25)]:
+        for visibility in ['visible', 'hidden']:
+            name = platform+'-'+visibility
+            seat = root/name
+            stress = json.loads((seat/'stress.json').read_text())
+            actions = json.loads((seat/'results.json').read_text())
+            requests = [json.loads(line) for line in (seat/'requests.jsonl').read_text().splitlines()]
+            if len(requests) != expected_count or len(stress) != (8 if platform == 'xcb' else 7) or len(actions) != 12:
+                raise ValueError('Incomplete held-key qualification: '+name)
+            seats[name] = {'stress': stress, 'ordinary_actions': actions, 'mock_request_count': len(requests)}
+    return seats
+
+
+def verify_greeter(root):
+    cases = json.loads((root/'results.json').read_text())
+    expected = {(mode, kde, action) for mode in ('system', 'always', 'immediate')
+                for kde in (False, True) for action in ('shutdown', 'reboot', 'logout')}
+    matrix = [case for case in cases if not case['countdown']]
+    countdown = [case for case in cases if case['countdown']]
+    if len(matrix) != 18 or {(c['mode'], c['kde_confirm'], c['action']) for c in matrix} != expected or len(countdown) != 1:
+        raise ValueError('Incomplete three-mode real-greeter matrix')
+    for case in cases:
+        confirm = case['mode'] == 'always' or (case['mode'] == 'system' and case['kde_confirm'])
+        if case['confirm'] != confirm or case['visible'] != confirm or not case['result']['ok']:
+            raise ValueError('Real-greeter confirmation/result mismatch')
+    if countdown[0]['elapsed'] < 25 or countdown[0]['action'] != 'shutdown' or not countdown[0]['confirm']:
+        raise ValueError('KDE countdown was not qualified')
+    requests = [json.loads(line)['member'] for line in (root/'requests.jsonl').read_text().splitlines()]
+    if sorted(requests) != sorted(['logoutAndShutdown']*4+['logoutAndReboot']*3+['logout']*3):
+        raise ValueError('Unexpected private greeter power requests')
+    return {'platform': 'X11', 'cases': cases, 'mock_requests': requests}
+
+
+def verify_applications(path):
+    result = json.loads(path.read_text())
+    required = {'applications', 'files', 'terminal', 'settings', 'power', 'network', 'printers', 'monitor', 'system', 'run'}
+    available = {row['action'] for row in result['actions'] if row['argv']}
+    if result['missing_required'] or not required <= available:
+        raise ValueError('Incomplete distribution application/module audit')
+    return result
+
+
+def verify_test_xml(path, required):
+    tree = ET.parse(path)
+    cases = tree.findall('.//testcase')
+    if not required <= {case.attrib['name'] for case in cases} or any(
+            case.find('failure') is not None or case.find('error') is not None or case.find('skipped') is not None for case in cases):
+        raise ValueError('Incomplete or failed native tests: '+str(path))
+    return [case.attrib['name'] for case in cases]
+
+
+def verify_distributions(root, commit, version):
+    reports = {}
+    for distro in ('Debian', 'Kubuntu'):
+        desktop = root/('opm-desktop-'+distro+'-'+commit)
+        install = root/('opm-install-'+distro+'-'+commit)
+        for directory in (desktop, install):
+            if (directory/'SOURCE-COMMIT').read_text().strip() != commit or (directory/'runtime-smoke').read_text().strip() != 'passed':
+                raise ValueError('Distribution source/runtime mismatch: '+distro)
+        bundle = json.loads((install/'bundle.json').read_text())
+        if bundle['source_commit'] != commit or bundle['version'] != version or bundle['os'] != ('ubuntu' if distro == 'Kubuntu' else 'debian'):
+            raise ValueError('Distribution bundle mismatch: '+distro)
+        reports[distro] = {'os_release': (desktop/'os-release').read_text(),
+            'build_packages': (desktop/'packages.txt').read_text().splitlines(),
+            'native_tests': verify_test_xml(desktop/'native-tests.xml', {'native-session-power', 'native-application-resolution', 'native-editor-gui', 'native-input', 'native-standalone'}),
+            'installation_tests': verify_test_xml(install/'packaging-tests.xml', {'native-session-power', 'native-platform-plugins', 'native-editor-startup-x11'}),
+            'applications': verify_applications(desktop/'applications.json'),
+            'greeter': verify_greeter(desktop/'plasma-greeter'),
+            'keyboard_seats': verify_keyboard(desktop/'plasma-keyboard'),
+            'runtime_smoke': 'passed', 'legacy_and_rc1_upgrade_rollback': 'passed'}
+    arch = root/('opm-native-Arch-'+commit)
+    if (arch/'SOURCE-COMMIT').read_text().strip() != commit:
+        raise ValueError('Arch source mismatch')
+    reports['Arch'] = {'os_release': (arch/'os-release').read_text(),
+        'build_packages': (arch/'packages.txt').read_text().splitlines(),
+        'runtime_packages': (arch/'runtime-packages.txt').read_text().splitlines(),
+        'applications': verify_applications(arch/'applications.json'),
+        'greeter': verify_greeter(arch/'greeter-tests'), 'keyboard_seats': verify_keyboard(arch/'keyboard-tests')}
+    return reports
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--artifacts', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--commit', required=True)
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--distribution-evidence', type=Path,
+                        help='Required by publication: artifacts from the same run for all other distributions')
     args = parser.parse_args()
     version = (ROOT/'native/VERSION').read_text().strip()
     if args.tag != 'v'+version or '-rc' not in version:
@@ -108,17 +194,10 @@ def main():
     package_info = package_contents['.PKGINFO'].decode()
     if 'pkgname = open-power-menu-native\n' not in package_info or 'pkgver = '+version.replace('-rc', 'rc')+'-1\n' not in package_info:
         raise ValueError('Package version mismatch')
-    seats = {}
-    for platform, expected_count in [('xcb', 27), ('wayland', 25)]:
-        for visibility in ['visible', 'hidden']:
-            name = platform+'-'+visibility
-            seat = args.artifacts/'keyboard-tests'/name
-            stress = json.loads((seat/'stress.json').read_text())
-            actions = json.loads((seat/'results.json').read_text())
-            requests = [json.loads(line) for line in (seat/'requests.jsonl').read_text().splitlines()]
-            if len(requests) != expected_count or len(stress) != (8 if platform == 'xcb' else 7) or len(actions) != 12:
-                raise ValueError('Incomplete held-key qualification: '+name)
-            seats[name] = {'stress': stress, 'ordinary_actions': actions, 'mock_request_count': len(requests)}
+    seats = verify_keyboard(args.artifacts/'keyboard-tests')
+    greeter = verify_greeter(args.artifacts/'greeter-tests')
+    applications = verify_applications(args.artifacts/'applications.json')
+    distributions = verify_distributions(args.distribution_evidence, current, version) if args.distribution_evidence else {}
     args.output.mkdir() # Refuse to overwrite an earlier publication set.
     for path in [package, bundle]:
         shutil.copy2(path, args.output/path.name)
@@ -130,7 +209,8 @@ def main():
         'os_release': (args.artifacts/'os-release').read_text(),
         'build_packages': (args.artifacts/'packages.txt').read_text().splitlines(),
         'runtime_packages': (args.artifacts/'runtime-packages.txt').read_text().splitlines(),
-        'keyboard_seats': seats, 'real_power_operations': 0,
+        'keyboard_seats': seats, 'greeter': greeter, 'applications': applications,
+        'other_distributions': distributions, 'real_power_operations': 0,
         'physical_acceptance': 'Pending; no physical workstation modified',
         'workflow': 'https://github.com/'+os.environ.get('GITHUB_REPOSITORY', 'BB7Networks/Open-Power-Menu')+'/actions/runs/'+os.environ.get('GITHUB_RUN_ID', '')}
     (args.output/'QUALIFICATION.json').write_text(json.dumps(qualification, indent=2)+'\n')

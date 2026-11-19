@@ -27,6 +27,7 @@ struct Entry {
     QJsonObject view;
     QStringList argv;
     QString powerAction;
+    QString powerPreference;
     QString program;
     QList<Entry> children;
 };
@@ -36,7 +37,7 @@ class Model {
     explicit Model(std::shared_ptr<PowerManager> power = powerManager()) : power(std::move(power)) {}
     bool execute(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation = nullptr);
     QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false, bool discoverPower = true,
-                           bool confirmPower = false);
+                           bool confirmPower = false, const QString &powerIdentity = {});
     QJsonArray publicMenu(const QJsonObject &config);
     Presentation capture(const QJsonObject &config);
     Entry selected(const QJsonObject &config, const QString &key, const Presentation &shown);
@@ -55,7 +56,7 @@ class Model {
         QString output;
     };
     QHash<QString, Probe> probes;
-    QString probe(const QString &program, const QStringList &arguments);
-    QStringList resolve(const QJsonObject &spec, bool expand = true);
+    QString probe(const QString &program, const QStringList &arguments, int cacheMilliseconds = 30000);
+    QStringList resolve(const QJsonObject &spec, bool expand = true, const QString &builtinId = {});
 };
 } // namespace Opm

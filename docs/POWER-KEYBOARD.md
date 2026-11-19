@@ -2,8 +2,9 @@
 
 Historical report for the 51-file candidate. Its held-key blocker and timestamp
 workaround are superseded by [held-key stabilization](HELD-KEY-STABILIZATION.md).
-The dispatch/migration details below remain applicable; the later report records
-the new physical-input guard and current release gates.
+The later report records the physical-input guard. RC2's three-mode preference
+and migration supersede the checkbox described here; see
+[power and distribution compatibility](POWER-DISTRIBUTION-RC2.md).
 
 This continues the **local 34-file session-reliability candidate**, based on
 `5b1384832c19d3d1d9a5dbadf8421f6e9b612811`, on

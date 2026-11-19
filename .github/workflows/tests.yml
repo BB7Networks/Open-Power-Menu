@@ -33,6 +33,9 @@ jobs:
           git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
           mkdir -p work/package-legacy
           git archive FETCH_HEAD | tar -x -C work/package-legacy
+          git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
+          mkdir -p work/package-rc1
+          git archive FETCH_HEAD | tar -x -C work/package-rc1
       - name: Build pacman package and test legacy upgrades on the target distro
         shell: bash
         run: |
@@ -129,8 +132,18 @@ jobs:
           path: work/qualified-dev/
           retention-days: 7
   native-packaging:
-    name: Native packaging and upgrades
+    name: Native ${{ matrix.label }} packaging and upgrades
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Debian 13
+            distro: Debian
+            image: debian:trixie-slim
+          - label: Kubuntu 26.04
+            distro: Kubuntu
+            image: ubuntu:26.04
     steps:
       - uses: actions/checkout@v4
       - name: Export the exact released upgrade baseline
@@ -138,10 +151,24 @@ jobs:
           git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
           mkdir -p work/package-legacy
           git archive FETCH_HEAD | tar -x -C work/package-legacy
+          git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
+          mkdir -p work/package-rc1
+          git archive FETCH_HEAD | tar -x -C work/package-rc1
       - name: Build complete native package and test transactions
-        run: docker build --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test .
+        run: docker build --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test .
       - name: Install, activate, reinstall, remove and roll back without Python
         run: docker run --rm --network none opm-native-package:test
+      - name: Collect independent installation evidence
+        run: |
+          container=$(docker create --network none opm-native-package:test)
+          docker cp "$container:/opt/opm-evidence" work/qualification
+          docker rm "$container"
+          printf '%s\n' passed > work/qualification/runtime-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-install-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualification/
+          retention-days: 7
   native-standalone:
     name: Native standalone menu
     runs-on: ubuntu-24.04
@@ -164,14 +191,36 @@ jobs:
           dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
           dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin OPM_OUTPUT_COUNT=2 OPM_SCALE=1.25 sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
   native-editor:
-    name: Native editor and recovery
+    name: Native ${{ matrix.label }} editor and desktop
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Debian 13
+            distro: Debian
+            image: debian:trixie-slim
+          - label: Kubuntu 26.04
+            distro: Kubuntu
+            image: ubuntu:26.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test native editor on Debian 13
-        run: docker build -f native/tests/editor.Dockerfile -t opm-native-editor:test .
+      - name: Build and test native editor and distribution desktop
+        run: docker build --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test .
       - name: Run GUI without Python or a compiler
         run: docker run --rm --network none opm-native-editor:test
+      - name: Collect desktop and power qualification evidence
+        run: |
+          mkdir -p work
+          container=$(docker create --network none opm-native-editor:test)
+          docker cp "$container:/opt/opm-evidence" work/qualification
+          docker rm "$container"
+          printf '%s\n' passed > work/qualification/runtime-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-desktop-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualification/
+          retention-days: 7
   native-runtime:
     name: Native Qt backend
     runs-on: ubuntu-24.04

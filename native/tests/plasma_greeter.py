@@ -108,45 +108,56 @@ def session(args):
         spawn([args.backend, '--service', '--bus-name', 'org.openpowermenu.Service'], 'backend.log')
         wait_for(lambda: bus.interface().isServiceRegistered('org.openpowermenu.Service').value())
         report = []
-        # Confirmed cases first: KDE 6.7 refuses to show a greeter if Shutdown
-        # already owns its name. It must be ACTIVATABLE, not pre-owned by a mock.
-        for confirm in (True, False):
-            for kde in (False, True):
-                for action in ('shutdown', 'reboot', 'logout'):
-                    config.write_text(json.dumps({'menu': [{'action': action}], 'confirm_power_actions': confirm}))
-                    (case/'config/ksmserverrc').write_text('[General]\nconfirmLogout='+str(kde).lower()+'\n')
-                    def menu():
-                        rows = json.loads(call('GetMenu'))
-                        return rows if rows and rows[0].get('enabled') else None
-                    rows = wait_for(menu)
-                    integration = json.loads(call('GetIntegration'))
-                    assert integration['confirm_power_actions'] == confirm
-                    before = len(records()); began = time.monotonic()
-                    started = json.loads(call('StartRun', rows[0]['key']))
-                    def finished():
-                        app.processEvents()
-                        result = json.loads(call('RunResult', started['operation']))
-                        return result if result['state'] == 'finished' else None
-                    result = wait_for(finished)
-                    assert result['ok'], result
-                    if confirm:
-                        wait_for(windows)
-                        # Observe native presentation, without requesting focus.
-                        time.sleep(2)
-                        assert windows(), 'Greeter disappeared before cancellation'
-                        assert len(records()) == before, 'Confirmation executed before cancellation'
-                        subprocess.run([sys.executable, SCRIPT, '--screenshot', str(case/(action+'-kde'+str(kde)+'.png'))], check=True)
-                        subprocess.run(['xdotool', 'key', 'Escape'], check=True)
-                        wait_for(lambda: not windows())
-                        wait_for(lambda: not bus.interface().isServiceRegistered('org.kde.LogoutPrompt').value())
-                        assert len(records()) == before
-                    else:
-                        wait_for(lambda: len(records()) == before+1)
-                        assert records()[-1]['member'] == {'shutdown': 'logoutAndShutdown', 'reboot': 'logoutAndReboot', 'logout': 'logout'}[action]
-                        assert not windows()
-                    report.append({'action': action, 'confirm': confirm, 'kde_confirm': kde, 'elapsed': time.monotonic()-began, 'visible': confirm, 'result': result})
+        defaults = json.loads(subprocess.check_output([args.backend, '--default-config'], text=True))
+        modes = ('system', 'always', 'immediate') if 'power_confirmation' in defaults else ('always', 'immediate')
+        cases = [(mode, kde, action, mode == 'always' or (mode == 'system' and kde), False)
+                 for mode in modes for kde in (False, True) for action in ('shutdown', 'reboot', 'logout')]
+        # KDE 6.7 refuses a greeter while Shutdown owns its name. Leave the mock
+        # activatable until the countdown case; immediate requests follow it.
+        cases = [case for case in cases if case[3]] + [('always', True, 'shutdown', True, True)] + [case for case in cases if not case[3]]
+        for mode, kde, action, confirm, countdown in cases:
+            config_value = {'menu': [{'action': action}], 'confirm_power_actions': confirm}
+            if 'power_confirmation' in defaults: config_value['power_confirmation'] = mode
+            config.write_text(json.dumps(config_value))
+            (case/'config/ksmserverrc').write_text('[General]\nconfirmLogout='+str(kde).lower()+'\n')
+            def menu():
+                rows = json.loads(call('GetMenu'))
+                return rows if rows and rows[0].get('enabled') else None
+            rows = wait_for(menu)
+            integration = json.loads(call('GetIntegration'))
+            assert integration['confirm_power_actions'] == confirm
+            before = len(records()); began = time.monotonic()
+            started = json.loads(call('StartRun', rows[0]['key']))
+            def finished():
+                app.processEvents()
+                result = json.loads(call('RunResult', started['operation']))
+                return result if result['state'] == 'finished' else None
+            result = wait_for(finished)
+            assert result['ok'], result
+            if confirm:
+                wait_for(windows)
+                # Observe native presentation, without requesting focus.
+                time.sleep(2)
+                assert windows(), 'Greeter disappeared before cancellation'
+                assert len(records()) == before, 'Confirmation executed before cancellation'
+                subprocess.run([sys.executable, SCRIPT, '--screenshot', str(case/(mode+'-'+action+'-kde'+str(kde)+'.png'))], check=True)
+                if countdown:
+                    wait_for(lambda: len(records()) == before+1, 40)
+                    assert time.monotonic()-began >= 25, 'Stock KDE countdown completed unexpectedly early'
+                    assert records()[-1]['member'] == 'logoutAndShutdown'
+                else:
+                    subprocess.run(['xdotool', 'key', 'Escape'], check=True)
+                wait_for(lambda: not windows())
+                wait_for(lambda: not bus.interface().isServiceRegistered('org.kde.LogoutPrompt').value())
+                assert len(records()) == before+int(countdown)
+            else:
+                wait_for(lambda: len(records()) == before+1)
+                assert records()[-1]['member'] == {'shutdown': 'logoutAndShutdown', 'reboot': 'logoutAndReboot', 'logout': 'logout'}[action]
+                assert not windows()
+            report.append({'action': action, 'mode': mode, 'confirm': confirm, 'kde_confirm': kde,
+                           'countdown': countdown, 'elapsed': time.monotonic()-began, 'visible': confirm, 'result': result})
         (case/'results.json').write_text(json.dumps(report, indent=2)+'\n')
-        print('PASS: real greeter visible/cancelled for all six confirmed cases; all six immediate requests recorded privately.', flush=True)
+        print('PASS: real greeter, native countdown and private immediate routes:', len(report), 'cases.', flush=True)
     finally:
         for child in reversed(processes):
             if child.poll() is None:

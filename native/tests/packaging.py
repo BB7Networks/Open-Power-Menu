@@ -14,6 +14,7 @@ import unittest
 parser = argparse.ArgumentParser()
 parser.add_argument('--bundle', type=Path, required=True)
 parser.add_argument('--legacy', type=Path, required=True)
+parser.add_argument('--rc1-bundle', type=Path, required=True)
 args, remaining = parser.parse_known_args()
 BUNDLE = args.bundle.resolve()
 os.umask(0o077)
@@ -94,6 +95,32 @@ class Packaging(unittest.TestCase):
         self.assertIn('Sign out and back in', upgrade.stdout)
         self.assertEqual((self.app/'run.py').read_bytes(),legacy_bytes)
         self.assertEqual((embedded/'keep').read_text(),'older history');self.assertEqual((recovery/'keep').read_text(),'history')
+        self.assertEqual(self.original,self.settings())
+
+    def test_rc1_upgrade_and_rollback_preserve_preferences(self):
+        # A separately built, exact released RC1 bundle, on this distribution.
+        # Nothing here selects or dispatches any power action.
+        old = args.rc1_bundle.resolve()
+        self.assertEqual(json.loads((old/'bundle.json').read_text())['version'], '2.1.0-rc1')
+        self.personal.update(confirm_power_actions=True)
+        (self.config/'open-power-menu/menu.json').write_text(json.dumps(self.personal))
+        self.original=self.settings()
+        installed = subprocess.run([str(old/'app/bin/open-power-menu-install'), '--install', str(old)],
+            env=self.env, capture_output=True, text=True, timeout=40)
+        self.assertEqual(installed.returncode, 0, installed.stdout+installed.stderr)
+        self.assertEqual(self.original,self.settings())
+        old_binary=(self.app/'bin/open-power-menu-native').read_bytes()
+        self.install()
+        def call(method):
+            value=subprocess.check_output(['busctl','--user','call','org.openpowermenu.Service','/OpenPowerMenu',
+                'org.openpowermenu.Service',method],env=self.env,text=True)
+            return json.loads(value.removeprefix('s ').strip())
+        self.assertIn(json.loads((BUNDLE/'bundle.json').read_text())['version'], call('Ping'))
+        self.assertEqual(json.loads(call('GetIntegration'))['power_confirmation'], 'always')
+        self.invoke('--rollback')
+        self.assertEqual((self.app/'bin/open-power-menu-native').read_bytes(),old_binary)
+        self.assertIn('2.1.0-rc1', call('Ping'))
+        self.assertTrue(json.loads(call('GetIntegration'))['confirm_power_actions'])
         self.assertEqual(self.original,self.settings())
     def test_widget_activation_detection_and_deferred_update(self):
         # Two widgets and unrelated panel state survive every action byte-for-byte.

@@ -7,6 +7,7 @@ dist
 **/*.pyc
 work/*
 !work/package-legacy
+!work/package-rc1
 !work/pacman-source
 venv
 *.log

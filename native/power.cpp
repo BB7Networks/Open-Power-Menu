@@ -11,10 +11,38 @@
 #include <array>
 #include <algorithm>
 #include <QCoreApplication>
+#include <QDateTime>
+#include <QJsonDocument>
+#include <QTextStream>
 #ifdef OPM_HAVE_KCONFIG
 #include <KAuthorized>
+#include <KConfig>
+#include <KConfigGroup>
 #endif
 namespace Opm {
+void powerTrace(const QString &event, QJsonObject fields) {
+    if (qEnvironmentVariable("OPM_SESSION_TRACE") != "1") return;
+    fields["event"] = event;
+    fields["timestamp"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+    fields["pid"] = QCoreApplication::applicationPid();
+    QTextStream(stderr) << "OPM_POWER_TRACE " << QJsonDocument(fields).toJson(QJsonDocument::Compact) << '\n';
+}
+PowerPreference powerPreference(const QJsonObject &config) {
+    PowerPreference result;
+    result.mode = config.contains("power_confirmation") ? config["power_confirmation"].toString()
+        : config["confirm_power_actions"].toBool() ? "always" : "immediate";
+    if (!QStringList{"system", "always", "immediate"}.contains(result.mode))
+        throw Error("Invalid power_confirmation mode");
+#ifdef OPM_HAVE_KCONFIG
+    // Same file, group and default as KWorkspace::SessionManagement. A fresh
+    // KConfig reads current user/system layers and immutable policy entries;
+    // no single-file parsing, cached startup value, or KDE setting writes.
+    KConfig session(QStringLiteral("ksmserverrc"));
+    result.kdeConfirmation = KConfigGroup(&session, "General").readEntry("confirmLogout", true);
+#endif
+    result.confirmation = result.mode == "always" || (result.mode == "system" && result.kdeConfirmation);
+    return result;
+}
 QDBusMessage sessionPowerRequest(const QString &action) {
     const bool confirm = action.endsWith("-confirm");
     const auto name = confirm ? action.chopped(8) : action;
@@ -209,12 +237,16 @@ class CachedPower final : public PowerManager {
         executionStep = final ? 3 : 2;
         auto request = final ? sessionPowerRequest(sessionOperation) : QDBusMessage::createMethodCall(
             "org.freedesktop.login1", "/org/freedesktop/login1", "org.freedesktop.login1.Manager", permission);
+        if (final) powerTrace("dispatcher.request", {{"action", sessionOperation}, {"service", request.service()},
+            {"path", request.path()}, {"interface", request.interface()}, {"method", request.member()}});
         const auto epoch = executionEpoch;
         executionDeadline.start(readTimeout);
         const QPointer<CachedPower> guard(this);
         transport(!final, request, [guard, epoch, final](QDBusMessage reply) {
             if (!guard || !guard->executing || guard->executionEpoch != epoch || guard->executionStep != (final ? 3 : 2)) return;
             guard->executionDeadline.stop();
+            if (final) powerTrace("dispatcher.reply", {{"action", guard->sessionOperation},
+                {"reply_type", int(reply.type())}, {"error", reply.errorName()}, {"message", reply.errorMessage()}});
             if (reply.type() == QDBusMessage::ErrorMessage) {
                 const bool unknown = final && (reply.errorName().endsWith("NoReply") || reply.errorName().endsWith("Timeout") || reply.errorName().endsWith("Disconnected"));
                 guard->complete("KDE session request: " + reply.errorName() + ": " + reply.errorMessage() +

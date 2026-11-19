@@ -1,8 +1,9 @@
-# Complete native v2.1.0-rc1 bundle
+# Complete native v2.1.0-rc2 bundle
 
 This is a prerelease for controlled physical testing. Stable 1.0.1 is unchanged.
-Read the [release notes](../../RELEASE-NOTES-v2.1.0-rc1.md), including the warning
-that Shutdown, Restart and Sign out are immediate by default. Back up your
+Read the [release notes](../../RELEASE-NOTES-v2.1.0-rc2.md), including the warning
+that Shutdown, Restart and Sign out can execute immediately. New installations
+follow KDE; upgrades preserve the previous preference and custom commands. Back up your
 personal configuration and use private mocks for keyboard power stress tests.
 Never run the installer as root. It does not install system dependencies.
 
@@ -11,7 +12,9 @@ Without that virtual input display, the offscreen fallback explicitly skips the
 file-dialog input case; it cannot qualify that workflow. These are test tools,
 not native runtime dependencies.
 
-Build with CMake 3.22+ on the target distribution (Debian 13 amd64 is the tested baseline):
+Build with CMake 3.22+ on the target distribution. Debian 13 and Kubuntu 26.04
+have separate build, runtime and installation qualification jobs; never install
+the published Manjaro binaries on these systems:
 
     cmake -S . -B build/package -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON
     cmake --build build/package --target native-package --parallel 2

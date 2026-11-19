@@ -1,8 +1,10 @@
 # Open Power Menu 2.1 development and acceptance
 
-Current candidate: [v2.1.0-rc1](../RELEASE-NOTES-v2.1.0-rc1.md). The development
+Current candidate: [v2.1.0-rc2](../RELEASE-NOTES-v2.1.0-rc2.md). The development
 history below is retained; native distribution versioning now comes from
 `native/VERSION`. Stable 1.0.1 and draft PR #10 are preserved.
+The current power modes, application selection, migration and release gates are
+described in [the RC2 compatibility report](POWER-DISTRIBUTION-RC2.md).
 
 Stable remains **1.0.1**. Development is **2.1.0-dev** on
 `feature/native-architecture-v1.1`, draft PR #10. The next public release is
