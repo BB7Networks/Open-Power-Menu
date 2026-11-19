@@ -8,6 +8,8 @@
 #include <QUuid>
 #include <QPointer>
 #include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusReply>
 
 namespace Opm {
 static QString json(const QJsonObject &value) {
@@ -39,7 +41,7 @@ Service::Service(Storage source, QObject *parent, std::shared_ptr<PowerManager> 
     idle.setSingleShot(true);
     idle.setInterval(5 * 60 * 1000);
     connect(&idle, &QTimer::timeout, this, [this] {
-        if (model.powerCapabilities()->executionPending()) touch();
+        if (model.powerCapabilities()->executionPending() || !editorStarts.isEmpty()) touch();
         else QCoreApplication::quit();
     });
     touch();
@@ -218,20 +220,53 @@ QString Service::RunResult(const QString &id) {
 QString Service::LastError() { touch(); return errors.value(caller()); }
 bool Service::Edit() {
     touch();
+    const auto fail = [this](const QString &error) {
+        qWarning().noquote() << error;
+        if (calledFromDBus()) sendErrorReply("org.openpowermenu.EditorStartupFailed", error);
+        return false;
+    };
     const auto editor = QCoreApplication::applicationDirPath() + "/open-power-menu-editor";
     if (!QFileInfo(editor).isExecutable()) {
-        qWarning("Native Configure is not installed beside the backend. Build with "
-                 "OPM_BUILD_EDITOR=ON or install the complete native developer build.");
-        return false;
+        return fail("Native Configure is not installed beside the backend. Install the complete native build.");
     }
+    if (!calledFromDBus()) return fail("Configure requires a D-Bus requester or direct open-power-menu --edit invocation.");
+    if (editorStarts.size() >= 8) return fail("Configure startup is already pending. Wait for the current request.");
+    const auto token = QUuid::createUuid().toString(QUuid::Id128);
     QProcess process;
     process.setProgram(editor);
-    process.setArguments({"--config", storage.path()});
+    process.setArguments({"--config", storage.path(), "--opm-reply-to", connection().baseService(),
+                          "--opm-request", token, "--opm-session-peer", message().service()});
     process.setStandardInputFile(QProcess::nullDevice());
     process.setStandardOutputFile(QProcess::nullDevice());
-    // Keep startup diagnostics in the user service log while GUI migration is
-    // being validated; no Python frontend is launched as a fallback.
-    return process.startDetached();
+    qint64 pid = 0;
+    if (!process.startDetached(&pid)) return fail("Could not execute Configure: " + process.errorString());
+    setDelayedReply(true);
+    auto *deadline = new QTimer(this);
+    deadline->setSingleShot(true);
+    editorStarts.insert(token, {message(), pid, deadline});
+    connect(deadline, &QTimer::timeout, this, [this, token] {
+        finishEditorStart(token, "Configure did not acknowledge startup. Check the user journal and install matching native binaries.");
+    });
+    deadline->start(22000);
+    return false; // The original request is answered only after GUI readiness.
+}
+void Service::finishEditorStart(const QString &token, const QString &error) {
+    auto entry = editorStarts.find(token);
+    if (entry == editorStarts.end()) return;
+    entry->deadline->stop();
+    entry->deadline->deleteLater();
+    const auto response = error.isEmpty() ? entry->request.createReply(true)
+        : entry->request.createErrorReply("org.openpowermenu.EditorStartupFailed", error);
+    QDBusConnection::sessionBus().send(response);
+    editorStarts.erase(entry);
+}
+void Service::EditorStarted(const QString &token, const QString &error) {
+    if (!calledFromDBus()) return;
+    const auto entry = editorStarts.constFind(token);
+    if (entry == editorStarts.cend()) return;
+    const auto pid = connection().interface()->servicePid(message().service());
+    if (!pid.isValid() || pid.value() != entry->pid) return;
+    finishEditorStart(token, error.left(2048));
 }
 QString Service::BeginLayoutEdit() {
     touch();

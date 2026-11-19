@@ -553,6 +553,22 @@ Kirigami.ApplicationWindow {
                                 wrapMode: Text.WordWrap
                                 text: "Assign individual letters in Layout → Edit."
                             }
+                            Kirigami.Separator { Layout.fillWidth: true }
+                            Controls.Label {
+                                text: "Power Actions"
+                                font.bold: true
+                            }
+                            Controls.CheckBox {
+                                objectName: "confirmPowerActions"
+                                text: "Confirm power actions"
+                                checked: window.settings.confirm_power_actions
+                                onToggled: window.preference("confirm_power_actions", checked)
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                                text: "When enabled, show KDE's confirmation screen before shutting down, restarting, or signing out. When disabled, begin the selected action immediately."
+                            }
                         }
                     }
                 }

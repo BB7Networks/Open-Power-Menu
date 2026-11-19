@@ -15,6 +15,18 @@ import "LayoutDraft.js" as LayoutDraft
 
 PlasmaCore.PopupPlasmaWindow {
     id: flyout
+    property var inputGuard: null
+    onInputGuardChanged: { if (inputGuard) inputGuard.watch(flyout); }
+    property var diagnostics: null
+    function traceWindow(callback) {
+        if (diagnostics && diagnostics.enabled)
+            diagnostics.record("flyout." + callback, {window: diagnostics.windowState(flyout),
+                pointerInside: pointerInside, keyboard: keyboardActivationRequested});
+    }
+    onActiveChanged: traceWindow("activeChanged")
+    onTransientParentChanged: traceWindow("transientParentChanged")
+    onVisibilityChanged: traceWindow("visibilityChanged")
+    onPointerInsideChanged: traceWindow("pointerInsideChanged")
     visible: false
     popupDirection: Qt.RightEdge
     // CRITICAL: false widens the horizontal anchor to the ENTIRE parent
@@ -28,7 +40,12 @@ PlasmaCore.PopupPlasmaWindow {
     // causing Plasma's parent applet popup to auto-dismiss. Keyboard-opened
     // flyouts opt back into focus *before* becoming visible.
     property bool keyboardActivationRequested: false
+    // Qt's XCB backend publishes WM_TRANSIENT_FOR only for transient window
+    // types. A plain Window ignores Plasma's transientParent at the X11 level;
+    // hiding that flyout can reactivate the background application and collapse
+    // the applet. Tool preserves native parenting without Qt.Popup input grabs.
     flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint |
+        (Qt.platform.pluginName === "xcb" ? Qt.Tool : 0) |
         ((Qt.platform.pluginName === "xcb" && !keyboardActivationRequested)
             ? Qt.WindowDoesNotAcceptFocus : 0)
     // Do not force Qt.Popup: that changes Wayland popup placement semantics.
@@ -66,6 +83,12 @@ PlasmaCore.PopupPlasmaWindow {
             ? effective : popupDirection;
     }
     signal returnToParent()
+    signal keyToParent(var event)
+    property bool returningToParent: false
+    // X11 activation is asynchronous. A rapid next key may still arrive in
+    // the parent QWindow; route it through the same handler, without waiting
+    // for focus or adding another shortcut system.
+    function handleKey(event) { flyoutSurface.handleKey(event); }
     function focusFirst() {
         // Callers set this before showing the window; also handle a flyout
         // already open from hover when keyboard navigation takes over.
@@ -91,6 +114,7 @@ PlasmaCore.PopupPlasmaWindow {
     }
     property Timer pointerTransition: Timer { interval: 150; repeat: false }
     function geometrySettling() {
+        traceWindow("geometryChanged");
         if (visible) pointerTransition.restart();
         geometryChanged();
         Qt.callLater(reposition);
@@ -172,8 +196,9 @@ PlasmaCore.PopupPlasmaWindow {
         child.visible = true;
     }
     onVisibleChanged: {
+        traceWindow("visibleChanged");
         resetSelection();
-        if (visible) { geometrySettling(); Qt.callLater(updateIndicatorDirection); }
+        if (visible) { returningToParent = false; geometrySettling(); Qt.callLater(updateIndicatorDirection); }
     }
 
     // PlasmaWindow's mainItem is resized to the window's size minus its
@@ -201,16 +226,31 @@ PlasmaCore.PopupPlasmaWindow {
                 lastGlobal = global;
             }
         }
-        Keys.onPressed: event => {
+        function handleKey(event) {
+            if (!flyout.inputGuard || !flyout.inputGuard.ready) { event.accepted = true; return; }
+            if (event.modifiers !== 0 || AccessKeys.editable(flyout.activeFocusItem)) return;
+            if (event.isAutoRepeat && event.key !== Qt.Key_Up && event.key !== Qt.Key_Down) { event.accepted = true; return; }
+            if (!flyout.visible) {
+                // Escape/Left may beat the window manager's focus transfer.
+                // Deliver an already queued next key to the parent level.
+                if (flyout.returningToParent) flyout.keyToParent(event);
+                return;
+            }
+            if (flyout.activeChild && flyout.activeChild.visible && flyout.activeChild.keyboardActivationRequested) {
+                flyout.activeChild.handleKey(event);
+                return;
+            }
             flyout.keyboardMode = true;
             flyout.keyboardUsed();
             const index = AccessKeys.index(flyout.entries, event.text, event.modifiers, event.isAutoRepeat);
             if (index >= 0) {
                 flyout.activeIndex = index;
-                const row = flyoutRows.itemAt(index);
-                if (!row) return;
-                if (row.entry.kind === "submenu") { row.openChild(true); if (row.childPopup) row.childPopup.focusFirst(); }
-                else { flyout.triggered(row.entry.key, row.entry.close_before_run === true); flyout.visible = false; }
+                const entry = flyout.entries[index];
+                if (entry.kind === "submenu") {
+                    const row = flyoutRows.itemAt(index);
+                    if (!row) return;
+                    row.openChild(true); if (row.childPopup) row.childPopup.focusFirst();
+                } else { flyout.triggered(entry.key, entry.close_before_run === true); flyout.visible = false; }
                 event.accepted = true;
                 return;
             }
@@ -225,6 +265,7 @@ PlasmaCore.PopupPlasmaWindow {
                         scroll.contentY = row.y + row.height - viewport.availableHeight;
                 }
             } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Escape) {
+                flyout.returningToParent = true;
                 flyout.visible = false;
                 flyout.returnToParent();
             } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
@@ -237,6 +278,11 @@ PlasmaCore.PopupPlasmaWindow {
                 }
             } else return;
             event.accepted = true;
+        }
+        Keys.onPressed: event => handleKey(event)
+        Keys.onShortcutOverride: event => {
+            if (event.modifiers !== 0 && !AccessKeys.editable(flyout.activeFocusItem))
+                event.accepted = true;
         }
 
         // Shared proxy for deeper cascading menus; each nested flyout is
@@ -283,6 +329,8 @@ PlasmaCore.PopupPlasmaWindow {
                                     return;
                                 }
                                 childPopup = factory.createObject(row, {
+                                    "inputGuard": Qt.binding(() => flyout.inputGuard),
+                                    "diagnostics": Qt.binding(() => flyout.diagnostics),
                                     "visualParent": childAnchor,
                                     "entries": row.entry.items || [],
                                     "screenRect": row.menuScreen,
@@ -299,6 +347,7 @@ PlasmaCore.PopupPlasmaWindow {
                                 childPopup.keyboardUsed.connect(flyout.keyboardUsed);
                                 childPopup.pointerMoved.connect(flyout.pointerMoved);
                                 childPopup.geometryChanged.connect(flyout.geometryChanged);
+                                childPopup.keyToParent.connect(event => flyout.handleKey(event));
                                 childPopup.returnToParent.connect(function() {
                                     if (!flyout.visible) return;
                                     flyout.requestActivate();

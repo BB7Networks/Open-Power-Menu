@@ -12,6 +12,7 @@
 #include <QImage>
 #include <QPainter>
 #include <QKeyEvent>
+#include <QScopedValueRollback>
 #include <QJsonDocument>
 #include <QMetaEnum>
 #include <QScreen>
@@ -296,6 +297,9 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
         if (menu == this && event->type() == QEvent::Show && windowHandle())
             windowHandle()->installEventFilter(this);
         switch (event->type()) {
+        case QEvent::KeyRelease:
+            physicalKeys.release(*static_cast<QKeyEvent *>(event));
+            break;
         case QEvent::Show: case QEvent::Move: case QEvent::Resize:
             if (isVisible()) {
                 leaveTimer.stop();
@@ -309,10 +313,17 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
             keyboard = true;
             updateDismissal();
             const auto *key = static_cast<QKeyEvent *>(event);
-            if (!(key->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) &&
+            const auto admission = forwardingKey ? KeyAdmission::Press : physicalKeys.press(*key);
+            if (admission == KeyAdmission::Reject) return true;
+            const bool repeated = admission == KeyAdmission::NavigationRepeat;
+            // Modified combinations belong to their normal handlers. Prevent
+            // QMenu's built-in mnemonics/Enter fallback from activating them.
+            if (key->modifiers() != Qt::NoModifier) return true;
+            if (repeated && key->key() != Qt::Key_Up && key->key() != Qt::Key_Down) return true;
+            if (key->modifiers() == Qt::NoModifier &&
                 ((key->key() >= Qt::Key_A && key->key() <= Qt::Key_Z) ||
                  (key->key() >= Qt::Key_0 && key->key() <= Qt::Key_9))) {
-                if (!key->isAutoRepeat() && config["access_keys_enabled"].toBool(true)) {
+                if (!repeated && config["access_keys_enabled"].toBool(true)) {
                     const auto letter = QString(QChar(key->key()));
                     QAction *match = nullptr;
                     for (auto *action : menu->actions())
@@ -324,6 +335,7 @@ bool Standalone::eventFilter(QObject *object, QEvent *event) {
                         menu->setActiveAction(match);
                         QKeyEvent activate(QEvent::KeyPress, match->menu() ? Qt::Key_Right : Qt::Key_Return,
                                            Qt::NoModifier);
+                        QScopedValueRollback<bool> scope(forwardingKey, true);
                         QCoreApplication::sendEvent(menu, &activate);
                     }
                 }
@@ -427,7 +439,9 @@ int Standalone::open(const QString &overrideAnchor) {
     activation.start(0);
     sample.start(250);
     lateSample.start(1500);
+    physicalKeys.setActive(true);
     auto *selected = exec(pos);
+    physicalKeys.setActive(false);
     leaveTimer.stop();
     focusTimer.stop();
     report("dismissed");

@@ -18,6 +18,11 @@ QtObject {
     readonly property bool settling: transition.running
     readonly property bool pending: deadline.running
     signal dismissed()
+    signal diagnosticEvent(string callback)
+    onPendingChanged: diagnosticEvent("pendingChanged")
+    onSettlingChanged: diagnosticEvent("settlingChanged")
+    onEnteredChanged: diagnosticEvent("enteredChanged")
+    onKeyboardModeChanged: diagnosticEvent("keyboardModeChanged")
 
     function update() {
         if (!enabled || !menuOpen || settling || pointerInside || protectedInteraction || keyboardMode || !entered)
@@ -66,6 +71,7 @@ QtObject {
         interval: policy.delay
         repeat: false
         onTriggered: {
+            policy.diagnosticEvent("deadline.triggered");
             if (policy.enabled && policy.menuOpen && !policy.settling && !policy.pointerInside &&
                     !policy.protectedInteraction && !policy.keyboardMode && policy.entered)
                 policy.dismissed();

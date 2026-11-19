@@ -75,6 +75,14 @@ class NativeContract(unittest.TestCase):
         return result
 
     def compare(self, config):
+        # The three session-ending built-ins now use native, policy-checked
+        # D-Bus requests instead of legacy qdbus command discovery. Their exact
+        # routes/labels are covered by session_power_test.cpp and the private
+        # Plasma keyboard harness; keep differential checks for unchanged items.
+        def unchanged(items):
+            return [{**item, **({'items': unchanged(item['items'])} if 'items' in item else {})}
+                    for item in items if item.get('action') not in ('shutdown', 'reboot', 'logout')]
+        config = {**config, 'menu': unchanged(config['menu'])}
         self.write(config)
         with patch.dict(os.environ, self.env, clear=True):
             expected = public_menu_from_config(load_config(self.config))
@@ -230,7 +238,8 @@ class NativeContract(unittest.TestCase):
             self.assertTrue(json.loads(self.call('GetIntegration'))['hide_original_launcher'])
             self.assertRegex(json.loads(self.call('GetMenu'))[0]['key'], r'^[a-f0-9]{32}/0$')
             # No editor stub masquerades as successful functionality.
-            self.assertEqual(self.call('Edit'), 'false')
+            failed_editor = self.run_native('--call', 'Edit', ok=False)
+            self.assertIn('Configure', failed_editor.stderr)
             conflict = self.run_native('--service', ok=False)
             self.assertIn('existing owner', conflict.stderr)
             self.config.write_text('{broken')

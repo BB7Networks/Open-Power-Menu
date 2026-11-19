@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QLibraryInfo>
 #include <QProcess>
+#include <QPluginLoader>
 #include <QProcessEnvironment>
 #include <QRegularExpression>
 #include <QSysInfo>
@@ -462,6 +463,10 @@ int main(int argc, char **argv) {
                 dataRoot() + "/open-power-menu-recovery/native-installs/" + id + "/new/0/bin/";
             for (const auto &n : {"open-power-menu-native", "open-power-menu-standalone"})
                 run(stagedBin + n, {"--version"});
+            QPluginLoader inputGuard(dataRoot() + "/open-power-menu-recovery/native-installs/" + id +
+                "/new/1/contents/ui/nativeinput/libopminputplugin.so");
+            if (!inputGuard.load())
+                throw Error("Native keyboard guard cannot load: " + inputGuard.errorString());
             validatePlatformPlugins(QLibraryInfo::path(QLibraryInfo::PluginsPath) + "/platforms");
             QTemporaryDir testProfile;
             run(stagedBin + "open-power-menu-editor",

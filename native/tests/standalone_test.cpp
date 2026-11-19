@@ -19,6 +19,31 @@
 #include <utility>
 
 using namespace Opm;
+// The X11 guard deliberately rejects QTest events with no native evidence.
+// Use actual XTest input in the X11 suite; offscreen/Wayland retain Qt events.
+static void sendKey(QWidget *widget, Qt::Key key, Qt::KeyboardModifiers modifiers, const QString &kind) {
+    if (QGuiApplication::platformName() != "xcb") {
+        if (kind == "key") QTest::keyClick(widget, key, modifiers);
+        else if (kind == "keydown") QTest::keyPress(widget, key, modifiers);
+        else QTest::keyRelease(widget, key, modifiers);
+        return;
+    }
+    QString symbol = QKeySequence(key).toString();
+    if (key == Qt::Key_Escape) symbol = "Escape";
+    if (key == Qt::Key_Return) symbol = "Return";
+    if (symbol.size() == 1) symbol = symbol.toLower();
+    if (modifiers & Qt::ShiftModifier) symbol.prepend("shift+");
+    if (modifiers & Qt::ControlModifier) symbol.prepend("ctrl+");
+    if (modifiers & Qt::AltModifier) symbol.prepend("alt+");
+    if (modifiers & Qt::MetaModifier) symbol.prepend("super+");
+    const auto id = QString::number(widget->window()->winId());
+    QCOMPARE(QProcess::execute("xdotool", {"windowfocus", id, kind, "--clearmodifiers", "--delay", "0", symbol}), 0);
+    QTest::qWait(25); // Drain test input; production has no keyboard timer.
+}
+static void clickKey(QWidget *widget, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) { sendKey(widget,key,modifiers,"key"); }
+static void pressKey(QWidget *widget, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) { sendKey(widget,key,modifiers,"keydown"); }
+static void releaseKey(QWidget *widget, Qt::Key key, Qt::KeyboardModifiers modifiers = Qt::NoModifier) { sendKey(widget,key,modifiers,"keyup"); }
+
 static QJsonObject command(const QString &label = "Command", const QJsonArray &args = {"/bin/true"}) {
     return {{"label", label}, {"command", args}};
 }
@@ -215,7 +240,7 @@ class StandaloneTest : public QObject {
             QJsonObject{{"submenu", "Second"}, {"items", QJsonArray{command()}}}};
         Standalone menu(cfg); menu.popup(QPoint(50, 50)); QTest::qWait(30);
         auto *first = menu.actions()[0]->menu(); auto *second = menu.actions()[1]->menu();
-        enter(&menu); menu.setActiveAction(menu.actions()[0]); QTest::keyClick(&menu, Qt::Key_Right);
+        enter(&menu); menu.setActiveAction(menu.actions()[0]); clickKey(&menu, Qt::Key_Right);
         QVERIFY(first->isVisible());
         for (int i = 0; i < 10; ++i)
             moveTo(&menu, menu.actionGeometry(menu.actions()[1]).center() + QPoint(i % 2, 0));
@@ -241,13 +266,13 @@ class StandaloneTest : public QObject {
         QTRY_VERIFY_WITH_TIMEOUT(child->isVisible(), expected + 600);
         // Reopen through QMenu's lifecycle; manually hiding a submenu bypasses
         // Qt's active-popup/sloppy-pointer cleanup and is not a user transition.
-        QTest::keyClick(child, Qt::Key_Escape);
+        clickKey(child, Qt::Key_Escape);
         menu.close(); menu.popup(QPoint(40,40)); QTest::qWait(20); enter(&menu);
         for (int i = 0; i < 10; ++i)
             moveTo(&menu, menu.actionGeometry(menu.actions()[2]).center() + QPoint(i % 2, 0));
         moveTo(&menu, menu.actionGeometry(menu.actions()[0]).center());
         QTest::qWait(expected + 80); QVERIFY(!child->isVisible());
-        menu.setActiveAction(menu.actions()[2]); QTest::keyClick(&menu, Qt::Key_Right);
+        menu.setActiveAction(menu.actions()[2]); clickKey(&menu, Qt::Key_Right);
         QVERIFY(child->isVisible()); // explicit activation does not wait
         menu.close(); QTest::qWait(expected + 80); QVERIFY(!child->isVisible());
     }
@@ -313,10 +338,10 @@ class StandaloneTest : public QObject {
         Standalone menu(cfg);
         QSignalSpy spy(&menu,&Standalone::diagnostic);
         QTimer::singleShot(50,&menu,[&]{
-            QTest::keyClick(&menu,Qt::Key_U);
+            clickKey(&menu,Qt::Key_U);
             auto *child=menu.actions()[0]->menu();
             QTRY_VERIFY(child->isVisible());
-            QTest::keyClick(child,Qt::Key_U);
+            clickKey(child,Qt::Key_U);
         });
         QCOMPARE(openWithTimeout(menu),0);
         bool launched=false; for(const auto &event:spy) launched |= event[0].toString()=="command-launched";
@@ -329,9 +354,54 @@ class StandaloneTest : public QObject {
         cfg["show_access_key_hints"]=false; Standalone hidden(cfg); QVERIFY(!hidden.actions()[0]->text().contains('\t'));
         cfg["access_keys_enabled"]=false; Standalone disabled(cfg);
         QSignalSpy spy(&disabled,&Standalone::diagnostic);
-        QTimer::singleShot(50,&disabled,[&]{ QTest::keyClick(&disabled,Qt::Key_X); QVERIFY(disabled.isVisible()); disabled.close(); });
+        QTimer::singleShot(50,&disabled,[&]{ clickKey(&disabled,Qt::Key_X); QVERIFY(disabled.isVisible()); disabled.close(); });
         QCOMPARE(openWithTimeout(disabled),0);
         for(const auto &event:spy) QVERIFY(event[0].toString()!="command-launched");
+    }
+    void modifiedAndRepeatedKeysCannotActivate() {
+        auto cfg = configuration();
+        auto item = command("Harmless"); item["access_key"] = "U";
+        cfg["menu"] = QJsonArray{item};
+        Standalone menu(cfg); QSignalSpy spy(&menu, &Standalone::diagnostic);
+        QTimer::singleShot(20, &menu, [&] {
+            menu.setActiveAction(menu.actions()[0]);
+            for (auto modifier : {Qt::ShiftModifier, Qt::ControlModifier, Qt::AltModifier, Qt::MetaModifier}) {
+                clickKey(&menu, Qt::Key_U, modifier);
+                clickKey(&menu, Qt::Key_Return, modifier);
+                QVERIFY(menu.isVisible());
+            }
+            for (int key : {Qt::Key_U, Qt::Key_Return, Qt::Key_Escape}) {
+                QKeyEvent repeat(QEvent::KeyPress, key, Qt::NoModifier, key == Qt::Key_U ? "u" : "", true);
+                QApplication::sendEvent(&menu, &repeat);
+                QVERIFY(menu.isVisible());
+                releaseKey(&menu, Qt::Key(key));
+            }
+            clickKey(&menu, Qt::Key_Return);
+        });
+        QCOMPARE(openWithTimeout(menu), 0);
+        int launched = 0;
+        for (const auto &event : spy) launched += event[0].toString() == "command-launched";
+        QCOMPARE(launched, 1);
+    }
+    void heldKeyAcrossNativeMenusRequiresRelease() {
+        auto cfg=configuration();
+        cfg["menu"]=QJsonArray{QJsonObject{{"submenu","Safe"},{"access_key","U"},
+            {"items",QJsonArray{QJsonObject{{"label","Harmless"},{"access_key","U"},{"command",QJsonArray{"/bin/true"}}}}}}};
+        Standalone menu(cfg);QSignalSpy spy(&menu,&Standalone::diagnostic);
+        QTimer::singleShot(20,&menu,[&] {
+            pressKey(&menu,Qt::Key_U);
+            auto *child=menu.actions()[0]->menu();QTRY_VERIFY(child->isVisible());
+            for (bool repeatFlag:{false,true,false}) {
+                QKeyEvent repeat(QEvent::KeyPress,Qt::Key_U,Qt::NoModifier,"u",repeatFlag);
+                QApplication::sendEvent(child,&repeat);
+                QVERIFY(child->isVisible());
+            }
+            releaseKey(child,Qt::Key_U); // Different native window.
+            clickKey(child,Qt::Key_U);
+        });
+        QCOMPARE(openWithTimeout(menu),0);
+        int launched=0;for(const auto &event:spy) launched+=event[0].toString()=="command-launched";
+        QCOMPARE(launched,1);
     }
     void repeatedPointerTiming_data() {
         QTest::addColumn<int>("delay");
@@ -368,7 +438,7 @@ class StandaloneTest : public QObject {
             QVERIFY(menu.isVisible()); QVERIFY(!menu.pointerTimerActive());
             enter(&menu);
             moveTo(&menu, QPoint(5,5));
-            QTest::keyClick(&menu, Qt::Key_Home); leave(&menu);
+            clickKey(&menu, Qt::Key_Home); leave(&menu);
             QVERIFY(menu.keyboardNavigation()); QVERIFY(!menu.pointerTimerActive());
             moveTo(&menu, menu.mapFromGlobal(area.center()));
             QVERIFY(!menu.keyboardNavigation());
@@ -454,7 +524,7 @@ class StandaloneTest : public QObject {
         QCOMPARE(longMenu.style()->styleHint(QStyle::SH_Menu_Scrollable, nullptr, &longMenu), 1);
         QTimer::singleShot(100, &longMenu, [&] {
             QVERIFY(longMenu.height() <= QGuiApplication::primaryScreen()->availableGeometry().height());
-            QTest::keyClick(&longMenu, Qt::Key_End);
+            clickKey(&longMenu, Qt::Key_End);
             QCOMPARE(longMenu.activeAction(), longMenu.actions().last());
             QVERIFY(longMenu.rect().contains(longMenu.actionGeometry(longMenu.actions().last()).center()));
             longMenu.close();
@@ -505,7 +575,7 @@ class StandaloneTest : public QObject {
         QVERIFY(menu.isVisible());
         leave(child);
         QVERIFY(menu.pointerTimerActive());
-        QTest::keyClick(child, Qt::Key_Down);
+        clickKey(child, Qt::Key_Down);
         QVERIFY(menu.keyboardNavigation());
         QVERIFY(!menu.pointerTimerActive());
         QTest::qWait(1250);
@@ -533,23 +603,23 @@ class StandaloneTest : public QObject {
         Standalone menu(configuration());
         QSignalSpy trace(&menu, &Standalone::diagnostic);
         QTimer::singleShot(50, &menu, [&] {
-            QTest::keyClick(&menu, Qt::Key_Down);
+            clickKey(&menu, Qt::Key_Down);
             QCOMPARE(menu.activeAction(), menu.actions()[0]);
-            QTest::keyClick(&menu, Qt::Key_Down);
+            clickKey(&menu, Qt::Key_Down);
             QCOMPARE(menu.activeAction(), menu.actions()[2]);
-            QTest::keyClick(&menu, Qt::Key_Right);
+            clickKey(&menu, Qt::Key_Right);
             auto *child = menu.actions()[2]->menu();
             QTRY_VERIFY(child->isVisible());
-            QTest::keyClick(child, Qt::Key_Down);
-            QTest::keyClick(child, Qt::Key_Right);
+            clickKey(child, Qt::Key_Down);
+            clickKey(child, Qt::Key_Right);
             auto *deep = child->actions()[1]->menu();
             QTRY_VERIFY(deep->isVisible());
-            QTest::keyClick(deep, Qt::Key_Return);
+            clickKey(deep, Qt::Key_Return);
         });
         QCOMPARE(openWithTimeout(menu), 0);
         QVERIFY(trace.contains(QList<QVariant>{QString("command-launched")}));
         for (int i = 0; i < 5; ++i) {
-            QTimer::singleShot(20, &menu, [&] { QTest::keyClick(&menu, Qt::Key_Escape); });
+            QTimer::singleShot(20, &menu, [&] { clickKey(&menu, Qt::Key_Escape); });
             QCOMPARE(openWithTimeout(menu), 0);
             QVERIFY(!menu.isVisible());
             QVERIFY(!menu.pointerTimerActive());

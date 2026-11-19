@@ -3,6 +3,10 @@
 <kcfg>
   <kcfgfile name=""/>
   <group name="General">
+    <entry name="popupDiagnostics" type="Bool">
+      <label>Temporary popup-collapse diagnostic logging</label>
+      <default>false</default>
+    </entry>
     <entry name="buttonIcon" type="String">
       <label>Icon name or absolute PNG/SVG path</label>
       <default>start-here-manjaro</default>

@@ -35,8 +35,8 @@ function fixture() {
   closeLauncherPopup(){return {ok:true}},synchronizeLauncherVisibility(){},releaseMask(){},activateSelectedLauncher(){},
   fullRepresentationItem:{prepared:0,prepareForOpen(){this.prepared++}},
   send(service,path,iface,method,args,done){calls.push({method,args,done})}};
- c.root=c;vm.createContext(c);vm.runInContext(METHODS,c);
- return {c,calls,later,reply(method,value,ok=true){const i=calls.findIndex(x=>x.method===method);assert(i>=0,method);calls.splice(i,1)[0].done(ok,typeof value==='boolean'?value:JSON.stringify(value))},
+ c.root=c; c.setPowerExpanded=function(value){this.expanded=value};vm.createContext(c);vm.runInContext(METHODS,c);
+ return {c,calls,later,reply(method,value,ok=true){const i=calls.findIndex(x=>x.method===method);assert(i>=0,method);calls.splice(i,1)[0].done(ok,method==='PowerCapabilitiesPending'?value:JSON.stringify(value))},
  drain(){while(later.length)later.shift()()}};
 }
 const menu=[{kind:'command',key:'safe',title:'Safe',enabled:true}];
@@ -59,11 +59,11 @@ for(const order of ['preferences-first','menu-first']) for(const mode of ['auto'
  assert(!f.calls.some(x=>x.method==='SetMenuHeight'));
 }
 // Initial capabilities can arrive after GetMenu; prepare only after discovery.
-{
+for(const wrapped of [false,true]) {
  const f=fixture(),c=f.c;c.openMenu();c.finishOpeningPower(c.menuSwitchEpoch);
- f.reply('GetIntegration',{});f.reply('GetMenu',[]);f.reply('PowerCapabilitiesPending',true);f.drain();
+ f.reply('GetIntegration',{});f.reply('GetMenu',[]);f.reply('PowerCapabilitiesPending',wrapped?{value:true}:true);f.drain();
  assert.equal(c.expanded,false);assert.equal(c.powerRefresh.running,true);
- c.fetchMenu(true,c.powerRefresh.readyCallback);f.reply('GetMenu',menu);f.reply('PowerCapabilitiesPending',false);f.drain();
+ c.fetchMenu(true,c.powerRefresh.readyCallback);f.reply('GetMenu',menu);f.reply('PowerCapabilitiesPending',wrapped?{value:false}:false);f.drain();
  assert.equal(c.expanded,true);assert.equal(c.visibleEntries.length,1);
 }
 // Errors expose a usable recovery popup instead of leaving an opening stuck.

@@ -35,6 +35,7 @@ QJsonObject defaults() {
         auto config = resource("defaults");
         config["access_keys_enabled"] = true;
         config["show_access_key_hints"] = true;
+        config["confirm_power_actions"] = false;
         config["auto_close_delay_ms"] = PointerLeaveDefault;
         config["submenu_hover_delay_ms"] = -1;
         config["menu_density"] = "standard";
@@ -63,6 +64,12 @@ QJsonObject actions() {
         auto catalog = resource("actions");
         catalog["sleep"] = QJsonObject{{"title", "Sleep"}, {"icon", "system-suspend"}, {"native_power", "sleep"}, {"commands", QJsonArray{}}};
         catalog["hibernate"] = QJsonObject{{"title", "Hibernate"}, {"icon", "system-suspend-hibernate"}, {"native_power", "hibernate"}, {"commands", QJsonArray{}}};
+        for (const auto &action : {"shutdown", "reboot", "logout"}) {
+            auto spec = catalog[action].toObject();
+            spec["native_power"] = action;
+            spec["commands"] = QJsonArray{};
+            catalog[action] = spec;
+        }
         return catalog;
     }();
     return value;
@@ -301,7 +308,7 @@ void validate(const QJsonObject &config) {
                 QFileInfo(path).suffix().toLower()))
             throw Error("Use a theme icon or absolute local image path");
     }
-    for (const auto &key : {"access_keys_enabled", "show_access_key_hints"})
+    for (const auto &key : {"access_keys_enabled", "show_access_key_hints", "confirm_power_actions"})
         if (config.contains(key) && !config[key].isBool())
             throw Error(QString(key) + " must be a boolean");
     pointerLeaveDelay(config);
@@ -341,7 +348,7 @@ QJsonObject integration(const QJsonObject &config) {
     for (const auto &key :
          {"hide_original_launcher", "launcher_applet_id", "button_icon_mode", "button_icon",
           "appearance", "show_menu_icons", "auto_close_on_pointer_leave",
-          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints",
+          "auto_close_delay_ms", "access_keys_enabled", "show_access_key_hints", "confirm_power_actions",
           "submenu_hover_delay_ms", "menu_density", "menu_width", "menu_icon_size",
           "menu_height_mode", "menu_custom_height"})
         result[key] = config[key];
@@ -472,7 +479,7 @@ QStringList Model::resolve(const QJsonObject &spec, bool expand) {
     }
     return {};
 }
-QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, bool discoverPower) {
+QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, bool discoverPower, bool confirmPower) {
     QList<Entry> result;
     for (const auto &value : items) {
         const auto item = value.toObject();
@@ -482,7 +489,7 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
                 continue;
             entry.view = {{"kind", "separator"}};
         } else if (item.contains("submenu")) {
-            entry.children = normalize(item["items"].toArray(), showUnavailable, discoverPower);
+            entry.children = normalize(item["items"].toArray(), showUnavailable, discoverPower, confirmPower);
             if (entry.children.isEmpty())
                 continue;
             entry.view = {{"kind", "submenu"},
@@ -494,6 +501,8 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
             PowerAvailability powerState;
             if (builtin && spec.contains("native_power")) {
                 entry.powerAction = spec["native_power"].toString();
+                if (confirmPower && sessionPowerRequest(entry.powerAction).type() == QDBusMessage::MethodCallMessage)
+                    entry.powerAction += "-confirm";
                 powerState = discoverPower ? power->capability(entry.powerAction)
                                            : power->presentedCapability(entry.powerAction);
             } else
@@ -502,9 +511,17 @@ QList<Entry> Model::normalize(const QJsonArray &items, bool showUnavailable, boo
             const bool enabled = !entry.argv.isEmpty() || powerState.available;
             if (!enabled && !showUnavailable)
                 continue;
-            const auto title = builtin ? label(item, "label", spec["title"].toString())
+            auto title = builtin ? label(item, "label", spec["title"].toString())
                                        : (item.contains("label") ? textValue(item["label"])
                                                                  : QString("Custom command"));
+            // Only the normal built-in title changes; never rewrite menu JSON
+            // or remove punctuation from a user's custom label.
+            if (sessionPowerRequest(entry.powerAction).type() == QDBusMessage::MethodCallMessage &&
+                (!item.contains("label") || title == spec["title"].toString() ||
+                 title == spec["title"].toString().chopped(3))) {
+                title = spec["title"].toString();
+                if (!confirmPower && title.endsWith("...")) title.chop(3);
+            }
             entry.view = {
                 {"kind", "command"},
                 {"title", title},
@@ -539,7 +556,7 @@ static QJsonArray present(const QList<Entry> &entries, const QString &prefix = {
     return result;
 }
 Presentation Model::capture(const QJsonObject &config) {
-    const auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]));
+    const auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, config["confirm_power_actions"].toBool());
     Presentation shown;
     shown.menu = present(tree, {}, config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
     std::function<void(const QList<Entry> &, QString)> collect = [&](const QList<Entry> &items, QString prefix) {
@@ -563,7 +580,7 @@ Entry Model::selected(const QJsonObject &config, const QString &key, const Prese
     return selected;
 }
 QJsonArray Model::publicMenu(const QJsonObject &config) {
-    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"])), {},
+    return present(normalize(config["menu"].toArray(), truth(config["show_unavailable"]), true, config["confirm_power_actions"].toBool()), {},
                    config["access_keys_enabled"].toBool(true), config["show_access_key_hints"].toBool(true));
 }
 QJsonArray Model::diagnosticMenu(const QJsonObject &config) {
@@ -586,7 +603,7 @@ std::optional<Entry> Model::selection(const QJsonObject &config, const QString &
     static const QRegularExpression pattern("^[0-9]{1,5}(?:\\.[0-9]{1,5}){0,11}$");
     if (key.size() > 128 || !pattern.match(key).hasMatch())
         return {};
-    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), false);
+    auto tree = normalize(config["menu"].toArray(), truth(config["show_unavailable"]), false, config["confirm_power_actions"].toBool());
     if (expectedPresentation && present(tree, {}, config["access_keys_enabled"].toBool(true),
                                         config["show_access_key_hints"].toBool(true)) != *expectedPresentation)
         return {};

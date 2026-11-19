@@ -5,6 +5,7 @@ foreach(binary open-power-menu-native open-power-menu-editor open-power-menu-sta
   file(COPY "@CMAKE_BINARY_DIR@/native/${binary}" DESTINATION "${bundle}/app/bin" FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
 endforeach()
 file(COPY "@PROJECT_SOURCE_DIR@/plasmoid/" DESTINATION "${bundle}/widget")
+file(COPY "@CMAKE_CURRENT_BINARY_DIR@/nativeinput/" DESTINATION "${bundle}/widget/contents/ui/nativeinput")
 file(READ "${bundle}/widget/metadata.json" metadata)
 string(JSON metadata SET "${metadata}" KPlugin Version "\"@PROJECT_VERSION@-dev\"")
 file(WRITE "${bundle}/widget/metadata.json" "${metadata}\n")

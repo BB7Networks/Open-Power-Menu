@@ -151,6 +151,22 @@ class Packaging(unittest.TestCase):
         self.install(ok=False);self.assertEqual(launcher.read_text(),'unrelated');launcher.unlink()
         launcher.symlink_to('/bin/true');self.install(ok=False);self.assertTrue(launcher.is_symlink());launcher.unlink()
         self.install();launcher.write_text('changed by user');self.install(ok=False);self.assertEqual(launcher.read_text(),'changed by user')
+    def test_input_guard_is_packaged_and_checked_before_cutover(self):
+        self.install();pid=self.pid()
+        installed=self.data/'plasma/plasmoids/org.openpowermenu.start/contents/ui/nativeinput/libopminputplugin.so'
+        self.assertTrue(installed.is_file())
+        previous=installed.read_bytes()
+        for kind in ('missing','corrupt'):
+            bundle=self.root/('guard-'+kind);shutil.copytree(BUNDLE,bundle)
+            module=bundle/'widget/contents/ui/nativeinput/libopminputplugin.so'
+            if kind=='missing':module.unlink()
+            else:module.write_bytes(b'not a native plugin')
+            (bundle/'bundle.json').unlink()
+            subprocess.run([str(INSTALLER),'--seal-bundle',str(bundle)],check=True,env=self.env)
+            result=self.invoke('--install',bundle,ok=False)
+            self.assertIn('Native keyboard guard cannot load',result.stderr+result.stdout)
+            self.assertEqual(installed.read_bytes(),previous)
+            self.assertEqual(self.pid(),pid)
     def test_unrelated_service_owner(self):
         # Correct protocol but a backend running from the development bundle is unrelated.
         p=subprocess.Popen([str(BUNDLE/'app/bin/open-power-menu-native'),'--service','--bus-name','org.openpowermenu.Service'],env=self.env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)

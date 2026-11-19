@@ -32,11 +32,14 @@ PlasmoidItem {
                     : maskActive ? "Original launcher hidden by Plasma (experimental) · Left click opens it"
                     : "Left click: launcher · Right click: Power User menu"
 
-    // KDE's native widget shortcut expands PlasmoidItem before QML receives
-    // activated(). Route the event through the guarded OPM popup handoff.
+    // Plasma also expands on activated(); connection order differs between
+    // versions. Finish that signal dispatch before toggling our popup,
+    // otherwise Plasma can reopen it after an intentional Meta+X dismissal.
     Connections {
         target: Plasmoid
-        function onActivated() { root.activatePowerShortcut(); }
+        function onActivated() {
+            Qt.callLater(() => root.activatePowerShortcut());
+        }
         // Applet::destroyedChanged(true) is an explicit widget-removal event,
         // unlike Component.onDestruction (which also runs on Plasma restart).
         function onDestroyedChanged(destroyed) { root.onWidgetRemovalChanged(destroyed); }
@@ -69,7 +72,65 @@ PlasmoidItem {
         Plasmoid.configuration.opmDefaultShortcutTried = true;
         if (!current) Plasmoid.globalShortcut = "Meta+X";
     }
-    Component.onCompleted: Qt.callLater(() => root.initializeDefaultShortcut())
+    Component.onCompleted: { root.initializeInputGuard(); Qt.callLater(() => root.initializeDefaultShortcut()); }
+
+    property var inputGuard: null
+    property var inputWindows: []
+    readonly property bool keyboardInputReady: inputGuard !== null && inputGuard.ready
+    function watchInputWindow(window) {
+        // Never install the guard on the shared Plasma panel window.
+        if (!window || window === root.Window.window) return;
+        if (inputWindows.indexOf(window) < 0) inputWindows = inputWindows.concat([window]);
+        if (inputGuard) inputGuard.watch(window);
+    }
+    function initializeInputGuard() {
+        const component = Qt.createComponent(Qt.resolvedUrl("NativeInput.qml"));
+        if (component.status === Component.Ready)
+            inputGuard = component.createObject(root, {
+                active: Qt.binding(() => root.expanded || root.openingPower),
+                navigationEnabled: Qt.binding(() => !root.layoutEditing),
+                diagnosticsEnabled: Qt.binding(() => popupTrace.enabled)
+            });
+        if (!inputGuard) {
+            console.warn("Open Power Menu: native keyboard guard unavailable; keyboard activation disabled", component.errorString());
+            return;
+        }
+        for (const window of inputWindows) watchInputWindow(window);
+    }
+    Connections {
+        target: root.inputGuard
+        function onInputDecision(decision, key, qtRepeat, window) {
+            popupTrace.record("InputGuard." + decision, {key: key, qtRepeat: qtRepeat,
+                window: popupTrace.windowState(window), focusItem: String(window.activeFocusItem),
+                focusEnabled: window.activeFocusItem ? window.activeFocusItem.enabled : null});
+        }
+    }
+
+    PopupTrace {
+        id: popupTrace
+        enabled: Plasmoid.configuration.popupDiagnostics === true
+        snapshot: () => root.popupTraceState()
+    }
+    function setPowerExpanded(value, callback) {
+        popupTrace.setExpanded(root, value, callback);
+    }
+    function popupTraceState() {
+        const item = root.fullRepresentationItem;
+        const launcher = root.selectedLauncherItem;
+        const plan = root.selectedLauncherPlan;
+        const launcherPopup = launcher ? launcher.fullRepresentationItem : null;
+        return {widget: Plasmoid.id, platform: Qt.platform.pluginName,
+            expanded: root.expanded, powerIsOpen: root.powerIsOpen,
+            openingPower: root.openingPower, requestedMenu: root.requestedMenu,
+            epoch: root.menuSwitchEpoch, autoClose: root.autoCloseOnPointerLeave,
+            panelWindow: popupTrace.windowState(root.Window.window),
+            maskActive: root.maskActive, hideOriginalLauncher: root.hideOriginalLauncherRequested,
+            launcher: {state: LauncherAdapters.describeState(launcher, plan ? plan.applet : null),
+                expanded: launcher ? launcher.expanded : null,
+                visible: launcher ? launcher.visible : null,
+                window: popupTrace.windowState(launcherPopup ? launcherPopup.Window.window : null)},
+            popup: item ? item.traceState() : null};
+    }
 
     property var menuEntries: []
     property var visibleEntries: []
@@ -182,7 +243,7 @@ PlasmoidItem {
         panelWindow: root.Window.window
         panelLocation: Plasmoid.location
         compactButtonHeight: root.compactRepresentationItem ? root.compactRepresentationItem.height : 0
-        onLauncherOpened: root.onOriginalLauncherOpened()
+        onLauncherOpened: root.onOriginalLauncherOpened("AppGridPanelBridge.launcherOpened")
     }
 
     function closeLauncherPopup() {
@@ -259,7 +320,7 @@ PlasmoidItem {
             popup.prepareForOpen();
             openingPower = false;
             powerIsOpen = true;
-            expanded = true;
+            root.setPowerExpanded(true, "preparePowerPopup.ready");
             // setExpanded attaches our item to Plasma's popup host, which can
             // initially impose its provisional size. Restore the calculated
             // content geometry synchronously after attachment, before painting.
@@ -317,7 +378,8 @@ PlasmoidItem {
                 root.closeLauncherPopup();
         }
     }
-    function onOriginalLauncherOpened() {
+    function onOriginalLauncherOpened(callback = "launcher-state") {
+        popupTrace.record(callback);
         LauncherAdapters.traceRequest(root, "launcher-state-signal", root.menuSwitchEpoch);
         if (!root.expanded || !LauncherAdapters.originalIsOpen(
                 root.selectedLauncherItem,
@@ -339,12 +401,15 @@ PlasmoidItem {
         } else {
             root.menuSwitchEpoch += 1;
             root.requestedMenu = "launcher";
-            root.expanded = false; // Original launcher/Meta takes precedence.
+            root.setPowerExpanded(false, "onOriginalLauncherOpened.precedence");
         }
     }
     Connections {
         target: root
-        function onExpandedChanged() { LauncherAdapters.traceRequest(root, "power-expanded", root.menuSwitchEpoch); }
+        function onExpandedChanged() {
+            popupTrace.expandedChanged();
+            LauncherAdapters.traceRequest(root, "power-expanded", root.menuSwitchEpoch);
+        }
         function onMaskActiveChanged() { LauncherAdapters.traceRequest(root, "mask-active", root.menuSwitchEpoch); }
     }
     Connections {
@@ -354,7 +419,7 @@ PlasmoidItem {
         // Nonstandard lifecycle signals are owned by their adapters.
         function onExpandedChanged() {
             root.logLauncherVisibility("original launcher expanded changed");
-            root.onOriginalLauncherOpened();
+            root.onOriginalLauncherOpened("selectedLauncherItem.expandedChanged");
         }
     }
 
@@ -655,7 +720,7 @@ PlasmoidItem {
         reply.finished.connect(() => {
             const bad = reply.isError;
             const value = reply.value;
-            if (onDone) onDone(!bad, value);
+            if (onDone) onDone(!bad, value, bad ? reply.error.message : "");
             reply.destroy();
         });
     }
@@ -725,7 +790,7 @@ PlasmoidItem {
         awaitingAsyncClose = false;
         launcherSwitchError = "";
         launcherCloseFollowup.stop();
-        expanded = false; // Also closes any visible side flyout.
+        root.setPowerExpanded(false, "activateLauncher"); // Also closes side flyouts.
         if (wasPowerPopupOpen) {
             pendingLauncherEpoch = epoch;
             launcherActivationSettle.restart();
@@ -773,7 +838,11 @@ PlasmoidItem {
                      send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
                           "PowerCapabilitiesPending", [], (stateOk, pending) => {
                               if (epoch !== menuFetchEpoch || (!expanded && !openingPower) || layoutEditing || layoutBusy) return;
-                              if (stateOk && pending === true) {
+                              // org.kde.plasma.private.dbus can expose a typed
+                              // boolean as DBusBoolean { value: true }. Do not
+                              // mistake that wrapper for completed discovery.
+                              const stillPending = pending === true || (pending && pending.value === true);
+                              if (stateOk && stillPending) {
                                   ++powerRefreshAttempts;
                                   powerRefresh.readyCallback = done;
                                   powerRefresh.restart();
@@ -795,7 +864,7 @@ PlasmoidItem {
             root.openMenu(); // Toggle off an existing/pending power popup.
             return;
         }
-        expanded = false; // Undo the eager expand before our handoff begins.
+        root.setPowerExpanded(false, "activatePowerShortcut.undoEagerExpand");
         root.openMenu();
     }
 
@@ -815,7 +884,7 @@ PlasmoidItem {
         awaitingAsyncClose = false;
         launcherSwitchError = "";
         if (alreadyOpen) {
-            expanded = false;
+            root.setPowerExpanded(false, "openMenu.toggleOff");
             return;
         }
         fetchIntegration(() => {
@@ -837,13 +906,13 @@ PlasmoidItem {
     }
     function openEditor() {
         // Close the panel popup so the separate Qt editor is visible.
-        expanded = false;
+        root.setPowerExpanded(false, "openEditor");
         send("org.openpowermenu.Service", "/OpenPowerMenu", "org.openpowermenu.Service",
-             "Edit", [], (ok, value) => {
+             "Edit", [], (ok, value, error) => {
                  if (!ok || value === false) {
-                     menuStatus = "Could not start menu editor. Run open-power-menu --edit in Konsole.";
+                     menuStatus = error || "Could not start menu editor. Run open-power-menu --edit in Konsole for details.";
                      commandError = menuStatus;
-                     console.warn("Open Power Menu: editor unavailable; service may need restarting");
+                     console.warn("Open Power Menu Configure: " + menuStatus);
                  }
              });
     }
@@ -854,7 +923,7 @@ PlasmoidItem {
         launchPending = true;
         commandError = "";
         if (closeBeforeRun) {
-            expanded = false;
+            root.setPowerExpanded(false, "launchItem.closeBeforeRun");
             desktopCloseSettle.key = key;
             desktopCloseSettle.epoch = epoch;
             desktopCloseSettle.restart();
@@ -873,7 +942,7 @@ PlasmoidItem {
     function finishRun(result, epoch) {
         launchPending = false;
         if (epoch !== menuSwitchEpoch) return;
-        if (result.ok === true) expanded = false;
+        if (result.ok === true) root.setPowerExpanded(false, "finishRun.success");
         else commandError = result.error || "Could not start this item. Reopen the menu to refresh it.";
     }
     function runItem(key, epoch) {
@@ -988,6 +1057,33 @@ PlasmoidItem {
 
     fullRepresentation: Item {
         id: popup
+        function traceState() {
+            const position = popup.mapToGlobal(0, 0);
+            return {window: popupTrace.windowState(popup.Window.window),
+                surface: popupTrace.itemState(popup),
+                parent: popupTrace.itemState(popup.parent),
+                inPanelWindow: popup.Window.window === root.Window.window,
+                item: [position.x, position.y, popup.width, popup.height],
+                preferred: [Layout.preferredWidth, Layout.preferredHeight],
+                padding: [themeHorizontalPadding, themeVerticalPadding],
+                activeFocus: popup.activeFocus, hover: popupHover.hovered,
+                pointer: [autoDismiss.lastPointer.x, autoDismiss.lastPointer.y],
+                dismissal: {enabled: autoDismiss.enabled, pending: autoDismiss.pending,
+                    settling: autoDismiss.settling, entered: autoDismiss.entered,
+                    keyboard: autoDismiss.keyboardMode, protected: autoDismiss.protectedInteraction},
+                flyout: {window: popupTrace.windowState(flyout), pointerInside: flyout.pointerInside},
+                activeIndex: activeIndex};
+        }
+        onParentChanged: popupTrace.record("popup.parentChanged")
+        onVisibleChanged: popupTrace.record("popup.visibleChanged")
+        onOpacityChanged: popupTrace.record("popup.opacityChanged")
+        property var guardedWindow: null
+        Window.onWindowChanged: {
+            popupTrace.record("popup.windowChanged");
+            if (guardedWindow && root.inputGuard) root.inputGuard.unwatch(guardedWindow);
+            guardedWindow = popup.Window.window;
+            root.watchInputWindow(guardedWindow);
+        }
         focus: true
         function prepareForOpen() {
             // Plasma anchors this item to its host during attachment. The host
@@ -1018,21 +1114,31 @@ PlasmoidItem {
             menuOpen: root.expanded
             pointerInside: popupHover.hovered || flyout.pointerInside
             protectedInteraction: root.layoutEditing || root.layoutBusy || root.launchPending
-            onDismissed: root.expanded = false
+            onDiagnosticEvent: callback => popupTrace.record("PointerDismissal." + callback)
+            onDismissed: root.setPowerExpanded(false, "PointerDismissal.dismissed")
         }
         HoverHandler {
             id: popupHover
+            onHoveredChanged: popupTrace.record("popupHover.hoveredChanged")
             onPointChanged: {
                 const global = popup.mapToGlobal(point.position.x, point.position.y);
                 autoDismiss.observePointer(global.x, global.y);
+                popupTrace.record("popupHover.pointChanged");
             }
         }
-        onWidthChanged: autoDismiss.geometryChanged()
-        onHeightChanged: autoDismiss.geometryChanged()
+        onWidthChanged: { popupTrace.record("popup.widthChanged"); autoDismiss.geometryChanged(); }
+        onHeightChanged: { popupTrace.record("popup.heightChanged"); autoDismiss.geometryChanged(); }
         Connections {
             target: popup.Window.window
-            function onXChanged() { autoDismiss.geometryChanged(); flyout.geometrySettling(); }
-            function onYChanged() { autoDismiss.geometryChanged(); flyout.geometrySettling(); }
+            function onVisibleChanged() { popupTrace.record("window.visibleChanged"); }
+            function onVisibilityChanged() { popupTrace.record("window.visibilityChanged"); }
+            function onActiveChanged() { popupTrace.record("window.activeChanged"); }
+            function onTransientParentChanged() { popupTrace.record("window.transientParentChanged"); }
+            function onFrameSwapped() { popupTrace.record("window.frameSwapped"); }
+            function onWidthChanged() { popupTrace.record("window.widthChanged"); }
+            function onHeightChanged() { popupTrace.record("window.heightChanged"); }
+            function onXChanged() { popupTrace.record("window.xChanged"); autoDismiss.geometryChanged(); flyout.geometrySettling(); }
+            function onYChanged() { popupTrace.record("window.yChanged"); autoDismiss.geometryChanged(); flyout.geometrySettling(); }
         }
         Rectangle {
             anchors.fill: parent
@@ -1076,6 +1182,8 @@ PlasmoidItem {
 
         SideFlyout {
             id: flyout
+            inputGuard: root.inputGuard
+            diagnostics: popupTrace
             appearance: root.menuAppearance
             showMenuIcons: root.showMenuIcons
             menuDensity: root.menuDensity
@@ -1087,6 +1195,7 @@ PlasmoidItem {
                 if (popup.Window.window) popup.Window.window.requestActivate();
                 popup.forceActiveFocus();
             }
+            onKeyToParent: event => { if (root.expanded) popup.handleKey(event); }
             onKeyboardUsed: autoDismiss.keyboardUsed()
             onPointerMoved: (globalX, globalY) => autoDismiss.observePointer(globalX, globalY)
             onGeometryChanged: autoDismiss.geometryChanged()
@@ -1287,7 +1396,7 @@ PlasmoidItem {
                 onFailed: message => root.layoutStatus = message
                 onSaveRequested: LayoutController.save(root)
                 onCancelRequested: LayoutController.cancel(root)
-                onCloseRequested: root.expanded = false
+                onCloseRequested: root.setPowerExpanded(false, "LayoutEditor.closeRequested")
             }
             QQC2.ScrollView {
                 id: menuScroll
@@ -1355,6 +1464,8 @@ PlasmoidItem {
                                 // Prefer right-hand flyouts regardless of
                                 // panel edge. Plasma flips left if necessary.
                                 onEntered: {
+                                    popupTrace.record("rowMouse.entered", {index: menuRow.index,
+                                        kind: menuRow.entry.kind, enabled: menuRow.entry.enabled});
                                     popup.activeIndex = menuRow.index;
                                     if (menuRow.entry.kind !== "submenu") flyout.visible = false;
                                 }
@@ -1421,9 +1532,21 @@ PlasmoidItem {
                 }
             }
         }
-        Keys.onPressed: event => {
+        function handleKey(event) {
+            if (!root.expanded || root.layoutEditing || root.layoutBusy || root.launchPending) return;
+            if (!root.keyboardInputReady) { event.accepted = true; return; }
+            if (event.modifiers !== 0 || AccessKeys.editable(popup.Window.window ? popup.Window.window.activeFocusItem : null)) return;
+            if (event.isAutoRepeat && event.key !== Qt.Key_Up && event.key !== Qt.Key_Down) { event.accepted = true; return; }
             autoDismiss.keyboardUsed();
-            if (root.layoutEditing || root.layoutBusy || root.launchPending) return;
+            if (flyout.visible && flyout.keyboardActivationRequested) {
+                flyout.handleKey(event);
+                return;
+            }
+            if (event.key === Qt.Key_Escape) {
+                root.setPowerExpanded(false, "popup.escape");
+                event.accepted = true;
+                return;
+            }
             const index = AccessKeys.index(root.visibleEntries, event.text, event.modifiers, event.isAutoRepeat);
             if (index >= 0) {
                 activeIndex = index;
@@ -1453,6 +1576,14 @@ PlasmoidItem {
                 event.accepted = true;
             }
         }
-        Keys.onEscapePressed: root.expanded = false
+        Keys.onPressed: event => handleKey(event)
+        Keys.onShortcutOverride: event => {
+            // Plasma tool buttons also register automatic Alt mnemonics.
+            // Reserve modified input while navigating the menu, before those
+            // shortcuts run; leave editable controls and layout editing alone.
+            if (!root.layoutEditing && event.modifiers !== 0 &&
+                    !AccessKeys.editable(popup.Window.window ? popup.Window.window.activeFocusItem : null))
+                event.accepted = true;
+        }
     }
 }

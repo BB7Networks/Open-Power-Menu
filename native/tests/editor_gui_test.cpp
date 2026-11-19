@@ -242,6 +242,10 @@ class EditorGuiTests : public QObject {
                 QVERIFY(!control("menu_icon_size")->isEnabled());
                 QTest::keyClick(window, Qt::Key_Space);
                 QVERIFY(control("menu_icon_size")->isEnabled());
+                auto *confirm = control("confirmPowerActions");
+                QVERIFY(confirm && !confirm->property("checked").toBool());
+                confirm->forceActiveFocus(); QTest::keyClick(window, Qt::Key_Space);
+                QVERIFY(session.configuration()["confirm_power_actions"].toBool());
                 QVERIFY(click(window, "saveConfiguration"));
                 QVERIFY(!session.dirty());
             }
@@ -250,6 +254,7 @@ class EditorGuiTests : public QObject {
             QCOMPARE(control("menu_icon_size")->property("currentIndex").toInt(), 2);
             QCOMPARE(control("hoverMode")->property("currentIndex").toInt(), 2);
             QCOMPARE(control("hoverDelay")->property("value").toInt(), 600);
+            QVERIFY(control("confirmPowerActions")->property("checked").toBool());
             const auto output=qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
             if (!output.isEmpty()) {
                 QTest::qWait(50);

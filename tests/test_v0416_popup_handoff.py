@@ -70,7 +70,7 @@ const assert=require('node:assert/strict'),vm=require('node:vm');
 const cbs=[],messages=[],events=[];
 const launcher={expanded:false};
 const applet={activated(){events.push('activated');launcher.expanded=!launcher.expanded}};
-const root={expanded:false,menuSwitchEpoch:0,requestedMenu:'none',pendingPowerEpoch:-1,
+const root={setPowerExpanded(value){this.expanded=value},expanded:false,menuSwitchEpoch:0,requestedMenu:'none',pendingPowerEpoch:-1,
   pendingLauncherEpoch:-1,awaitingAsyncClose:false,launcherSwitchError:'',
   selectedLauncherPlan:{item:launcher,applet},selectedLauncherItem:launcher};
 const poll={running:false,start(){this.running=true},stop(){this.running=false}};

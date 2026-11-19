@@ -5,6 +5,9 @@
 #include <functional>
 #include <memory>
 namespace Opm {
+// Only these six identifiers select a KDE session-ending request. Confirmation
+// is part of the captured action identity, never a late global preference read.
+QDBusMessage sessionPowerRequest(const QString &action);
 struct PowerAvailability { bool available = false; QString reason; };
 class PowerManager : public QObject {
     Q_OBJECT

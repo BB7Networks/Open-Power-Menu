@@ -264,6 +264,7 @@ bool EditorSession::preference(const QString &text) {
                                     "auto_close_delay_ms",
                                     "access_keys_enabled",
                                     "show_access_key_hints",
+                                    "confirm_power_actions",
                                     "backup_retention",
                                     "show_unavailable"};
         for (auto it = changes.begin(); it != changes.end(); ++it) {

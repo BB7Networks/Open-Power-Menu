@@ -2,7 +2,7 @@
 # Build the executable on Debian 13 before copying it into this image.
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libqt6core6t64 libqt6dbus6 dbus && rm -rf /var/lib/apt/lists/*
+    libqt6core6t64 libqt6dbus6 libkf6configcore6 dbus && rm -rf /var/lib/apt/lists/*
 COPY open-power-menu-native /usr/local/bin/open-power-menu-native
 RUN ! command -v python3 && ! command -v g++ && \
     useradd --uid 1000 --no-create-home --home-dir /tmp --shell /usr/sbin/nologin opm

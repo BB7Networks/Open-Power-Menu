@@ -13,11 +13,11 @@ MAIN = ROOT / 'plasmoid/contents/ui/main.qml'
 def test_widget_activation_handler_and_native_configuration():
     qml = MAIN.read_text(encoding='utf-8')
     assert 'target: Plasmoid' in qml
-    assert 'function onActivated() { root.activatePowerShortcut(); }' in qml
+    assert 'Qt.callLater(() => root.activatePowerShortcut())' in function(qml, 'onActivated')
     handler = function(qml, 'activatePowerShortcut')
     assert 'root.openMenu()' in handler
     assert 'powerIsOpen' in handler
-    assert 'expanded = false;' in handler
+    assert 'root.setPowerExpanded(false, "activatePowerShortcut.undoEagerExpand")' in handler
     assert 'property bool powerIsOpen: false' in qml
     assert 'root.powerIsOpen = false;' in qml
     assert 'powerIsOpen = true;' in function(qml, 'preparePowerPopup')
@@ -36,7 +36,7 @@ def test_native_activation_after_plasma_eager_expand():
     qml = MAIN.read_text(encoding='utf-8')
     js = r"""
 const assert=require('node:assert/strict'),vm=require('node:vm');
-const root={expanded:true,requestedMenu:'none',powerIsOpen:false,opens:0,
+const root={setPowerExpanded(value){this.expanded=value},expanded:true,requestedMenu:'none',powerIsOpen:false,opens:0,
   openMenu(){this.opens++;this.expanded=!this.powerIsOpen;}};
 const poll={running:false};
 const ctx={root,launcherClosePoll:poll};
@@ -136,3 +136,25 @@ assert.equal(disabled.Plasmoid.globalShortcut,'');
         env={**os.environ,'QML_FUNCTION':function(qml,'onWidgetRemovalChanged')},
         text=True,capture_output=True,timeout=12)
     assert result.returncode == 0, result.stderr + result.stdout
+
+
+def test_shortcut_close_wins_on_both_platforms_regardless_of_signal_connection_order():
+    qml = MAIN.read_text()
+    handler = function(qml, 'onActivated')
+    script = r"""
+const assert=require('node:assert/strict'),vm=require('node:vm');
+for (const platform of ['xcb','wayland']) for (const plasmaFirst of [true,false]) {
+ const later=[],root={expanded:true,calls:0,activatePowerShortcut(){this.calls++;this.expanded=false}};
+ const c={root,Qt:{platform:{pluginName:platform},callLater(f){later.push(f)}}};
+ vm.createContext(c);vm.runInContext(process.env.HANDLER,c);
+ if(plasmaFirst) root.expanded=true;
+ c.onActivated();
+ if(!plasmaFirst) root.expanded=true;
+ assert.equal(root.calls,0);
+ while(later.length) later.shift()();
+ assert.equal(root.calls,1);assert.equal(root.expanded,false);
+}
+"""
+    result=subprocess.run(['node','-e',script],env={**os.environ,'HANDLER':handler},
+                          capture_output=True,text=True,timeout=12)
+    assert result.returncode==0,result.stderr

@@ -1,5 +1,6 @@
 #include "editor_catalog.hpp"
 #include "editor_session.hpp"
+#include "editor_launch.hpp"
 #include <QCommandLineParser>
 #include <QGuiApplication>
 #include <QIcon>
@@ -7,9 +8,16 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
-#include <QTimer>
+#include <cstdio>
+#include <cstring>
 
 int main(int argc, char **argv) {
+    // Resolve the live session before QGuiApplication can load a stale display
+    // plugin or authentication path. The Core-only parent supervises startup.
+    bool child = false;
+    for (int i = 1; i < argc; ++i)
+        if (std::strcmp(argv[i], "--opm-editor-child") == 0) child = true;
+    if (!child) return Opm::coordinateEditor(argc, argv);
     QGuiApplication app(argc, argv);
     app.setApplicationName("Open Power Menu Configure");
     app.setApplicationVersion(OPM_NATIVE_VERSION);
@@ -25,6 +33,9 @@ int main(int argc, char **argv) {
     parser.addOption({"config", "Configuration file", "file"});
     parser.addOption({"smoke-test", "Load the native editor and exit after one event-loop cycle"});
     parser.addOption({"screenshot", "Capture the editor during a developer smoke test", "file"});
+    QCommandLineOption childOption("opm-editor-child", "Internal graphical child");
+    childOption.setFlags(QCommandLineOption::HiddenFromHelp);
+    parser.addOption(childOption);
     parser.process(app);
     Opm::EditorSession session(Opm::Storage(parser.value("config")));
     Opm::EditorCatalog catalog;
@@ -39,24 +50,28 @@ int main(int argc, char **argv) {
         return 2;
     }
     auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-    if (window)
-        window->setIcon(editorIcon);
+    if (!window) { qCritical("Native Configure did not create a window"); return 2; }
+    window->setIcon(editorIcon);
+    bool ready = false;
+    QObject::connect(window, &QQuickWindow::frameSwapped, &app, [&] {
+        if (ready || !window->isVisible() || !window->isExposed()) return;
+        ready = true;
+        std::puts(Opm::editorReady);
+        std::fflush(stdout);
+        if (parser.isSet("smoke-test")) {
+            if (parser.isSet("screenshot") && !window->grabWindow().save(parser.value("screenshot"))) {
+                app.exit(3);
+                return;
+            }
+            app.quit();
+        }
+    }, Qt::QueuedConnection);
     if (parser.isSet("smoke-test")) {
-        if (!window || window->icon().isNull() ||
+        if (window->icon().isNull() ||
             QGuiApplication::desktopFileName() != QStringLiteral("org.openpowermenu.configure")) {
             qCritical("Native Configure window icon or desktop identity is missing");
             return 4;
         }
-        QTimer::singleShot(250, &app, [&] {
-            if (parser.isSet("screenshot")) {
-                auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
-                if (!window || !window->grabWindow().save(parser.value("screenshot"))) {
-                    app.exit(3);
-                    return;
-                }
-            }
-            app.quit();
-        });
     }
     return app.exec();
 }

@@ -13,8 +13,11 @@ See the [architecture and dependency inventory](../docs/architecture/0001-native
 
 Development dependencies: CMake 3.21+, C++17 compiler, Ninja/Make, Qt 6.4+
 Core/DBus development packages and Qt Test for tests. Debian/Ubuntu packages:
-`cmake ninja-build g++ qt6-base-dev`; Manjaro equivalents:
-`cmake ninja gcc qt6-base`. Ordinary future binary installations must not
+`cmake ninja-build g++ qt6-base-dev libkf6config-dev`; Manjaro equivalents:
+`cmake ninja gcc qt6-base kconfig`. KConfigCore provides KDE's standard kiosk
+authorization checks for Shutdown, Restart and Sign out. Complete editor/package
+builds require it. A Qt-only backend preview can still build, but disables these
+three actions rather than bypassing KDE policy. Ordinary future binary installations must not
 require a compiler.
 
 ```bash
@@ -42,6 +45,15 @@ qml6-module-qtquick-controls qml6-module-qtquick-dialogs
 qml6-module-qtquick-layouts qml6-module-qtquick-window
 qml6-module-qtqml-workerscript qt6-qpa-plugins` to the backend build packages.
 See [the tested Docker recipe](tests/editor.Dockerfile) for exact dependencies.
+
+Editor/widget and standalone builds also need XCB and its XInput extension
+(`libxcb-xinput-dev` on Debian, `libxcb` on Manjaro). Runtime packages must include
+`libxcb-xinput0` on Debian. The widget's private `nativeinput` QML plugin is built
+beside the executables and included in `native-bundle`; the installer checks it
+before replacing an installation. Copying QML alone is insufficient: missing or
+incompatible input guards disable menu keyboard dispatch. No plugin is installed
+into Plasma's system QML directories. See [held-key stabilization](../docs/HELD-KEY-STABILIZATION.md)
+for physical-key handling, regression results and safe mock-only acceptance.
 
 ```bash
 cmake -S . -B build/editor -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_EDITOR=ON
@@ -165,11 +177,11 @@ cmake --install build/standalone --prefix /tmp/opm-standalone-stage
 /tmp/opm-standalone-stage/bin/open-power-menu-standalone --config /tmp/opm-preview/menu.json --diagnose-launch
 ```
 
-Build: Qt 6.4+ Core/Gui/Widgets (`qt6-base-dev`), CMake 3.21+, C++17 and Qt Test
+Build: Qt 6.4+ Core/Gui/Widgets (`qt6-base-dev`), `libxcb-xinput-dev`, CMake 3.21+, C++17 and Qt Test
 when testing. Runtime: Qt 6 Core/Gui/Widgets shared libraries, libc/libstdc++ and
 the distribution's transitive dependencies, a Qt platform plugin for the
 session, fonts and the desktop icon/theme provider. Debian 13 runtime packages:
-`libqt6widgets6 qt6-qpa-plugins` for X11; add `qt6-wayland` for Wayland. No QML,
+`libqt6widgets6 libxcb-xinput0 qt6-qpa-plugins` for X11; add `qt6-wayland` for Wayland. No QML,
 Kirigami, Python, PySide6 or compiler is needed by this executable. Configured
 actions still need their own applications/KDE command helpers, as in 1.0.1;
 unavailable applications follow `show_unavailable`. The Qt dynamic loader names

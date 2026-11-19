@@ -123,14 +123,22 @@ PROBE = '''
 '''
 
 
+def install_test_input_module(widget):
+    module = os.environ.get('OPM_TEST_INPUT_MODULE')
+    if not module:
+        raise RuntimeError('Set OPM_TEST_INPUT_MODULE to the build/native/nativeinput directory')
+    shutil.copytree(module, widget/'contents/ui/nativeinput')
+
+
 def instrument(case, platform, pointer_regression=False):
     widget = case/'data/plasma/plasmoids/org.openpowermenu.start'
     shutil.copytree(ROOT/'plasmoid', widget)
+    install_test_input_module(widget)
     path = widget/'contents/ui/main.qml'
     source = path.read_text()
     # Keep shortcuts out of the fixture. Instrument a copy, never installed files.
-    source = source.replace('Component.onCompleted: Qt.callLater(() => root.initializeDefaultShortcut())',
-                            'Component.onCompleted: console.info("OPM_WIDGET_READY",Date.now())')
+    source = source.replace('Qt.callLater(() => root.initializeDefaultShortcut());',
+                            'console.info("OPM_WIDGET_READY",Date.now());')
     source = source.replace('    property var menuEntries: []', PROBE+'\n    property var menuEntries: []')
     source = source.replace('        id: popup\n', '''        id: popup
         onFittedHeightChanged: console.info("OPM_STARTUP", JSON.stringify(root.startupProbe("height")))
@@ -261,7 +269,7 @@ def session(args):
                    '--no-global-shortcuts', '--socket', os.environ['WAYLAND_DISPLAY']], 'kwin.log')
             wait_for(lambda: (Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
         spawn([sys.executable, str(SCRIPT), '--backend'], 'backend.jsonl')
-        for phase in ['fresh', 'shell-restart']:
+        for phase in (['fresh'] if args.single_start else ['fresh', 'shell-restart']):
             log = case/f'{phase}.log'
             shell = spawn(['plasmashell', '--no-respawn'], log.name)
             if phase == 'fresh':
@@ -378,6 +386,7 @@ def main():
     parser.add_argument('--only')
     parser.add_argument('--session',action='store_true')
     parser.add_argument('--backend',action='store_true')
+    parser.add_argument('--single-start',action='store_true', help='Check a fresh private shell without restarting it')
     parser.add_argument('--platform',choices=['xcb','wayland'],default='xcb')
     parser.add_argument('--panel-edge',choices=['bottom','top','left','right'],default='bottom')
     parser.add_argument('--width',type=int,default=1280)
@@ -413,7 +422,8 @@ def main():
                  'OPM_POINTER_REGRESSION':'1' if platform=='xcb' and name=='ready' else '0'}
             with (case/'session.log').open('w') as log:
                 process=subprocess.Popen(['dbus-run-session','--',sys.executable,str(SCRIPT),'--session','--output',str(case),
-                    '--platform',platform,'--panel-edge',edge,'--width',str(width),'--height',str(height),'--scale',str(scale),'--outputs',str(outputs)],
+                    '--platform',platform,'--panel-edge',edge,'--width',str(width),'--height',str(height),'--scale',str(scale),'--outputs',str(outputs)]
+                    + (['--single-start'] if args.single_start else []),
                     env=env,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
                 try:
                     result=process.wait(timeout=90)

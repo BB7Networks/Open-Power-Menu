@@ -40,13 +40,13 @@ for(const hidden of [false,true]) for(const draft of [null,{token:'opaque',entri
   const applet={id:59,pluginName:'dev.xarbit.appgrid',status:hidden?1:2,
     activated(){activations++; if(item.gridOpen) item.closeWindow();
       else {item.gridOpen=true;item.gridWindow.visible=true}}};
-  const root={selectedLauncherPlan:{item,applet},selectedLauncherItem:item,launcherAppletId:59,
+  const root={setPowerExpanded(value){this.expanded=value},selectedLauncherPlan:{item,applet},selectedLauncherItem:item,launcherAppletId:59,
     openingPower:false,openingPreferencesReady:false,openingEntriesReady:false,
     fullRepresentationItem:{prepareForOpen(){}},menuSwitchEpoch:0,requestedMenu:'none',expanded:false,pendingPowerEpoch:-1,pendingLauncherEpoch:-1,
     awaitingAsyncClose:false,launcherSwitchError:'',maskActive:hidden,hideOriginalLauncherRequested:hidden,
     layoutDraft:draft,fetchMenu(_,done){done()},send(){throw Error('Unexpected D-Bus activation')}};
   const timer=()=>({running:false,start(){this.running=true},restart(){this.running=true},stop(){this.running=false}});
-  const c={root,console:h.console,LauncherAdapters:h,Qt:{callLater(f){callbacks.push(f)}},
+  const c={popupTrace:{record(){}},root,console:h.console,LauncherAdapters:h,Qt:{callLater(f){callbacks.push(f)}},
     launcherActivationSettle:timer(),launcherClosePoll:timer(),launcherCloseFollowup:timer(),fetchIntegration(done){done()},
     fetchMenu(_,done){done()},closeLauncherPopup(){return root.closeLauncherPopup()}};
   for(const name of Object.keys(root)) Object.defineProperty(c,name,{configurable:true,get(){return root[name]},set(v){root[name]=v}});

@@ -76,7 +76,7 @@ assert.equal(Draft.nextIndex(visible,2,-1,false),3);
 assert.equal(Draft.nextIndex(visible,-1,1,true),0);
 assert.equal(Draft.nextIndex([{kind:'separator'}],-1,1,false),-1);
 let requests=[],fetches=0;
-const root={layoutDraft:null,layoutBusy:false,layoutExpired:false,layoutEpoch:0,menuFetchEpoch:0,
+const root={setPowerExpanded(value){expanded=value},layoutDraft:null,layoutBusy:false,layoutExpired:false,layoutEpoch:0,menuFetchEpoch:0,
  layoutStatus:'',menuStatus:'',expanded:true,
  send(service,path,iface,method,args,done){requests.push({method,args,done})},fetchMenu(){fetches++}};
 assert.equal(root.layoutDraft,null); // locked default
@@ -147,26 +147,27 @@ def test_locked_popup_and_flyout_keyboard_handlers():
     side = (UI / 'SideFlyout.qml').read_text()
     handlers = ''
     for name, source in [('mainKeys', main), ('sideKeys', side)]:
-        start = source.rindex('Keys.onPressed: event =>')
+        start = source.rindex('function handleKey(event)')
         handlers += f'function {name}(event) ' + braced(source, source.index('{', start)) + '\n'
     code = 'const assert=require("node:assert/strict");\n'
-    code += library('AccessKeys', 'index') + library('LayoutDraft', 'nextIndex') + handlers + r'''
+    code += library('AccessKeys', 'index, editable') + library('LayoutDraft', 'nextIndex') + handlers + r'''
 const Qt=Object.fromEntries(['Up','Down','Right','Left','Return','Enter','Escape'].map(k=>['Key_'+k,k]));
-let opens=0,launches=[],returned=0,childClosed=0,childFocused=0;
+let opens=0,launches=[],returned=0,childClosed=0,childFocused=0,parentKeys=0;
 let activeIndex=-1;
 const entries=[{kind:'separator'},{kind:'command',enabled:false,key:'disabled'},
  {kind:'submenu',key:'group'},{kind:'command',key:'command'}];
 const rows=entries.map((entry,i)=>({entry,y:i*28,height:28,
  openChild(){opens++},childPopup:{focusFirst(){childFocused++}}}));
-const root={visibleEntries:entries,layoutEditing:false,layoutBusy:false,launchPending:false,
+const root={expanded:true,keyboardInputReady:true,visibleEntries:entries,layoutEditing:false,layoutBusy:false,launchPending:false,
  launchItem(key){launches.push(key)}};
 const autoDismiss={keyboardUsed(){}};
-const flyout={keyboardUsed(){},entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
- closeChild(){childClosed++},returnToParent(){returned++},triggered(key){launches.push(key)}};
+const popup={Window:{window:{activeFocusItem:null}}};
+const flyout={inputGuard:{ready:true},keyboardUsed(){},entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
+ closeChild(){childClosed++},returnToParent(){returned++},keyToParent(){parentKeys++},triggered(key){launches.push(key)}};
 const normalRows={itemAt(i){return rows[i]}},flyoutRows=normalRows;
 const menuScroll={contentItem:{contentY:0},availableHeight:55},viewport=menuScroll;
 function showFlyout(){opens++}
-function key(handler,key){const e={key,accepted:false};handler(e);return e}
+function key(handler,key){const e={key,modifiers:0,isAutoRepeat:false,accepted:false};handler(e);return e}
 key(mainKeys,'Down');assert.equal(activeIndex,2);assert.equal(flyout.visible,false);
 assert.equal(menuScroll.contentItem.contentY,29);
 key(mainKeys,'Right');assert.equal(opens,1);assert.equal(childFocused,1);
@@ -179,13 +180,14 @@ root.layoutEditing=true;assert.equal(key(mainKeys,'Return').accepted,false);
 root.layoutEditing=false;root.layoutBusy=true;key(mainKeys,'Return');
 root.layoutBusy=false;root.launchPending=true;key(mainKeys,'Return');
 assert.equal(launches.length,1);
+flyout.visible=true;
 key(sideKeys,'Down');assert.equal(flyout.activeIndex,2);assert.equal(childClosed,1);
 key(sideKeys,'Right');assert.equal(opens,2);assert.equal(childFocused,2);
 key(sideKeys,'Down');assert.equal(flyout.activeIndex,3);
 key(sideKeys,'Enter');assert.deepEqual(launches,['command','command']);
 flyout.visible=true;key(sideKeys,'Left');assert.equal(returned,1);assert.equal(flyout.visible,false);
 flyout.visible=true;key(sideKeys,'Escape');assert.equal(returned,2);assert.equal(flyout.visible,false);
-flyout.activeIndex=1;key(sideKeys,'Return');assert.equal(launches.length,2);
+flyout.activeIndex=1;key(sideKeys,'Return');assert.equal(launches.length,2);assert.equal(parentKeys,1);
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -224,7 +226,7 @@ def test_desktop_dispatch_waits_for_popup_close_and_cancels_stale_request():
     code+=r'''
 let layoutEditing=false,layoutBusy=false,launchPending=false,commandError='',expanded=true,menuSwitchEpoch=1;
 let sent=[],waiting=0;
-const root={runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
+const root={setPowerExpanded(value){expanded=value},runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
 const desktopCloseSettle={key:'',epoch:-1,restart(){waiting++}};
 function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else sent.push(args)}
 launchItem('desktop',true);assert.equal(expanded,false);assert.equal(sent.length,0);assert.equal(waiting,1);
@@ -243,6 +245,7 @@ def test_async_activation_poll_reports_only_its_operation_and_never_retries():
     from test_v0416_popup_handoff import timer_handler
     source = (UI / 'main.qml').read_text()
     code = 'const assert=require("node:assert/strict");\n'
+    code += 'const root={setPowerExpanded(value){expanded=value}};\n'
     code += function(source, 'finishRun')
     code += timer_handler(source, 'activationPoll').replace('function settleTick()', 'function activationTick()')
     code += r'''
@@ -270,6 +273,7 @@ def test_frontend_protocol_probe_and_legacy_rollback_never_retry():
     if not shutil.which('node'): pytest.skip('Node required')
     source = (UI/'main.qml').read_text()
     code = 'const assert=require("node:assert/strict");\n'
+    code += 'const root={setPowerExpanded(value){expanded=value}};\n'
     for name in ['runItem','startNativeRun','finishRun']:
         code += function(source,name)
     code += r'''

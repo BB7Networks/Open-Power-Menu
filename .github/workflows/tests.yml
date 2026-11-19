@@ -65,7 +65,7 @@ jobs:
       - name: Install virtual compositor test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev qt6-wayland dbus xvfb xauth weston kwin-wayland
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev qt6-wayland libxcb-xinput-dev dbus xvfb xauth xdotool weston kwin-wayland
       - name: Test X11 and Wayland menu interaction
         run: |
           cmake -S . -B build/standalone -G Ninja -DOPM_BUILD_STANDALONE=ON

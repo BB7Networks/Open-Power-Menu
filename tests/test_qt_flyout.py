@@ -71,6 +71,9 @@ Window {
     component = QQmlComponent(engine, QUrl.fromLocalFile(str(tmp_path / 'SideFlyout.qml')))
     window = component.create()
     assert window, [str(e) for e in component.errors()]
+    # This suite isolates QML navigation/layout. Physical admission is covered
+    # by native-input and the real X11/Wayland Plasma fixtures.
+    evaluate(window, 'inputGuard=({ready:true,watch:function(){}});')
     evaluate(window, '''entries = [{kind:'submenu',title:'Group',items:[
         {kind:'command',title:'Child',key:'child'},
         {kind:'submenu',title:'Deep',items:[{kind:'command',title:'Leaf'}]}]},
@@ -486,6 +489,9 @@ Window {
  width: popup.width+leftPadding+rightPadding
  height: popup.height+topPadding+bottomPadding
  property bool expanded: true
+ property bool keyboardInputReady: true
+ property var inputGuard: ({ready:true,watch:function(){},unwatch:function(){}})
+ function watchInputWindow(window) {}
  property bool autoCloseOnPointerLeave: false
  property int autoCloseDelay: 500
  property int submenuHoverDelay: -1
@@ -514,7 +520,10 @@ Window {
  property var visibleEntries: []
  function fetchMenu() {}
  function fetchIntegration() {}
- function launchItem() { throw new Error("No command execution in sizing fixture") }
+ property var launchRequests: []
+ QtObject { id: popupTrace; property bool enabled: false; function record() {} }
+ function setPowerExpanded(value) { expanded = value; }
+ function launchItem(key) { launchRequests = launchRequests.concat([key]); launchPending = true; expanded = false; }
  function openEditor() {}
 '''+item+'\n}'
     path=tmp_path/'MainFixture.qml';path.write_text(source)
@@ -598,3 +607,112 @@ def test_font_change_updates_live_row_and_hint_metrics(flyout):
     QTest.qWait(40)
     assert column.width()>width
     assert flyout.height()>height
+
+
+@pytest.mark.parametrize('key,action', [('U','shutdown'),('R','reboot'),('I','logout'),('S','sleep'),('H','hibernate'),('L','lock')])
+@pytest.mark.parametrize('parent_delivery', [True, False])
+def test_rapid_power_access_keys_record_once(main_popup, key, action, parent_delivery):
+    from PySide6.QtGui import QKeyEvent
+    window = main_popup
+    evaluate(window, """visibleEntries=[{kind:'submenu',title:'Power',key:'group',access_key:'U',items:
+      ['shutdown','reboot','logout','sleep','hibernate','lock'].map((key,i)=>
+        ({kind:'command',title:key,key,enabled:true,access_key:['U','R','I','S','H','L'][i]}))}];
+      popup.forceActiveFocus();""")
+    QTest.keyClick(window, Qt.Key_U, Qt.NoModifier, 0)
+    child = evaluate(window, 'flyout')
+    assert child.isVisible()
+    target = window if parent_delivery else child
+    # No wait for the compositor to transfer focus between consecutive keys.
+    repeated = QKeyEvent(QKeyEvent.KeyPress, getattr(Qt, 'Key_'+key), Qt.NoModifier, key.lower(), True)
+    if parent_delivery:
+        # Qt drops synthetic events sent to an already inactive QWindow. Model
+        # the key that reached the parent handler before X11 focus transfer;
+        # the other parameter sends actual QKeyEvents to the focused flyout.
+        evaluate(window, f'popup.handleKey({{key:Qt.Key_{key},text:"{key.lower()}",modifiers:0,isAutoRepeat:true}})')
+    else:
+        QApplication.sendEvent(target, repeated)
+    assert evaluate(window, 'launchRequests.length') == 0
+    if parent_delivery:
+        evaluate(window, f'popup.handleKey({{key:Qt.Key_{key},text:"{key.lower()}",modifiers:0,isAutoRepeat:false}})')
+    else:
+        QTest.keyClick(target, getattr(Qt, 'Key_'+key), Qt.NoModifier, 0)
+    QTest.keyClick(window, getattr(Qt, 'Key_'+key), Qt.NoModifier, 0)
+    assert evaluate(window, 'JSON.stringify(launchRequests)') == '["'+action+'"]'
+
+
+def test_missing_input_guard_fails_closed(main_popup):
+    window=main_popup
+    evaluate(window, """visibleEntries=[{kind:'command',title:'Safe mock',key:'safe',enabled:true,access_key:'U'}];
+        keyboardInputReady=false; popup.forceActiveFocus();""")
+    for key in ('U','Return','Down','Escape'):
+        evaluate(window, f'popup.handleKey({{key:Qt.Key_{key},text:"u",modifiers:0,isAutoRepeat:false}})')
+    assert evaluate(window,'launchRequests.length===0 && expanded')
+    evaluate(window, """flyout.entries=visibleEntries; flyout.inputGuard=null; flyout.visible=true;
+        flyout.handleKey({key:Qt.Key_U,text:'u',modifiers:0,isAutoRepeat:false});""")
+    assert evaluate(window,'launchRequests.length===0')
+
+
+def test_root_routes_escape_arrows_and_nested_handoff(main_popup):
+    window=main_popup
+    def queued(key):
+        evaluate(window, f'popup.handleKey({{key:Qt.Key_{key},text:"{key.lower() if len(key)==1 else ""}",modifiers:0,isAutoRepeat:false}})')
+    evaluate(window, """visibleEntries=[{kind:'submenu',title:'Power',key:'group',access_key:'U',items:[
+      {kind:'command',title:'Unavailable',key:'disabled',enabled:false,access_key:'D'},
+      {kind:'separator'}, {kind:'submenu',title:'Deep',key:'deep',access_key:'N',items:[
+      {kind:'command',title:'Leaf',key:'leaf',access_key:'Z'}]},
+      {kind:'command',title:'Other',key:'other',access_key:'O'}]}]; popup.forceActiveFocus();""")
+    for key in ('Down', 'Right', 'Right'):
+        queued(key)
+    assert evaluate(window,'flyout.activeChild.visible')
+    queued('Escape')
+    assert not evaluate(window,'flyout.activeChild.visible')
+    assert evaluate(window,'flyout.visible && expanded')
+    queued('Left')
+    assert evaluate(window,'!flyout.visible && expanded')
+    for key in ('U','Down','Up','Enter','Z'): queued(key)
+    assert evaluate(window,'JSON.stringify(launchRequests)') == '["leaf"]'
+
+
+def test_modified_editable_disabled_and_custom_keys(main_popup):
+    window=main_popup
+    evaluate(window, """visibleEntries=[{kind:'submenu',title:'Custom',key:'group',access_key:'Z',items:[
+      {kind:'command',title:'Disabled',key:'disabled',enabled:false,access_key:'D'},
+      {kind:'command',title:'Unbound',key:'unbound',access_key:''},
+      {kind:'command',title:'Custom',key:'custom',access_key:'C'},
+      {kind:'command',title:'Collision one',key:'first',access_key:'X'},
+      {kind:'command',title:'Collision two',key:'second',access_key:'X'}]}]; popup.forceActiveFocus();""")
+    QTest.keyClick(window,Qt.Key_U,Qt.NoModifier,0)
+    assert not evaluate(window,'flyout.visible')
+    for modifier in (Qt.ControlModifier,Qt.AltModifier,Qt.MetaModifier,Qt.ShiftModifier):
+        QTest.keyClick(window,Qt.Key_Z,modifier,0)
+    assert not evaluate(window,'flyout.visible')
+    evaluate(window, '''var field=Qt.createQmlObject('import QtQuick; TextInput {objectName:"entryField";width:100;height:30}',popup); field.forceActiveFocus();''')
+    QTest.keyClick(window,Qt.Key_Z,Qt.NoModifier,0)
+    assert not evaluate(window,'flyout.visible')
+    evaluate(window,'popup.forceActiveFocus()')
+    for key in ('Z','D','X','U'):
+        evaluate(window, f'popup.handleKey({{key:Qt.Key_{key},text:"{key.lower()}",modifiers:0,isAutoRepeat:false}})')
+    assert evaluate(window,'launchRequests.length') == 0
+    QTest.keyClick(window,Qt.Key_Enter,Qt.ControlModifier,0)
+    assert evaluate(window,'launchRequests.length') == 0
+    evaluate(window, 'popup.handleKey({key:Qt.Key_C,text:"c",modifiers:0,isAutoRepeat:false})')
+    assert evaluate(window,'JSON.stringify(launchRequests)') == '["custom"]'
+
+
+def test_queued_keys_return_through_hidden_flyout_levels(main_popup):
+    window=main_popup
+    evaluate(window, """visibleEntries=[{kind:'submenu',title:'Outer',key:'outer',access_key:'U',items:[
+      {kind:'submenu',title:'Inner',key:'inner',access_key:'N',items:[
+      {kind:'command',title:'Safe',key:'safe',access_key:'S'}]}]}]; popup.forceActiveFocus();""")
+    def queued(target,key):
+        evaluate(window, f'{target}.handleKey({{key:Qt.Key_{key},text:"{key.lower() if len(key)==1 else ""}",modifiers:0,isAutoRepeat:false}})')
+    queued('popup','U'); queued('popup','N')
+    assert evaluate(window,'flyout.activeChild.visible')
+    queued('flyout.activeChild','Escape')
+    assert evaluate(window,'flyout.visible && !flyout.activeChild.visible && expanded')
+    queued('flyout.activeChild','Left')
+    assert evaluate(window,'!flyout.visible && expanded')
+    queued('flyout','Escape')
+    assert not evaluate(window,'expanded')
+    queued('flyout','U') # A closed root must never be reactivated by a stale key.
+    assert evaluate(window,'!flyout.visible && launchRequests.length===0')

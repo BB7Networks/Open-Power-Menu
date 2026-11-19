@@ -35,7 +35,8 @@ class Model {
   public:
     explicit Model(std::shared_ptr<PowerManager> power = powerManager()) : power(std::move(power)) {}
     bool execute(const QJsonObject &config, const QString &key, const QJsonArray *expectedPresentation = nullptr);
-    QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false, bool discoverPower = true);
+    QList<Entry> normalize(const QJsonArray &items, bool showUnavailable = false, bool discoverPower = true,
+                           bool confirmPower = false);
     QJsonArray publicMenu(const QJsonObject &config);
     Presentation capture(const QJsonObject &config);
     Entry selected(const QJsonObject &config, const QString &key, const Presentation &shown);

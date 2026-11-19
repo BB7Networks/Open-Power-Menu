@@ -6,13 +6,17 @@
 #include <QSaveFile>
 #include <QThread>
 #include <unistd.h>
+#include "editor_launch.hpp"
 
 int main(int argc, char **argv) {
     QCoreApplication app(argc, argv);
     const auto args = app.arguments();
-    if (args.size() == 3 && args[1] == "--config") {
+    if (args.size() >= 3 && args[1] == "--config") {
         QFile launched(args[2] + ".editor-probe");
-        return launched.open(QIODevice::WriteOnly) ? 0 : 3;
+        const bool opened = launched.open(QIODevice::WriteOnly);
+        const auto option = [&](const QString &name) { const auto i = args.indexOf(name); return i > 0 ? args.value(i + 1) : QString(); };
+        Opm::reportEditorStartup(option("--opm-reply-to"), option("--opm-request"), opened ? QString() : "Probe failed");
+        return opened ? 0 : 3;
     }
     if (args.size() < 4)
         return 2;

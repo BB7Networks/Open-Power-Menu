@@ -5,6 +5,7 @@
 #include <QDBusContext>
 #include <QDBusServiceWatcher>
 #include <QElapsedTimer>
+#include <QDBusMessage>
 
 namespace Opm {
 class Service : public QObject, protected QDBusContext {
@@ -19,6 +20,9 @@ class Service : public QObject, protected QDBusContext {
     QHash<QString, Menu> menus;
     struct Operation { bool pending = true, alive = true; QString owner, error; qint64 expires = 0; };
     QHash<QString, std::shared_ptr<Operation>> operations;
+    struct EditorStart { QDBusMessage request; qint64 pid; QTimer *deadline; };
+    QHash<QString, EditorStart> editorStarts;
+    void finishEditorStart(const QString &token, const QString &error);
     QElapsedTimer elapsed;
     std::function<qint64()> now;
     QDBusServiceWatcher clients;
@@ -43,6 +47,7 @@ class Service : public QObject, protected QDBusContext {
     QString RunResult(const QString &operation);
     QString LastError();
     bool Edit();
+    void EditorStarted(const QString &token, const QString &error);
     QString BeginLayoutEdit();
     QString SaveLayoutEdit(const QString &token, const QString &references);
     bool CancelLayoutEdit(const QString &token);

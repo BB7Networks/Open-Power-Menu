@@ -26,7 +26,7 @@ JS = ROOT / 'plasmoid/contents/ui/adapters/LauncherAdapters.js'
 
 def extract_qml_function(text: str, name: str) -> str:
     """Extract a self-contained JS method from the real QML file."""
-    start = text.index('    function ' + name + '() {')
+    start = text.index('    function ' + name + '(')
     brace = text.index('{', start)
     depth = 0
     for pos in range(brace, len(text)):
@@ -109,7 +109,7 @@ class MutualExclusionAndIconTests(unittest.TestCase):
         self.assertIn('if (requestEpoch !== root.menuSwitchEpoch) return;',q)
         self.assertIn('dev.xarbit.appgrid.Standalone', (ROOT/'plasmoid/contents/ui/adapters/AppGridLauncher.js').read_text())
         self.assertIn('\"Hide\", []', (ROOT/'plasmoid/contents/ui/adapters/AppGridLauncher.js').read_text())
-        self.assertIn('root.expanded = false; // Original launcher/Meta takes precedence.', q)
+        self.assertIn('root.setPowerExpanded(false, "onOriginalLauncherOpened.precedence");', q)
         self.assertIn('Qt.callLater(() => root.activateSelectedLauncher(epoch));', q)
         self.assertIn('applet.activated();', (ROOT/'plasmoid/contents/ui/adapters/PlasmaLauncher.js').read_text())
         self.assertIn('function activateSelectedLauncher(epoch)', q)
@@ -189,11 +189,11 @@ const plan={item,applet};
 const sends=[];
 const callbacks=[];
 const timer={running:true};
-const root={selectedLauncherPlan:plan,selectedLauncherItem:item,expanded:true,
+const root={setPowerExpanded(value){this.expanded=value},selectedLauncherPlan:plan,selectedLauncherItem:item,expanded:true,
   menuSwitchEpoch:2,requestedMenu:'power',
   send(...args){sends.push(args)},
   closeLauncherPopup(){return c.closeLauncherPopup()}};
-const c={root,selectedLauncherPlan:plan,selectedLauncherItem:item,
+const c={popupTrace:{record(){}},root,selectedLauncherPlan:plan,selectedLauncherItem:item,
   launcherCloseFollowup:timer,
   Plasmoid:{containment:null,id:1},
   LauncherVisibility:{prepare(){throw Error('unexpected')}},
@@ -254,7 +254,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const events=[];
 const callbacks=[];
-const root={expanded:false,menuSwitchEpoch:0,requestedMenu:'none',
+const root={setPowerExpanded(value){this.expanded=value},expanded:false,menuSwitchEpoch:0,requestedMenu:'none',
   pendingPowerEpoch:-1, pendingLauncherEpoch:-1,
   launcherSwitchError:'',awaitingAsyncClose:false,
   launcherClosePollCount:0};

@@ -4,7 +4,7 @@ FROM debian:trixie-slim AS build
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake ninja-build g++ qt6-base-dev qt6-declarative-dev \
+    cmake ninja-build g++ qt6-base-dev qt6-declarative-dev libxcb-xinput-dev \
     libkf6service-dev libkf6config-dev kde-cli-tools dbus \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
@@ -24,7 +24,7 @@ RUN umask 022 && cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release
 FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libqt6core6t64 libqt6dbus6 libqt6gui6 libqt6widgets6 libqt6qml6 libqt6quick6 \
-    libqt6quickcontrols2-6 libkf6service6 libkf6configcore6 kde-cli-tools dbus \
+    libqt6quickcontrols2-6 libkf6service6 libkf6configcore6 libxcb-xinput0 kde-cli-tools dbus \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \

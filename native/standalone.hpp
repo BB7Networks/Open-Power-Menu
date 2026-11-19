@@ -1,6 +1,7 @@
 #pragma once
 #include "model.hpp"
 #include "interaction.hpp"
+#include "physical_keys.hpp"
 #include <QElapsedTimer>
 #include <QMenu>
 #include <QSet>
@@ -30,6 +31,8 @@ class Standalone : public QMenu {
     const QJsonObject config;
     QString lastError;
     Model model;
+    PhysicalKeys physicalKeys;
+    bool forwardingKey = false;
     QJsonArray presentation;
     Presentation captured;
     std::function<bool()> current;

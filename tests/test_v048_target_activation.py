@@ -43,7 +43,7 @@ let selectedActivations=0,otherActivations=0;
 const selected={id:59,pluginName:'dev.xarbit.appgrid',activated(){selectedActivations++;item.gridOpen=true;item.gridWindow.visible=true}};
 const other={id:75,pluginName:'dev.xarbit.appgrid',activated(){otherActivations++}};
 const plan={applet:selected,item};
-const root={selectedLauncherPlan:plan,launcherAppletId:59,menuSwitchEpoch:0,
+const root={setPowerExpanded(value){this.expanded=value},selectedLauncherPlan:plan,launcherAppletId:59,menuSwitchEpoch:0,
   requestedMenu:'none',pendingPowerEpoch:-1,awaitingAsyncClose:false,
   launcherSwitchError:'',expanded:false,send(){throw Error('Must not use global activation')},
   activateSelectedLauncher(epoch){return env.activateSelectedLauncher(epoch)}};
@@ -67,7 +67,7 @@ assert.equal(item.closeCount,1);assert.equal(item.gridOpen,false);
         self.run_js(r'''
 const assert=require('node:assert/strict'),vm=require('node:vm');
 let global=0,old=0;
-const root={menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:59,
+const root={setPowerExpanded(value){this.expanded=value},menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:59,
   selectedLauncherPlan:{applet:{id:72,activated(){old++}}},
   launcherSwitchError:'',send(){global++}};
 const env={root,console,LauncherAdapters:{traceRequest(){}},Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('not found')}},
@@ -84,7 +84,7 @@ assert.match(root.launcherSwitchError,/Selected launcher cannot be activated/);
         self.run_js(r'''
 const assert=require('node:assert/strict'),vm=require('node:vm');
 const sent=[];
-const root={menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:0,
+const root={setPowerExpanded(value){this.expanded=value},menuSwitchEpoch:4,requestedMenu:'launcher',launcherAppletId:0,
   selectedLauncherPlan:null,launcherSwitchError:'',
   send(...args){sent.push(args);args[5](true,null)}};
 const env={root,console,LauncherAdapters:{traceRequest(){}},Plasmoid:{containment:null,id:3},LauncherVisibility:{prepare(){throw Error('no unique launcher')}},
