@@ -101,6 +101,22 @@ jobs:
                   message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
                   print('::error title=Private seat ' + seat.name + ' ' + name + '::' + message)
           PY
+      - name: Verify the real KDE greeter with private power recorders
+        shell: bash
+        run: |
+          set -euo pipefail
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
+            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_greeter.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-greeter)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          set +e
+          docker start --attach "$container" 2>&1 | tee work/pacman-greeter.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/tmp/plasma-greeter" work/qualified-dev/greeter-tests
+          test "$status" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
       - name: Verify the Manjaro release asset set before tagging
         if: matrix.distro == 'Manjaro'
         run: |
