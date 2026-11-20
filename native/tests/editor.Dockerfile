@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript qml6-module-qttest \
     qt6-svg-plugins qt6-qpa-plugins qt6-wayland xvfb xauth xdotool x11-utils xterm \
-    plasma-desktop plasma-workspace kwin-x11 kwin-wayland \
+    plasma-desktop plasma-workspace plasma-integration breeze kwin-x11 kwin-wayland \
     plasma-discover dolphin konsole systemsettings powerdevil plasma-nm print-manager \
     plasma-systemmonitor kinfocenter ksystemlog partitionmanager virt-manager krdc \
     python3 python3-pyside6.qtdbus python3-pyside6.qtgui && rm -rf /var/lib/apt/lists/* && \
@@ -29,6 +29,7 @@ RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_
     cmake --build /tmp/build --parallel 2 && \
     QT_QUICK_CONTROLS_STYLE=Basic ctest --test-dir /tmp/build --output-on-failure --output-junit /tmp/native-tests.xml && \
     QT_QUICK_CONTROLS_STYLE=org.kde.desktop ctest --test-dir /tmp/build -R native-editor-gui --output-on-failure && \
+    sh native/tests/editor-appearance.sh /tmp/build/native/native-editor-gui-tests /tmp/dropdown-screenshots && \
     dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb /tmp/build/native/native-standalone-tests && \
     dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh /tmp/build/native/native-standalone-tests && \
     XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python3 native/tests/application_resolution.py --probe /tmp/build/native/native-application-probe --live-audit /tmp/applications.json && \
@@ -40,6 +41,7 @@ RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_
     python3 native/tests/plasma_keyboard.py --held-repeat --output /tmp/plasma-keyboard --backend /tmp/build/native/open-power-menu-native && \
     cmake --install /tmp/build --prefix /tmp/stage && \
     mkdir /tmp/qualification && cp /tmp/native-tests.xml /tmp/applications.json /tmp/qualification/ && \
+    cp -r /tmp/dropdown-screenshots /tmp/qualification/ && \
     cp -r /tmp/plasma-greeter /tmp/plasma-keyboard /tmp/plasma-startup /tmp/plasma-popup /tmp/plasma-popup-untraced /tmp/plasma-dismissal /tmp/qualification/ && \
     cp /etc/os-release /tmp/qualification/os-release && dpkg-query -W > /tmp/qualification/packages.txt && \
     printf '%s\n' "$OPM_SOURCE_COMMIT" > /tmp/qualification/SOURCE-COMMIT

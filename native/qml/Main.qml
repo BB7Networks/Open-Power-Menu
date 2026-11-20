@@ -553,7 +553,8 @@ Kirigami.ApplicationWindow {
                             }
                             ChoiceBox {
                                 objectName: "powerConfirmation"
-                                Layout.fillWidth: true
+                                Layout.preferredWidth: implicitWidth
+                                Layout.maximumWidth: parent.width
                                 model: ["Follow KDE system settings — recommended", "Always show confirmation", "Execute immediately"]
                                 currentIndex: ["system", "always", "immediate"].indexOf(window.settings.power_confirmation)
                                 onActivated: index => window.preference("power_confirmation", ["system", "always", "immediate"][index])

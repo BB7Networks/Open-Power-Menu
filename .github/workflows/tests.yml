@@ -36,6 +36,9 @@ jobs:
           git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
           mkdir -p work/package-rc1
           git archive FETCH_HEAD | tar -x -C work/package-rc1
+          git fetch --depth 1 origin 2f889df3e5b29f49611f8cf37f41f15e86cad7c1
+          mkdir -p work/package-rc2
+          git archive FETCH_HEAD | tar -x -C work/package-rc2
       - name: Build pacman package and test legacy upgrades on the target distro
         shell: bash
         run: |
@@ -124,13 +127,13 @@ jobs:
         if: matrix.distro == 'Manjaro'
         run: |
           python3 scripts/prepare-native-release.py --artifacts work/qualified-dev --output work/release-verified \
-            --commit "$GITHUB_SHA" --tag "v$(cat native/VERSION)"
+            --commit "$GITHUB_SHA" --tag "v$(cat native/VERSION)" --staging
           (cd work/release-verified && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
           name: opm-native-${{ matrix.distro }}-${{ github.sha }}
           path: work/qualified-dev/
-          retention-days: 7
+          retention-days: 90
   native-packaging:
     name: Native ${{ matrix.label }} packaging and upgrades
     runs-on: ubuntu-24.04
@@ -154,6 +157,9 @@ jobs:
           git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
           mkdir -p work/package-rc1
           git archive FETCH_HEAD | tar -x -C work/package-rc1
+          git fetch --depth 1 origin 2f889df3e5b29f49611f8cf37f41f15e86cad7c1
+          mkdir -p work/package-rc2
+          git archive FETCH_HEAD | tar -x -C work/package-rc2
       - name: Build complete native package and test transactions
         shell: bash
         run: |
@@ -162,7 +168,7 @@ jobs:
       - name: Expose installation qualification failures
         if: failure()
         run: python3 scripts/report-ci-failure.py work/packaging-build.log
-      - name: Install, activate, reinstall, remove and roll back without Python
+      - name: Exercise EZ installation and rollback without PySide6 or a compiler
         run: docker run --rm --network none opm-native-package:test
       - name: Collect independent installation evidence
         run: |
@@ -174,7 +180,7 @@ jobs:
         with:
           name: opm-install-${{ matrix.distro }}-${{ github.sha }}
           path: work/qualification/
-          retention-days: 7
+          retention-days: 90
   native-standalone:
     name: Native standalone menu
     runs-on: ubuntu-24.04
@@ -233,7 +239,7 @@ jobs:
         with:
           name: opm-desktop-${{ matrix.distro }}-${{ github.sha }}
           path: work/qualification/
-          retention-days: 7
+          retention-days: 90
   native-runtime:
     name: Native Qt backend
     runs-on: ubuntu-24.04
@@ -331,3 +337,26 @@ jobs:
       - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_qt_flyout.py tests/test_qt_dismissal.py tests/test_installation.py tests/test_native_store.py
         env:
           QT_QPA_PLATFORM: offscreen
+
+  stage-ez:
+    name: Stage 2.1.0 EZ installers for Phase 1 review
+    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/release/2.1.0-')
+    needs: [native-pacman, native-packaging, native-standalone, native-editor, native-runtime, portable, qt-runtime]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: opm-*-${{ github.sha }}
+          path: qualification-evidence
+      - name: Verify exact source, native binaries and all three EZ archives
+        run: |
+          python3 scripts/stage-native-ez.py --evidence qualification-evidence --output phase1-assets --commit "$GITHUB_SHA"
+          (cd phase1-assets && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1.0-phase1-${{ github.sha }}
+          path: phase1-assets/
+          retention-days: 90

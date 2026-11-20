@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
-# Manjaro's base image needs Python for pacman-mirrors. Keep that unrelated
-# runtime; separately require PySide6 absence. Debian/Arch prove strict absence.
+# Minimal Debian/Arch images prove strict Python absence. Full Plasma images
+# and Manjaro's base image need distro Python; still require PySide6 absence.
 case "${OPM_TEST_RUNTIME_PYTHON:-absent}" in
     absent) absent_tools='python3 python g++ cmake';;
     distro)
-        python -c 'import importlib.util; assert importlib.util.find_spec("PySide6") is None'
+        python3 -c 'import importlib.util; assert importlib.util.find_spec("PySide6") is None'
         absent_tools='g++ cmake';;
     *) echo 'Unknown runtime test profile' >&2; exit 1;;
 esac
@@ -33,6 +33,13 @@ if [ -n "${OPM_TEST_SETUP:-}" ]; then
     "$OPM_TEST_SETUP"
 else
     sh "$bundle/install.sh"
+fi
+# Exercise the shipped EZ entrypoint offline, still with fault hooks disabled.
+if [ -d /opt/opm-ez ]; then
+    for ez in /opt/opm-ez/*; do
+        bash "$ez/install.sh" --check
+        bash "$ez/install.sh" --yes
+    done
 fi
 unset OPM_INSTALL_CRASH_AFTER OPM_INSTALL_FAIL_AFTER
 "$XDG_BIN_HOME/open-power-menu" --version

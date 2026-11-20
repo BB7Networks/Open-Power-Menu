@@ -15,6 +15,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--bundle', type=Path, required=True)
 parser.add_argument('--legacy', type=Path, required=True)
 parser.add_argument('--rc1-bundle', type=Path, required=True)
+parser.add_argument('--rc2-bundle', type=Path, required=True)
+parser.add_argument('--ez', type=Path, required=True)
 args, remaining = parser.parse_known_args()
 BUNDLE = args.bundle.resolve()
 os.umask(0o077)
@@ -78,7 +80,7 @@ class Packaging(unittest.TestCase):
         embedded=self.app/'widget-backups';embedded.mkdir(exist_ok=True);(embedded/'keep').write_text('older history')
         # Start actual legacy Python service through its installed activation file.
         subprocess.run(['busctl','--user','call','org.openpowermenu.Service','/OpenPowerMenu','org.openpowermenu.Service','Ping'],env=self.env,check=True,stdout=subprocess.DEVNULL)
-        old_pid=self.pid();upgrade=self.install();self.assertNotEqual(old_pid,self.pid())
+        old_pid=self.pid();upgrade=self.ez('--yes');self.assertNotEqual(old_pid,self.pid())
         # The optional review is read-only and one-time even on an unattended upgrade.
         state=self.data/'open-power-menu-recovery/dependency-review/native-2.1.json'
         self.assertTrue(state.exists(), upgrade.stdout + upgrade.stderr)
@@ -98,10 +100,18 @@ class Packaging(unittest.TestCase):
         self.assertEqual(self.original,self.settings())
 
     def test_rc1_upgrade_and_rollback_preserve_preferences(self):
+        self.upgrade_native(args.rc1_bundle, '2.1.0-rc1')
+
+    def test_rc2_upgrade_and_rollback_preserve_preferences(self):
+        self.upgrade_native(args.rc2_bundle, '2.1.0-rc2')
+
+    def upgrade_native(self, old, version):
         # A separately built, exact released RC1 bundle, on this distribution.
         # Nothing here selects or dispatches any power action.
-        old = args.rc1_bundle.resolve()
-        self.assertEqual(json.loads((old/'bundle.json').read_text())['version'], '2.1.0-rc1')
+        old = old.resolve()
+        manifest=json.loads((old/'bundle.json').read_text())
+        self.assertEqual(manifest['version'], version)
+        self.assertEqual(manifest['source_commit'], {'2.1.0-rc1':'2384a9d03947b9a2e5de8f0ef72ae57e556bc29c','2.1.0-rc2':'2f889df3e5b29f49611f8cf37f41f15e86cad7c1'}[version])
         self.personal.update(confirm_power_actions=True)
         (self.config/'open-power-menu/menu.json').write_text(json.dumps(self.personal))
         self.original=self.settings()
@@ -110,7 +120,7 @@ class Packaging(unittest.TestCase):
         self.assertEqual(installed.returncode, 0, installed.stdout+installed.stderr)
         self.assertEqual(self.original,self.settings())
         old_binary=(self.app/'bin/open-power-menu-native').read_bytes()
-        self.install()
+        self.ez('--yes')
         def call(method):
             value=subprocess.check_output(['busctl','--user','call','org.openpowermenu.Service','/OpenPowerMenu',
                 'org.openpowermenu.Service',method],env=self.env,text=True)
@@ -119,9 +129,85 @@ class Packaging(unittest.TestCase):
         self.assertEqual(json.loads(call('GetIntegration'))['power_confirmation'], 'always')
         self.invoke('--rollback')
         self.assertEqual((self.app/'bin/open-power-menu-native').read_bytes(),old_binary)
-        self.assertIn('2.1.0-rc1', call('Ping'))
+        self.assertIn(version, call('Ping'))
         self.assertTrue(json.loads(call('GetIntegration'))['confirm_power_actions'])
         self.assertEqual(self.original,self.settings())
+    def ez(self, *arguments, ok=True, extra=None, directory=None, answer=None):
+        p = subprocess.run(['bash', str((directory or args.ez)/'install.sh'), *arguments],
+            env={**self.env, **(extra or {})}, input=answer, capture_output=True, text=True, timeout=60)
+        self.assertEqual(p.returncode == 0, ok, p.stdout+p.stderr)
+        self.assertEqual(self.original, self.settings(), 'EZ changed personal state')
+        return p
+
+    def test_ez_check_cancel_install_reinstall_recover(self):
+        self.ez('--check')
+        self.assertFalse(self.app.exists())
+        self.ez(answer='n\n')
+        self.assertFalse(self.app.exists())
+        self.ez('--yes')
+        self.assertTrue((self.app/'bin/open-power-menu-editor').is_file())
+        self.assertIn('Existing native installation', self.ez('--yes').stdout)
+        crashed=self.ez('--yes', ok=False, extra={'OPM_INSTALL_CRASH_AFTER':'2'})
+        self.assertTrue((self.data/'open-power-menu-recovery/native-installs/active.json').exists())
+        self.ez('--recover', '--yes')
+        self.assertFalse((self.data/'open-power-menu-recovery/native-installs/active.json').exists())
+        self.assertIsNotNone(self.pid())
+        self.ez('--rollback', '--yes')
+        self.assertTrue((self.app/'bin/open-power-menu-native').is_file())
+
+    def test_ez_missing_corrupt_symlink_payload(self):
+        self.install(); pid=self.pid()
+        for kind in ('missing', 'corrupt', 'symlink'):
+            folder=self.root/('EZ '+kind);shutil.copytree(args.ez,folder)
+            file=folder/'native-bundle/widget/contents/ui/nativeinput/libopminputplugin.so'
+            if kind == 'missing': file.unlink()
+            elif kind == 'corrupt': file.write_bytes(file.read_bytes()+b'corrupt')
+            else:
+                file.unlink();file.symlink_to(BUNDLE/'widget/contents/ui/nativeinput/libopminputplugin.so')
+            result=self.ez('--yes',directory=folder,ok=False)
+            self.assertTrue('Integrity check failed' in result.stderr or 'Symbolic links' in result.stderr,result.stderr)
+            self.assertEqual(pid,self.pid())
+
+    def test_ez_missing_plasma_reports_dependencies_without_package_operations(self):
+        fake=self.root/'fake-tools';fake.mkdir()
+        for tool in ('bash','dirname','sha256sum','find','uname','mktemp','rm','dbus-run-session'):
+            (fake/tool).symlink_to(shutil.which(tool))
+        marker=self.root/'package-operation'
+        for tool in ('sudo','pacman','apt'):
+            file=fake/tool;file.write_text('#!/bin/sh\ntouch "'+str(marker)+'"\nexit 1\n');file.chmod(0o700)
+        result=self.ez('--yes',ok=False,extra={'PATH':str(fake)})
+        self.assertIn('Missing dependency: plasmashell',result.stderr)
+        self.assertIn('Runtime setup for',result.stderr)
+        self.assertFalse(marker.exists());self.assertFalse(self.app.exists())
+
+    def test_ez_default_home_paths_with_spaces_and_uninstall(self):
+        home=self.root/'home with spaces';home.mkdir()
+        self.env['HOME']=str(home)
+        mapping={'XDG_DATA_HOME':home/'.local/share','XDG_BIN_HOME':home/'.local/bin',
+                 'XDG_CONFIG_HOME':home/'.config','XDG_CACHE_HOME':home/'.cache'}
+        for key,path in mapping.items():
+            shutil.copytree(self.env[key],path)
+            self.env.pop(key)
+        self.data=mapping['XDG_DATA_HOME'];self.app=self.data/'open-power-menu';self.config=mapping['XDG_CONFIG_HOME']
+        # The activation bus must start with the same HOME/XDG roots as the client.
+        self.bus.terminate();self.bus.wait(timeout=5);self.bus.stdout.close()
+        # libdbus's default HOME lookup uses the account database; explicitly
+        # model the temporary user's default data location on this private bus.
+        from xml.sax.saxutils import escape
+        bus_config=self.root/'home-bus.conf'
+        bus_config.write_text('<busconfig><include>/usr/share/dbus-1/session.conf</include><servicedir>'+escape(str(self.data/'dbus-1/services'))+'</servicedir></busconfig>')
+        self.bus=subprocess.Popen(['dbus-daemon','--config-file='+str(bus_config),'--nofork','--print-address=1'],env=self.env,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True)
+        self.env['DBUS_SESSION_BUS_ADDRESS']=self.bus.stdout.readline().strip()
+        folder=self.root/'extracted EZ with spaces';shutil.copytree(args.ez,folder)
+        self.ez('--yes',directory=folder)
+        self.ez('--uninstall','--yes',directory=folder,ok=False)
+        (self.config/'plasma-org.kde.plasma.desktop-appletsrc').write_text('[Containments]\n')
+        self.original=self.settings()
+        self.ez('--uninstall','--yes',directory=folder)
+        self.assertFalse(self.app.exists())
+        self.ez('--rollback','--yes',directory=folder)
+        self.assertTrue(self.app.exists())
+
     def test_widget_activation_detection_and_deferred_update(self):
         # Two widgets and unrelated panel state survive every action byte-for-byte.
         panel=self.config/'plasma-org.kde.plasma.desktop-appletsrc'

@@ -166,9 +166,14 @@ def session(args):
         spawn([sys.executable, __file__, '--backend'] + (['--hidden'] if args.hidden else []), 'backend.log')
         shell = spawn(['plasmashell', '--no-respawn'], 'plasma.log')
         wait_for(lambda: log.exists() and state() and state().get('button'), timeout=30)
-        spawn(['xterm', '-title', 'OPM background application', '-geometry', '100x30+150+80'], 'application.log')
-        app_id = wait_for(lambda: subprocess.run(['xdotool', 'search', '--name', '^OPM background application$'],
-                          capture_output=True, text=True).stdout.strip())
+        background = spawn(['xterm', '-title', 'OPM background application', '-geometry', '100x30+150+80'], 'application.log')
+        def background_window():
+            assert background.poll() is None, (case/'application.log').read_text()
+            # Ubuntu's interactive shell rewrites the title after xterm maps.
+            # Match the process we launched, independently of shell prompt timing.
+            return subprocess.run(['xdotool', 'search', '--onlyvisible', '--pid', str(background.pid)],
+                                  capture_output=True, text=True).stdout.strip()
+        app_id = wait_for(background_window)
         if args.dismissal:
             from plasma_dismissal import exercise
             exercise(args, case, spawn, command, move, state, log, shell, app_id)
