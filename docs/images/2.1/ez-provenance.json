@@ -1,0 +1,24 @@
+{
+  "source_commit": "4e11393c4d289c453044130d79dc54a23049c32c",
+  "version": "2.1.0",
+  "os": "debian",
+  "os_version": "13",
+  "archive": "OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip",
+  "archive_sha256": "fa119bf78ed5dcc76e49d0b53920d2a00b2c622aaad070c63804624c26945897",
+  "operations": [
+    {
+      "command": "sha256sum -c OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip.sha256",
+      "exit_code": 0
+    },
+    {
+      "command": "bash install.sh --check",
+      "exit_code": 0
+    },
+    {
+      "command": "bash install.sh",
+      "exit_code": 0
+    }
+  ],
+  "power_actions_invoked": 0,
+  "environment": "Disposable profile; private session/system bus; offline container"
+}

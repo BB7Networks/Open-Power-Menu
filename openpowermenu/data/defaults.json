@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "appearance": "native",
+  "anchor": "cursor",
+  "show_unavailable": false,
+  "show_menu_icons": true,
+  "auto_close_on_pointer_leave": false,
+  "backup_retention": 10,
+  "hide_original_launcher": false,
+  "launcher_applet_id": 0,
+  "button_icon_mode": "launcher",
+  "button_icon": "",
+  "menu": [
+    {
+      "action": "applications"
+    },
+    {
+      "action": "power"
+    },
+    {
+      "action": "logs"
+    },
+    {
+      "action": "system"
+    },
+    {
+      "action": "hardware"
+    },
+    {
+      "action": "network"
+    },
+    {
+      "action": "disks"
+    },
+    {
+      "action": "printers"
+    },
+    {
+      "action": "vms"
+    },
+    {
+      "separator": true
+    },
+    {
+      "action": "terminal"
+    },
+    {
+      "action": "monitor"
+    },
+    {
+      "action": "files"
+    },
+    {
+      "action": "settings"
+    },
+    {
+      "action": "run"
+    },
+    {
+      "separator": true
+    },
+    {
+      "submenu": "Remote & Work",
+      "icon": "network-server",
+      "items": [
+        {
+          "action": "remote"
+        }
+      ]
+    },
+    {
+      "submenu": "Shut down or sign out",
+      "icon": "system-shutdown",
+      "items": [
+        {
+          "action": "lock"
+        },
+        {
+          "action": "logout"
+        },
+        {
+          "action": "reboot"
+        },
+        {
+          "action": "shutdown"
+        }
+      ]
+    },
+    {
+      "action": "show_desktop"
+    }
+  ]
+}

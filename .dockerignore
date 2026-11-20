@@ -1,0 +1,14 @@
+.git
+.venv
+build
+dist
+.pytest_cache
+**/__pycache__
+**/*.pyc
+work/*
+!work/package-legacy
+!work/package-rc1
+!work/package-rc2
+!work/pacman-source
+venv
+*.log

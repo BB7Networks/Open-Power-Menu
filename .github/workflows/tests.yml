@@ -1,9 +1,285 @@
 name: Tests
 on:
   push:
+    branches: ['**']
   pull_request:
   workflow_dispatch:
+  workflow_call:
 jobs:
+  native-pacman:
+    name: Native ${{ matrix.label }} package and upgrades
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Arch
+            label: Arch (2026-09-27)
+            image: archlinux:base-20260927.0.600689@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040
+            snapshot: '2026/09/27'
+            runtime_python: absent
+            test_x11: 'ON'
+          - distro: Manjaro
+            label: Manjaro
+            image: manjarolinux/base:latest
+            snapshot: ''
+            runtime_python: distro
+            test_x11: 'ON'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare checksum-pinned native source and released upgrade baseline
+        run: |
+          sh native/packaging/prepare-pacman.sh . work/pacman-source
+          git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
+          mkdir -p work/package-legacy
+          git archive FETCH_HEAD | tar -x -C work/package-legacy
+          git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
+          mkdir -p work/package-rc1
+          git archive FETCH_HEAD | tar -x -C work/package-rc1
+          git fetch --depth 1 origin 2f889df3e5b29f49611f8cf37f41f15e86cad7c1
+          mkdir -p work/package-rc2
+          git archive FETCH_HEAD | tar -x -C work/package-rc2
+      - name: Build pacman package and test legacy upgrades on the target distro
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --progress=plain --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
+            --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} \
+            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
+            -f native/tests/pacman.Dockerfile -t opm-native-pacman:test . 2>&1 | tee work/pacman-build.log
+      - name: Expose failed qualification details in the check result
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path('work/pacman-build.log')
+          if log.exists():
+              lines = log.read_text(errors='replace').splitlines()
+              errors = [line for line in lines if re.search(r'error:|FAIL!|Exception|AssertionError|not found|failed to', line, re.I)]
+              # GitHub truncates individual check annotations at 4 KiB.
+              for title, message in [('Native package failure details', '\n'.join(errors)[-3000:]),
+                                     ('Native package final output', '\n'.join(lines[-45:])[-3000:])]:
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::error title=' + title + '::' + message)
+          PY
+      - name: Install sealed package, activate and roll back without PySide6 or a compiler
+        run: docker run --rm --network none opm-native-pacman:test
+      - name: Collect development artifacts and distribution snapshot
+        run: |
+          container=$(docker create --network none opm-native-pacman:test)
+          docker cp "$container:/opt/opm-artifacts" work/qualified-dev
+          docker rm "$container"
+      - name: Qualify private keyboard seats on the target distro
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --target build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
+            --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
+            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
+            -f native/tests/pacman.Dockerfile -t opm-native-keyboard:test .
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
+            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-keyboard --held-repeat)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          set +e
+          docker start --attach "$container" 2>&1 | tee work/pacman-keyboard.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/tmp/plasma-keyboard" work/qualified-dev/keyboard-tests
+          test "$status" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
+      - name: Expose private seat failures in the check result
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for seat in sorted(Path('work/qualified-dev/keyboard-tests').glob('*')):
+              for name in ('session.log', 'kwin.log', 'plasma.log'):
+                  path = seat/name
+                  if not path.is_file():
+                      continue
+                  lines = [line for line in path.read_text(errors='replace').splitlines()
+                           if 'OPM_POPUP_TRACE' not in line]
+                  message = '\n'.join(lines)[-2800:]
+                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                  print('::error title=Private seat ' + seat.name + ' ' + name + '::' + message)
+          PY
+      - name: Verify the real KDE greeter with private power recorders
+        shell: bash
+        run: |
+          set -euo pipefail
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
+            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_greeter.py \
+            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
+            --output /tmp/plasma-greeter)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          set +e
+          docker start --attach "$container" 2>&1 | tee work/pacman-greeter.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/tmp/plasma-greeter" work/qualified-dev/greeter-tests
+          test "$status" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
+      - name: Verify the Manjaro release asset set before tagging
+        if: matrix.distro == 'Manjaro'
+        run: |
+          python3 scripts/prepare-native-release.py --artifacts work/qualified-dev --output work/release-verified \
+            --commit "$GITHUB_SHA" --tag "v$(cat native/VERSION)" --staging
+          (cd work/release-verified && sha256sum -c SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-native-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualified-dev/
+          retention-days: 90
+  native-packaging:
+    name: Native ${{ matrix.label }} packaging and upgrades
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Debian 13
+            distro: Debian
+            image: debian:trixie-slim
+          - label: Kubuntu 26.04
+            distro: Kubuntu
+            image: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Export the exact released upgrade baseline
+        run: |
+          git fetch --depth 1 origin 34058480b6e3bc1ecc1f19d420fb744f570eca34
+          mkdir -p work/package-legacy
+          git archive FETCH_HEAD | tar -x -C work/package-legacy
+          git fetch --depth 1 origin 2384a9d03947b9a2e5de8f0ef72ae57e556bc29c
+          mkdir -p work/package-rc1
+          git archive FETCH_HEAD | tar -x -C work/package-rc1
+          git fetch --depth 1 origin 2f889df3e5b29f49611f8cf37f41f15e86cad7c1
+          mkdir -p work/package-rc2
+          git archive FETCH_HEAD | tar -x -C work/package-rc2
+      - name: Build complete native package and test transactions
+        shell: bash
+        run: |
+          set -o pipefail
+          docker build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/packaging.Dockerfile -t opm-native-package:test . 2>&1 | tee work/packaging-build.log
+      - name: Expose installation qualification failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py work/packaging-build.log
+      - name: Exercise EZ installation and rollback without PySide6 or a compiler
+        run: docker run --rm --network none opm-native-package:test
+      - name: Collect independent installation evidence
+        run: |
+          container=$(docker create --network none opm-native-package:test)
+          docker cp "$container:/opt/opm-evidence" work/qualification
+          docker rm "$container"
+          printf '%s\n' passed > work/qualification/runtime-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-install-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualification/
+          retention-days: 90
+  native-standalone:
+    name: Native standalone menu
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native menu
+        run: docker build -f native/tests/standalone.Dockerfile -t opm-native-standalone:test .
+      - name: Staged launch without Python or compiler and missing-library diagnostic
+        run: docker run --rm --network none opm-native-standalone:test
+      - name: Install virtual compositor test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev qt6-wayland libxcb-xinput-dev dbus xvfb xauth xdotool weston kwin-wayland
+      - name: Test X11 and Wayland menu interaction
+        run: |
+          cmake -S . -B build/standalone -G Ninja -DOPM_BUILD_STANDALONE=ON
+          cmake --build build/standalone --parallel 2
+          dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb build/standalone/native/native-standalone-tests
+          dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+          dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin OPM_OUTPUT_COUNT=2 OPM_SCALE=1.25 sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
+  native-editor:
+    name: Native ${{ matrix.label }} editor and desktop
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Debian 13
+            distro: Debian
+            image: debian:trixie-slim
+          - label: Kubuntu 26.04
+            distro: Kubuntu
+            image: ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and test native editor and distribution desktop
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p work
+          docker build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test . 2>&1 | tee work/editor-build.log
+      - name: Expose desktop qualification failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py work/editor-build.log
+      - name: Run GUI without Python or a compiler
+        run: docker run --rm --network none opm-native-editor:test
+      - name: Collect desktop and power qualification evidence
+        run: |
+          mkdir -p work
+          container=$(docker create --network none opm-native-editor:test)
+          docker cp "$container:/opt/opm-evidence" work/qualification
+          docker rm "$container"
+          printf '%s\n' passed > work/qualification/runtime-smoke
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-desktop-${{ matrix.distro }}-${{ github.sha }}
+          path: work/qualification/
+          retention-days: 90
+  native-runtime:
+    name: Native Qt backend
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ qt6-base-dev dbus
+      - name: Build native runtime
+        run: |
+          cmake -S . -B build/native -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          cmake --build build/native --parallel 2
+      - name: Native model and storage tests
+        shell: bash
+        run: |
+          set -o pipefail
+          ctest --test-dir build/native --output-on-failure 2>&1 | tee native-tests.log
+      - name: Expose native test failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py native-tests.log
+      - name: Legacy compatibility and private D-Bus tests
+        run: |
+          dbus-run-session -- python3 native/tests/contract.py \
+            --binary build/native/native/open-power-menu-native \
+            --probe build/native/native/native-launch-probe
+      - name: Check staged source installation
+        run: |
+          cmake --install build/native --prefix "$RUNNER_TEMP/opm-native"
+          "$RUNNER_TEMP/opm-native/bin/open-power-menu-native" --version
+          test ! -e "$RUNNER_TEMP/opm-native/share/dbus-1/services/org.openpowermenu.Service.service"
+      - name: Smoke test without Python installed
+        run: |
+          mkdir -p "$RUNNER_TEMP/opm-runtime"
+          cp native/tests/runtime.Dockerfile "$RUNNER_TEMP/opm-runtime/Dockerfile"
+          cp build/native/native/open-power-menu-native "$RUNNER_TEMP/opm-runtime/"
+          docker build -t opm-native-runtime:test "$RUNNER_TEMP/opm-runtime"
+          docker run --rm --network none \
+            -v "$GITHUB_WORKSPACE/native/tests/runtime-smoke.sh:/smoke.sh:ro" \
+            opm-native-runtime:test sh /smoke.sh
   portable:
     name: Portable tests
     runs-on: ubuntu-latest
@@ -18,9 +294,16 @@ jobs:
       - run: python -m pip install pytest
       - run: python -m pytest -q
       - run: python -m compileall -q openpowermenu tests run.py
+      - run: python scripts/audit-repository.py
+      - name: Verify native showcase assets and comparison provenance
+        run: python tools/showcase/check.py
+      - name: Verify the approved Phase 2 maintenance boundary
+        if: github.head_ref == 'maintenance/2.1.0-repository-cleanup' || github.ref == 'refs/heads/maintenance/2.1.0-repository-cleanup'
+        run: python scripts/audit-repository.py --phase2
       - name: Check every shell script
         run: |
-          for script in install.sh uninstall.sh scripts/*.sh tools/*.sh; do
+          shopt -s nullglob
+          for script in install.sh uninstall.sh scripts/*.sh tools/*.sh legacy/1.0.1/*.sh legacy/1.0.1/scripts/*.sh native/packaging/*.sh native/packaging/*.sh.in native/tests/*.sh; do
             bash -n "$script"
           done
   qt-runtime:
@@ -54,10 +337,43 @@ jobs:
           import subprocess
           import PySide6
           parser = Path(PySide6.__file__).parent / "qmlformat"
-          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "MenuEntryContent.qml", "PointerDismissal.qml", "adapters/AppGridPanelBridge.qml"]
+          files = ["main.qml", "SideFlyout.qml", "LayoutEditor.qml", "MenuEntryContent.qml", "PointerDismissal.qml", "BackendSetup.qml", "adapters/AppGridPanelBridge.qml"]
           subprocess.run([str(parser), *["plasmoid/contents/ui/" + name for name in files]],
                          stdout=subprocess.DEVNULL, check=True)
           PY
-      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_qt_flyout.py tests/test_qt_dismissal.py tests/test_installation.py
+      - run: python -m pytest -q tests/test_qt_runtime.py tests/test_qt_editor.py tests/test_qt_inmenu.py tests/test_qt_flyout.py tests/test_qt_dismissal.py tests/test_installation.py tests/test_native_store.py
         env:
           QT_QPA_PLATFORM: offscreen
+
+  stage-ez:
+    name: Stage 2.1.0 EZ installers for review
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/heads/release/2.1.0-') || startsWith(github.ref, 'refs/heads/maintenance/2.1.0-'))
+    needs: [native-pacman, native-packaging, native-standalone, native-editor, native-runtime, portable, qt-runtime]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: opm-*-${{ github.sha }}
+          path: qualification-evidence
+      - name: Verify exact source, native binaries and all three EZ archives
+        run: |
+          python3 scripts/stage-native-ez.py --evidence qualification-evidence --output review-assets --commit "$GITHUB_SHA"
+          (cd review-assets && sha256sum -c SHA256SUMS)
+      - name: Validate the final public asset set without publishing
+        run: |
+          python3 scripts/stage-native-ez.py --publication --evidence qualification-evidence --output publication-check --commit "$GITHUB_SHA"
+          python3 scripts/publish-stable-release.py --assets publication-check --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1.0-review-${{ github.sha }}
+          path: review-assets/
+          retention-days: 90
+      - name: Retain the verified stable asset set for publication review
+        uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1.0-stable-verified-${{ github.sha }}
+          path: publication-check/
+          retention-days: 90

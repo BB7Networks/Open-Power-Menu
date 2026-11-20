@@ -1,0 +1,46 @@
+# Build inside the target Arch/Manjaro snapshot from a reviewed source checkout.
+# This package stages a matching native bundle; setup is an explicit user action.
+pkgname=open-power-menu-native
+pkgver=2.1.0
+pkgrel=1
+pkgdesc='Open Power Menu 2.1 with reversible per-user setup'
+arch=('x86_64')
+url='https://github.com/BB7Networks/Open-Power-Menu'
+license=('MIT')
+depends=('glibc' 'gcc-libs' 'libxcb' 'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'kirigami' 'kservice' 'kconfig' 'kde-cli-tools' 'dbus')
+conflicts=('open-power-menu-native-dev')
+makedepends=('cmake' 'ninja' 'gcc' 'extra-cmake-modules')
+checkdepends=('xorg-server-xvfb' 'xorg-xauth' 'python')
+optdepends=('plasma-desktop: Plasma 6 widget and launcher integration')
+# Place the reviewed git archive beside this recipe. No remote branch is fetched.
+source=('open-power-menu-source.tar.gz')
+sha256sums=('SOURCE_SHA256') # Filled by prepare-pacman.sh from the exact source archive.
+_opm_source_commit='SOURCE_COMMIT'
+# makepkg must not mutate sealed bundle binaries after package().
+options=('!strip' '!debug')
+
+build() {
+    cmake -S "$srcdir/Open-Power-Menu" -B "$srcdir/build" -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_PACKAGE=ON -DOPM_INSTALL_TEST_HOOKS=OFF \
+        -DOPM_SOURCE_COMMIT="$_opm_source_commit"
+    cmake --build "$srcdir/build" --parallel 2
+}
+check() {
+    QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software ctest --test-dir "$srcdir/build" --output-on-failure
+}
+package() {
+    # Refuse an older rolling runtime than the one used to link these binaries.
+    local dependency installed_version
+    local qualified_dependencies=()
+    for dependency in "${depends[@]}"; do
+        installed_version=$(pacman -Q "$dependency")
+        qualified_dependencies+=("$dependency>=${installed_version#* }")
+    done
+    depends=("${qualified_dependencies[@]}")
+    cmake --build "$srcdir/build" --target native-package
+    install -d "$pkgdir/usr/lib/open-power-menu-native" "$pkgdir/usr/bin" "$pkgdir/usr/share/licenses/$pkgname"
+    cp -a "$srcdir/build/native-bundle" "$pkgdir/usr/lib/open-power-menu-native/bundle"
+    printf '%s\n' '#!/bin/sh' 'exec /usr/lib/open-power-menu-native/bundle/install.sh "$@"' > "$pkgdir/usr/bin/open-power-menu-native-setup"
+    chmod 755 "$pkgdir/usr/bin/open-power-menu-native-setup"
+    install -m644 "$srcdir/Open-Power-Menu/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

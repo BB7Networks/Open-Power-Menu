@@ -1,0 +1,29 @@
+# Open Power Menu @OPM_VERSION@ native bundle
+
+Source commit: `@OPM_SOURCE_COMMIT@`. `bundle.json` seals every payload file and
+records the distribution, CPU and build-time dependency versions. Use only the
+bundle matching your supported distribution and the accompanying SHA-256 file.
+Do not treat an Actions review artifact as an approved stable release.
+
+Run `bash install.sh` from the extracted `native-bundle` directory as your normal
+Plasma user. It checks compatibility before changing the installation. The
+native runtime, Configure editor, standalone menu, Plasma widget, input plugin,
+icons and desktop integration are included; Python/PySide6 is not required.
+
+The installer preserves user menus, shortcuts and panel layout. Keep this
+bundle for `bash install.sh --rollback`, `--recover` or `--uninstall`. Remove the
+OPM widget through Plasma before uninstalling; retain the original launcher.
+Do not delete recovery snapshots or unrelated dependencies as cleanup.
+
+**Power actions can execute immediately.** The KDE setting, OPM Power Actions
+preference and explicit custom commands determine behavior. Test with private
+mock services; do not use live power actions merely to check installation.
+
+Versioned documentation:
+
+- [Installation and upgrades](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/INSTALLATION.md)
+- [Supported runtimes](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/COMPATIBILITY.md)
+- [Configuration](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/CONFIGURATION.md)
+- [Power behavior](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/POWER.md)
+- [Recovery](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/RECOVERY.md)
+- [Troubleshooting](https://github.com/BB7Networks/Open-Power-Menu/blob/@OPM_SOURCE_COMMIT@/docs/TROUBLESHOOTING.md)

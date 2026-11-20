@@ -1,0 +1,23 @@
+path,decision,reason
+.github/workflows/publish-native-release.yml,add,"Replace archived prerelease trigger with explicit stable approval, full qualification and verified draft publication."
+docs/COMPATIBILITY.md,add,Active native user/developer guidance.
+docs/CONFIGURATION.md,add,Active native user/developer guidance.
+docs/INSTALLATION.md,add,Active native user/developer guidance.
+docs/POWER.md,add,Active native user/developer guidance.
+docs/README.md,add,Active native user/developer guidance.
+docs/RECOVERY.md,add,Active native user/developer guidance.
+docs/TROUBLESHOOTING.md,add,Active native user/developer guidance.
+docs/history/README.md,add,Index historical investigations and distinguish them from current instructions.
+docs/maintenance/PHASE2-CLEANUP.md,add,"Record the complete approved baseline, added files or review/audit results."
+docs/maintenance/phase2-added-files.csv,add,"Record the complete approved baseline, added files or review/audit results."
+docs/maintenance/phase2-inventory.csv,add,"Record the complete approved baseline, added files or review/audit results."
+install.sh,add,Replace legacy installer with non-mutating distribution-specific native guidance.
+legacy/1.0.1/README.md,add,Explain retained compatibility fixtures and exact released upgrade baselines.
+legacy/1.0.1/scripts/fixture-guard.sh,add,Require explicit fixture opt-in and private XDG roots before legacy installation tests.
+native/packaging/README-NATIVE.md.in,add,Ship current native installation guidance with source-pinned links instead of historical reports.
+scripts/audit-repository.py,add,Audit local links and the optional Phase 2 inventory/protected-file boundary.
+scripts/publish-stable-release.py,add,Implement default verification and explicitly approved draft/upload/download/verify/stable/latest flow.
+scripts/release_assets.py,add,Enforce the complete 21-file stable asset set and matching provenance/checksums.
+tests/test_source_entrypoints.py,add,Prove source guidance does not run tools or mutate user profiles and legacy opt-in fails closed.
+tests/test_stable_publisher.py,add,"Test approval, history protection, complete assets and ordered draft publication using a fake API."
+uninstall.sh,add,"Replace legacy uninstaller with non-mutating native removal, rollback and recovery guidance."

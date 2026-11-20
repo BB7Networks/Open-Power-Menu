@@ -1,0 +1,888 @@
+{
+  "measurement_code_commit": "3fd2cd9",
+  "baseline_code_commit": "2937ac646200ef7884b9c6c4fa7c568e2fbb0b3a",
+  "environment": {
+    "distribution": "Debian GNU/Linux 13 amd64",
+    "kernel": "6.18.57",
+    "compiler": "GCC 14.2",
+    "qt": "6.8.2",
+    "kf6": "6.13",
+    "glibc": "2.41-12+deb13u4",
+    "rendering": "offscreen/software",
+    "build": "CMake Release; complete test toolchain; private D-Bus/XDG profiles; shared cloud CPU; warm filesystem caches"
+  },
+  "limits": [
+    "Application editor memory is one observation per configuration/implementation, reproducing the historical benchmark.",
+    "Three fresh Qt Test harness processes exercise native 2.1 defaults. Harness PSS includes Qt Test/fixtures and is not the application baseline.",
+    "QObject counts cover descendants of the QML window, not the entire engine/heap.",
+    "No physical Plasma or actual power action was tested.",
+    "The historical benchmark key native_2.0_dev labels the current 2.1.0-dev binary; consult environment.native_version."
+  ],
+  "power_baseline": {
+    "binary": "/src/work/baseline-build/native/open-power-menu-native",
+    "method": "Three GetMenu round trips per service scenario, including fresh CLI IPC client overhead; private session/system fixture bus; no power actions.",
+    "scenarios": [
+      {
+        "mode": "healthy",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          6.846,
+          8.539,
+          8.596
+        ],
+        "median_ms": 8.539,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ]
+      },
+      {
+        "mode": "slow",
+        "per_reply_delay_ms": 300,
+        "GetMenu_roundtrip_ms": [
+          1782.765,
+          1805.283,
+          1793.918
+        ],
+        "median_ms": 1793.918,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ]
+      },
+      {
+        "mode": "missing",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          8.583,
+          7.36,
+          6.766
+        ],
+        "median_ms": 7.36,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          }
+        ]
+      },
+      {
+        "mode": "unresponsive",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          2858.941,
+          2909.426,
+          3000.2
+        ],
+        "median_ms": 2909.426,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          }
+        ]
+      }
+    ]
+  },
+  "power_async": {
+    "binary": "/src/work/review-build/native/open-power-menu-native",
+    "method": "Three GetMenu round trips per service scenario, including fresh CLI IPC client overhead; private session/system fixture bus; no power actions.",
+    "scenarios": [
+      {
+        "mode": "healthy",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          4.791,
+          5.537,
+          5.709
+        ],
+        "median_ms": 5.537,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ]
+      },
+      {
+        "mode": "slow",
+        "per_reply_delay_ms": 300,
+        "GetMenu_roundtrip_ms": [
+          4.873,
+          4.426,
+          4.758
+        ],
+        "median_ms": 4.758,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Checking KDE/logind power availability"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Checking KDE/logind power availability"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": true,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate"
+          }
+        ]
+      },
+      {
+        "mode": "missing",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          5.281,
+          4.426,
+          4.567
+        ],
+        "median_ms": 4.567,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.ServiceUnknown: The name org.freedesktop.PowerManagement was not provided by any .service files"
+          }
+        ]
+      },
+      {
+        "mode": "unresponsive",
+        "per_reply_delay_ms": 0,
+        "GetMenu_roundtrip_ms": [
+          4.709,
+          4.722,
+          4.452
+        ],
+        "median_ms": 4.709,
+        "initial_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Checking KDE/logind power availability"
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Checking KDE/logind power availability"
+          }
+        ],
+        "settled_presentation": [
+          {
+            "access_hint": "S",
+            "access_key": "S",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend",
+            "key": "0",
+            "kind": "command",
+            "title": "Sleep",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          },
+          {
+            "access_hint": "H",
+            "access_key": "H",
+            "close_before_run": false,
+            "enabled": false,
+            "icon": "system-suspend-hibernate",
+            "key": "1",
+            "kind": "command",
+            "title": "Hibernate",
+            "unavailable_reason": "Power management: org.freedesktop.DBus.Error.NoReply: Did not receive a reply. Possible causes include: the remote application did not send a reply, the message bus security policy blocked the reply, the reply timeout expired, or the network connection was broken."
+          }
+        ]
+      }
+    ]
+  },
+  "application_comparison": {
+    "environment": {
+      "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+      "qt": "6.8.2",
+      "python_test_client": "3.13.5",
+      "legacy_version": "Open Power Menu 1.0.1",
+      "native_version": "open-power-menu-native 2.1.0-dev"
+    },
+    "method": "Same container, private D-Bus, fake availability tools, software rendering; warm filesystem caches. Process RSS/PSS, not total desktop memory.",
+    "source_revisions": {
+      "native": "2937ac6+engineering-review",
+      "legacy": "34058480b6e3bc1ecc1f19d420fb744f570eca34"
+    },
+    "binary_sha256": {
+      "open-power-menu-native": "27d070e5abccc5227477808a3d4b4026f4fa881a0a75aa57a9564771dfa0c04b",
+      "open-power-menu-editor": "2f9a8aece362b7928601287e89262c64b0b2b6b31a049c72dc523b65d5760a67"
+    },
+    "configurations": {
+      "default": {
+        "legacy_1.0.1": {
+          "fresh_cli_process": {
+            "median_ms": 48.215,
+            "p95_ms": 50.687,
+            "samples": 25
+          },
+          "service_ready_ms_single_observation": 94.39,
+          "warm_GetMenu_roundtrip": {
+            "median_ms": 1.371,
+            "p95_ms": 1.539,
+            "samples": 200
+          },
+          "backend_memory": {
+            "Rss_KiB": 41876,
+            "Pss_KiB": 28714,
+            "Private_Clean_KiB": 276,
+            "Private_Dirty_KiB": 16892
+          },
+          "editor_memory_after_2s": {
+            "Rss_KiB": 77036,
+            "Pss_KiB": 64276,
+            "Private_Clean_KiB": 9688,
+            "Private_Dirty_KiB": 43368
+          },
+          "editor_mapped_memory_after_2s": {
+            "other_files": {
+              "Rss_KiB": 43884,
+              "Pss_KiB": 32269
+            },
+            "anonymous": {
+              "Rss_KiB": 20356,
+              "Pss_KiB": 20348
+            },
+            "Python_PySide_files": {
+              "Rss_KiB": 12796,
+              "Pss_KiB": 11652
+            }
+          }
+        },
+        "native_2.0_dev": {
+          "fresh_cli_process": {
+            "median_ms": 5.538,
+            "p95_ms": 6.001,
+            "samples": 25
+          },
+          "service_ready_ms_single_observation": 8.684,
+          "warm_GetMenu_roundtrip": {
+            "median_ms": 0.656,
+            "p95_ms": 0.786,
+            "samples": 200
+          },
+          "backend_memory": {
+            "Rss_KiB": 15776,
+            "Pss_KiB": 8658,
+            "Private_Clean_KiB": 512,
+            "Private_Dirty_KiB": 2604
+          },
+          "editor_memory_after_2s": {
+            "Rss_KiB": 81460,
+            "Pss_KiB": 73369,
+            "Private_Clean_KiB": 1200,
+            "Private_Dirty_KiB": 65620
+          },
+          "editor_mapped_memory_after_2s": {
+            "other_files": {
+              "Rss_KiB": 41728,
+              "Pss_KiB": 33637
+            },
+            "anonymous": {
+              "Rss_KiB": 18204,
+              "Pss_KiB": 18196
+            },
+            "Qt_Quick_Qml_KDE_files": {
+              "Rss_KiB": 21528,
+              "Pss_KiB": 21528
+            }
+          }
+        }
+      },
+      "custom_200_commands": {
+        "legacy_1.0.1": {
+          "fresh_cli_process": {
+            "median_ms": 59.5,
+            "p95_ms": 63.13,
+            "samples": 25
+          },
+          "service_ready_ms_single_observation": 89.417,
+          "warm_GetMenu_roundtrip": {
+            "median_ms": 8.564,
+            "p95_ms": 8.916,
+            "samples": 200
+          },
+          "backend_memory": {
+            "Rss_KiB": 42800,
+            "Pss_KiB": 29512,
+            "Private_Clean_KiB": 276,
+            "Private_Dirty_KiB": 17552
+          },
+          "editor_memory_after_2s": {
+            "Rss_KiB": 78676,
+            "Pss_KiB": 65872,
+            "Private_Clean_KiB": 10004,
+            "Private_Dirty_KiB": 44572
+          },
+          "editor_mapped_memory_after_2s": {
+            "other_files": {
+              "Rss_KiB": 43568,
+              "Pss_KiB": 31911
+            },
+            "anonymous": {
+              "Rss_KiB": 21864,
+              "Pss_KiB": 21856
+            },
+            "Python_PySide_files": {
+              "Rss_KiB": 13244,
+              "Pss_KiB": 12098
+            }
+          }
+        },
+        "native_2.0_dev": {
+          "fresh_cli_process": {
+            "median_ms": 8.295,
+            "p95_ms": 10.549,
+            "samples": 25
+          },
+          "service_ready_ms_single_observation": 9.034,
+          "warm_GetMenu_roundtrip": {
+            "median_ms": 4.248,
+            "p95_ms": 4.617,
+            "samples": 200
+          },
+          "backend_memory": {
+            "Rss_KiB": 15808,
+            "Pss_KiB": 8881,
+            "Private_Clean_KiB": 552,
+            "Private_Dirty_KiB": 2884
+          },
+          "editor_memory_after_2s": {
+            "Rss_KiB": 80368,
+            "Pss_KiB": 72267,
+            "Private_Clean_KiB": 1196,
+            "Private_Dirty_KiB": 64584
+          },
+          "editor_mapped_memory_after_2s": {
+            "other_files": {
+              "Rss_KiB": 41828,
+              "Pss_KiB": 33727
+            },
+            "anonymous": {
+              "Rss_KiB": 17024,
+              "Pss_KiB": 17016
+            },
+            "Qt_Quick_Qml_KDE_files": {
+              "Rss_KiB": 21516,
+              "Pss_KiB": 21516
+            }
+          }
+        }
+      }
+    },
+    "program_payload_bytes": {
+      "native_backend": 608920,
+      "native_editor": 620880,
+      "legacy_python_sources": 173531
+    }
+  },
+  "editor_stress_runs": [
+    {
+      "qt": "6.8.2",
+      "samples": [
+        {
+          "Pss_KiB": 79839,
+          "Rss_KiB": 82020,
+          "phase": "startup_general_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 80035,
+          "Rss_KiB": 82216,
+          "phase": "layout",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 80371,
+          "Rss_KiB": 82552,
+          "phase": "backups_preview",
+          "qml_objects": 1807
+        },
+        {
+          "Pss_KiB": 102575,
+          "Rss_KiB": 104756,
+          "phase": "after_100_edits_10_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100795,
+          "Rss_KiB": 102976,
+          "phase": "after_200_edits_20_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102899,
+          "Rss_KiB": 105080,
+          "phase": "after_300_edits_30_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102847,
+          "Rss_KiB": 105028,
+          "phase": "after_400_edits_40_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100767,
+          "Rss_KiB": 102948,
+          "phase": "after_500_edits_50_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100759,
+          "Rss_KiB": 102940,
+          "phase": "reloaded_idle_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 87591,
+          "Rss_KiB": 89772,
+          "phase": "diagnostic_allocator_trim",
+          "qml_objects": 1805
+        }
+      ]
+    },
+    {
+      "qt": "6.8.2",
+      "samples": [
+        {
+          "Pss_KiB": 79907,
+          "Rss_KiB": 82128,
+          "phase": "startup_general_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 79991,
+          "Rss_KiB": 82212,
+          "phase": "layout",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 80327,
+          "Rss_KiB": 82548,
+          "phase": "backups_preview",
+          "qml_objects": 1807
+        },
+        {
+          "Pss_KiB": 102463,
+          "Rss_KiB": 104684,
+          "phase": "after_100_edits_10_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100683,
+          "Rss_KiB": 102904,
+          "phase": "after_200_edits_20_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102779,
+          "Rss_KiB": 105000,
+          "phase": "after_300_edits_30_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102663,
+          "Rss_KiB": 104884,
+          "phase": "after_400_edits_40_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100647,
+          "Rss_KiB": 102868,
+          "phase": "after_500_edits_50_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100639,
+          "Rss_KiB": 102860,
+          "phase": "reloaded_idle_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 87199,
+          "Rss_KiB": 89420,
+          "phase": "diagnostic_allocator_trim",
+          "qml_objects": 1805
+        }
+      ]
+    },
+    {
+      "qt": "6.8.2",
+      "samples": [
+        {
+          "Pss_KiB": 80085,
+          "Rss_KiB": 82316,
+          "phase": "startup_general_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 80165,
+          "Rss_KiB": 82396,
+          "phase": "layout",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 80521,
+          "Rss_KiB": 82752,
+          "phase": "backups_preview",
+          "qml_objects": 1807
+        },
+        {
+          "Pss_KiB": 102653,
+          "Rss_KiB": 104884,
+          "phase": "after_100_edits_10_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100869,
+          "Rss_KiB": 103100,
+          "phase": "after_200_edits_20_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102969,
+          "Rss_KiB": 105200,
+          "phase": "after_300_edits_30_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 102853,
+          "Rss_KiB": 105084,
+          "phase": "after_400_edits_40_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100909,
+          "Rss_KiB": 103140,
+          "phase": "after_500_edits_50_dialog_cycles",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 100901,
+          "Rss_KiB": 103132,
+          "phase": "reloaded_idle_2s",
+          "qml_objects": 1805
+        },
+        {
+          "Pss_KiB": 87377,
+          "Rss_KiB": 89608,
+          "phase": "diagnostic_allocator_trim",
+          "qml_objects": 1805
+        }
+      ]
+    }
+  ],
+  "baseline_backend_sha256": "63741895dc9e14f798685e67aa33663fa66b45a64851c4a776401aef962ee730",
+  "measured_source_sha256": {
+    "native/editor_catalog.cpp": "8f02a8509b61d39ea5dfc82750036a9700f7404bbe422d4cedde9223c3867897",
+    "native/editor_catalog.hpp": "03224f79ff52935cf1051df4987adee63401fad2d7be51a79d96d823f028cfd3",
+    "native/main.cpp": "261cd145d97f40cf8431386fd6cec411278d4e4a9698124c30635ee936ba5390",
+    "native/model.cpp": "db0f5eac91c2ab233eb11ce332f46f8294838deb7f609b02394f89fdc4d26cce",
+    "native/model.hpp": "71e20179b20c80b682823ed1278e5939a735afb2b3a60851b9dccf0fdbab675e",
+    "native/power.cpp": "f2762807a01e599d02f69767183c772bcc485740c1b89f587daa2256c6fadc38",
+    "native/power.hpp": "409d3525c50edff34d607c4f4136fe285687012961e9fe3a7653cea946182e27",
+    "native/qml/EntryDialog.qml": "59469b1794eb6cf452271953bf9174b8414d29f5d6e546de12c03f419b96d56e",
+    "native/qml/Main.qml": "6631fe7a9c8e616090a27deb444fcf9804088d63b191de74dd7c71f2fb4ea154",
+    "native/service.cpp": "e8c31f39a5bef91922b47835d416cc148372296b8bbe4b79f6addbc7368d855e",
+    "native/service.hpp": "e5af9978740633660b483243abd4ec1e0b4856fe530914b16ecf60539219be4c",
+    "native/standalone.cpp": "c3b8ff3bd0ad4727ca392fa2d5078c571b4fd6e105e4f364f71e2d7d1c60a3b3",
+    "native/standalone.hpp": "7849125a3557c06076508cbf50821b5f8244fdb35e8a4e79e9900411a81ff201",
+    "native/standalone_main.cpp": "15652c35b7e563a6454c043280c2e4b9891417b88d1ec33e5b702c103ce0541e",
+    "native/tests/contract.py": "917ccd28de7ff3f8f36af93ce6f073c6586a667ef83cdd9dd0346b222d53e2c7",
+    "native/tests/editor_gui_test.cpp": "9419c2267289846ea162f2fd37e696b57a18fa281240cea70762df97ce9988c7",
+    "native/tests/interaction_test.cpp": "fe695c895b94b7849fd0bb6f1a3afff6cc1205b127bc387041cfa29c052702ed",
+    "native/tests/power_benchmark.py": "19d8676df7342adcccbafda7ca5e67b77cf9b8e30ec8a15d325243889bc2389b",
+    "native/tests/standalone_test.cpp": "fe21c4d0eb1d9681a37995a5c0f7e40cbdd35c984888ad683b5a78f5d404dda9",
+    "plasmoid/contents/ui/main.qml": "8391c23833ee599b943357e9447be90634976b341636670c3e7b8b5c73ba8c1d"
+  }
+}

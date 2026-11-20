@@ -67,7 +67,7 @@ class ArchitectureTests(unittest.TestCase):
                      'if (!active) reset();', 'restoreAppGridPassThrough();',
                      'owner.setInputRect(win, 0, 0, 0, 0)', 'bridge.launcherOpened();'):
             self.assertIn(part, q)
-        self.assertIn('onLauncherOpened: root.onOriginalLauncherOpened()',
+        self.assertIn('onLauncherOpened: root.onOriginalLauncherOpened("AppGridPanelBridge.launcherOpened")',
                       (UI/'main.qml').read_text())
 
 

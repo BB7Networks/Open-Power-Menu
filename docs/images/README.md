@@ -1,4 +1,10 @@
-# Screenshot gallery
+# Historical screenshot gallery
+
+These images are preserved from earlier releases. They are historical evidence,
+not the current native 2.1 configuration reference. See the [new native visual
+tour](../../README.md), [capture provenance](../SHOWCASE.md) and
+[2.1 image inventory](2.1/image-inventory.csv). All original filenames and pixels
+remain intact.
 
 ## Put it where you prefer
 
@@ -33,5 +39,5 @@ at full size.
 <img src="combined-launcher.png" alt="Power User Menu with a combined launcher button" width="420">
 
 [Appearance and menu preferences](../../README.md#configure-your-menu) ·
-[Capture and release review](../RELEASE-1.0.1.md#screenshot-provenance) ·
-[Earlier capture notes](../MENU-FLYOUT-UX.md#screenshots)
+[Capture and release review](../history/releases/RELEASE-1.0.1.md#screenshot-provenance) ·
+[Earlier capture notes](../history/0.x-and-1.0/MENU-FLYOUT-UX.md#screenshots)
