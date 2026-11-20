@@ -69,7 +69,9 @@ Installer tests cover clean install, same-version reinstall, actual released
 1.0.1/RC1/RC2 upgrades and rollback, preserved custom data/panels/shortcuts,
 interruption/recovery, removal, corrupt/missing payload, native input plugin,
 missing dependencies, symlink/path refusal and home/extraction paths with spaces.
-Independent runtime images exercise the actual extracted EZ wrapper offline,
+Both X11 and virtual KWin Wayland also install the extracted EZ payload, activate
+the installed backend and Configure editor, capture its first frame, and uninstall
+from a private profile. Independent runtime images exercise the actual extracted EZ wrapper offline,
 without compilers or PySide6 (and without Python where the OS permits).
 
 The Power Actions control now uses its measured natural width, bounded by its
@@ -114,7 +116,7 @@ window palette. No desktop settings are changed. Power entries are never invoked
 
 ## Changed-file inventory
 
-25 files differ from RC2:
+26 files differ from RC2:
 
 - `.dockerignore`
 - `.github/workflows/tests.yml`
@@ -134,6 +136,7 @@ window palette. No desktop settings are changed. Power entries are never invoked
 - `native/tests/editor-appearance.sh`
 - `native/tests/editor.Dockerfile`
 - `native/tests/editor_gui_test.cpp`
+- `native/tests/ez-desktop-smoke.sh`
 - `native/tests/package-runtime-smoke.sh`
 - `native/tests/packaging.Dockerfile`
 - `native/tests/packaging.py`

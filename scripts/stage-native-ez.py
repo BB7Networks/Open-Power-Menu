@@ -37,6 +37,11 @@ def main():
     for distro, prefix, os_id, os_version in [('Manjaro','native','manjaro','unknown'),
             ('Debian','install','debian','13'),('Kubuntu','install','ubuntu','26.04')]:
         directory = args.evidence/('opm-'+prefix+'-'+distro+'-'+args.commit)
+        for platform in ('xcb','wayland'):
+            if (directory/('ez-desktop-'+platform)).read_text().strip() != 'passed':
+                raise ValueError('Installed EZ desktop activation missing: '+distro+' '+platform)
+            if not (directory/('installed-editor-'+platform+'.png')).is_file():
+                raise ValueError('Installed editor capture missing: '+distro+' '+platform)
         bundles = list(directory.glob('OpenPowerMenu-*.tar.gz'))
         archives = list(directory.glob('OpenPowerMenu-EZ-*.zip'))
         if len(bundles) != 1 or len(archives) != 1: raise ValueError('Incomplete artifacts: '+distro)

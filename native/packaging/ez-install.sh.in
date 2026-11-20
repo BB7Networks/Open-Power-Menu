@@ -86,7 +86,7 @@ if [[ $approved != true ]]; then
 fi
 if [[ $mode = install ]]; then
     # Native code retains OS, hash, ELF, plugin, safe-path and transaction checks.
-    if ! bash "$bundle/install.sh"; then dependency_help; fail 'Native installation failed; retain this archive for --recover or --rollback.'; fi
+    if ! bash "$bundle/install.sh"; then fail 'Native installation failed; read the diagnostic above and README-INSTALL.md. Retain this archive for --recover or --rollback.'; fi
     printf '\n%s\n' 'Installed. For a new setup: panel → Add Widgets → Open Power Menu Start Button.'
     printf '%s\n' 'For an upgrade, keep the existing applet and original launcher. Do not recreate the panel.'
     printf '%s\n' 'If Plasma has cached an older widget, sign out and back in when convenient. No session restart was performed.'

@@ -39,7 +39,9 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
     XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python src/Open-Power-Menu/native/tests/application_resolution.py \
       --probe src/build/native/native-application-probe --live-audit artifacts/applications.json && \
-    printf '%s\n' 'Stable 2.1.0 preparation artifacts; publication not approved. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt
+    printf '%s\n' 'Stable 2.1.0 preparation artifacts; publication not approved. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt && \
+    xvfb-run -a sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* xcb artifacts && \
+    dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh src/Open-Power-Menu/native/tests/standalone-wayland.sh sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* wayland artifacts
 # The workflow runs all four keyboard seats in this build image with networking
 # disabled, then collects their evidence alongside the sealed runtime artifacts.
 # Test actual legacy migration and all transaction fault paths in a separate
@@ -81,6 +83,8 @@ RUN pacman -U --noconfirm /opt/opm-artifacts/*.pkg.tar.zst && \
         printf '%s\n%s\n' "$binary" "$libraries"; \
         case "$libraries" in *'not found'*) exit 1;; esac; \
     done
+RUN if bash /opt/opm-ez/*/install.sh --yes > /tmp/root-refusal.log 2>&1; then exit 1; fi && \
+    grep -q 'without sudo' /tmp/root-refusal.log
 COPY --chmod=0644 native/tests/package-runtime-smoke.sh /usr/local/libexec/opm-package-smoke.sh
 ENV LANG=C.UTF-8 OPM_TEST_BUNDLE=/usr/lib/open-power-menu-native/bundle OPM_TEST_SETUP=/usr/bin/open-power-menu-native-setup
 USER 1000:1000

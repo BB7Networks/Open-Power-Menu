@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qml6-module-org-kde-kirigami qml6-module-qtquick-controls \
     qml6-module-qtquick-dialogs qml6-module-qtquick-layouts \
     qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-    plasma-workspace unzip qt6-svg-plugins qt6-qpa-plugins qt6-wayland xvfb xauth systemd python3 python3-pyside6.qtdbus python3-pyside6.qtwidgets && rm -rf /var/lib/apt/lists/* && \
+    plasma-workspace kwin-wayland unzip qt6-svg-plugins qt6-qpa-plugins qt6-wayland xvfb xauth systemd python3 python3-pyside6.qtdbus python3-pyside6.qtwidgets && rm -rf /var/lib/apt/lists/* && \
     (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
 RUN chown 1000:1000 /src
 USER 1000:1000
@@ -31,6 +31,8 @@ RUN umask 022 && cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release
     cmake --build /tmp/build --target native-package --parallel 2 && \
     python3 native/packaging/prepare-ez.py --bundle /tmp/build/native-bundle --output /tmp/ez-final && unzip -q /tmp/ez-final/*.zip -d /tmp/ez-final/root && \
     mkdir /tmp/qualification && cp /tmp/packaging-tests.xml /tmp/qualification/ && \
+    xvfb-run -a sh native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* xcb /tmp/qualification && \
+    dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh sh native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* wayland /tmp/qualification && \
     cp /tmp/build/OpenPowerMenu-*.tar.gz /tmp/build/OpenPowerMenu-*.sha256 /tmp/ez-final/*.zip /tmp/ez-final/*.sha256 /tmp/qualification/ && \
     cp /tmp/build/native-bundle/bundle.json /tmp/qualification/ && \
     cp /etc/os-release /tmp/qualification/os-release && dpkg-query -W > /tmp/qualification/packages.txt && \
@@ -49,7 +51,9 @@ COPY --from=build /tmp/build/native-bundle /opt/opm-bundle
 COPY --from=build /tmp/ez-final/root/ /opt/opm-ez/
 COPY --from=build /tmp/qualification /opt/opm-evidence
 COPY --chmod=0644 native/tests/package-runtime-smoke.sh /usr/local/libexec/opm-package-smoke.sh
-RUN ! command -v python3 && ! command -v g++
+RUN ! command -v python3 && ! command -v g++ && \
+    if bash /opt/opm-ez/*/install.sh --yes > /tmp/root-refusal.log 2>&1; then exit 1; fi && \
+    grep -q 'without sudo' /tmp/root-refusal.log
 USER 1000:1000
 ENV LANG=C.UTF-8
 CMD ["sh", "/usr/local/libexec/opm-package-smoke.sh"]
