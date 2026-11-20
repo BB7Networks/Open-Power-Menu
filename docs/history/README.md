@@ -15,3 +15,9 @@ Historical Git tags and public assets are unchanged. The
 [Phase 1 evidence](2.1-development/EZ-INSTALLER-PHASE1.md) remains explicitly staged
 and includes its original file inventory. The current
 [cleanup inventory](../maintenance/phase2-inventory.csv) records every baseline move.
+
+Some historical Actions artifact links now return 404 because their retention
+period ended or the artifact was removed. Their run links and recorded checksums
+remain historical evidence, not current installation downloads. Current review
+builds are linked from the stacked cleanup PR; published historical releases
+remain on GitHub Releases.

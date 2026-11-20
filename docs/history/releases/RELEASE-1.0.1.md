@@ -35,7 +35,7 @@ which calls `setShowingDesktop(!showingDesktop())`.
 
 The registered component is `org.kde.kglobalaccel`, `/component/kwin`,
 `org.kde.kglobalaccel.Component`. Its
-[interface](https://github.com/KDE/kglobalaccel/blob/Plasma/6.3/src/org.kde.kglobalaccel.Component.xml)
+[interface](https://github.com/KDE/kglobalaccel/blob/v6.10.0/src/org.kde.kglobalaccel.Component.xml)
 provides read-only `shortcutNames` discovery and `invokeShortcut`, taking the
 exact action ID. OPM verifies registration before offering the builtin; the
 availability probe has a two-second timeout and a 30-second cache.

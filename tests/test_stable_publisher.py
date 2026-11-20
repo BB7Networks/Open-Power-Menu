@@ -141,3 +141,22 @@ def test_local_asset_failure_precedes_api(qualified, damage):
     github = FakeGitHub()
     with pytest.raises(ValueError): run(qualified, github)
     assert github.calls == []
+
+
+def test_asset_names_match_cmake_archiver(tmp_path):
+    """Exercise the real naming template, including Manjaro's unknown -> rolling."""
+    import shutil
+    import subprocess
+    if not shutil.which('cmake'):
+        pytest.skip('CMake naming is also exercised by all distribution packaging jobs')
+    for os_id, os_version in [('manjaro','unknown'),('debian','13'),('ubuntu','26.04')]:
+        build=tmp_path/os_id;widget=build/'native-bundle/widget/contents';widget.mkdir(parents=True)
+        (widget.parent/'metadata.json').write_text('{}')
+        (build/'native-bundle/bundle.json').write_text(json.dumps({'os':os_id,'os_version':os_version,'cpu':'x86_64'}))
+        source=(ROOT/'native/packaging/archive.cmake.in').read_text()
+        for key,value in {'CMAKE_BINARY_DIR':str(build),'OPM_VERSION':'2.1.0','CMAKE_COMMAND':shutil.which('cmake')}.items():
+            source=source.replace('@'+key+'@',value)
+        script=build/'archive.cmake';script.write_text(source)
+        subprocess.run(['cmake','-P',str(script)],check=True,capture_output=True)
+        archives=list(build.glob('*.tar.gz'))
+        assert len(archives)==1 and archives[0].name in assets.payload_names()

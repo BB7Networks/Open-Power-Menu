@@ -66,8 +66,10 @@ Local qualification before the CI run:
 
 - Full local suite: 571 passed, 8 skipped, 18 subtests passed.
 - 71 targeted legacy path, root entrypoint and stable-publisher tests passed.
-- 241 local documentation links/anchors resolve; 53 distinct external URLs are
-  inventoried separately. Historical external source/evidence links are preserved;
+- 241 local documentation links/anchors resolve; 53 distinct external URLs were checked: 43 returned 200; six historical
+  Actions artifact links are unavailable, the planned stable release is not yet
+  published, and Python/systemd documentation hosts were unreachable. One broken
+  historical KDE interface link was corrected to the verified Frameworks tag. Historical external source/evidence links are preserved;
   Actions links can require sign-in or expire. GitHub's release API confirms
   v1.0.1, RC1 and RC2 remain available. The future v2.1.0 URL is explicitly labelled.
 - 109 protected runtime/installer/gallery files match approved Phase 1 SHA-256s.

@@ -6,7 +6,7 @@ import re
 
 VERSION = '2.1.0'
 REPOSITORY = 'BB7Networks/Open-Power-Menu'
-TARGETS = [('Manjaro', 'manjaro-unknown'), ('Debian13', 'debian-13'), ('Kubuntu26.04', 'ubuntu-26.04')]
+TARGETS = [('Manjaro', 'manjaro-rolling'), ('Debian13', 'debian-13'), ('Kubuntu26.04', 'ubuntu-26.04')]
 
 
 def payload_names():
