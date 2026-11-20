@@ -71,8 +71,11 @@ interruption/recovery, removal, corrupt/missing payload, native input plugin,
 missing dependencies, symlink/path refusal and home/extraction paths with spaces.
 Both X11 and virtual KWin Wayland also install the extracted EZ payload, activate
 the installed backend and Configure editor, capture its first frame, and uninstall
-from a private profile. Independent runtime images exercise the actual extracted EZ wrapper offline,
-without compilers or PySide6 (and without Python where the OS permits).
+from a private profile. Independent minimal runtime images verify activation,
+installation and rollback without Python on Debian/Ubuntu/Arch; Manjaro retains
+its distro-required Python without PySide6. A subsequent image adds the actual
+Plasma packages and exercises the extracted EZ wrapper offline. These full
+Plasma images include distro Python dependencies but no PySide6 or compilers.
 
 The Power Actions control now uses its measured natural width, bounded by its
 parent. GUI tests exercise 620/960/1280 logical-pixel windows, real popup contents,
@@ -116,7 +119,7 @@ window palette. No desktop settings are changed. Power entries are never invoked
 
 ## Changed-file inventory
 
-26 files differ from RC2:
+27 files differ from RC2:
 
 - `.dockerignore`
 - `.github/workflows/tests.yml`
@@ -141,6 +144,7 @@ window palette. No desktop settings are changed. Power entries are never invoked
 - `native/tests/packaging.Dockerfile`
 - `native/tests/packaging.py`
 - `native/tests/pacman.Dockerfile`
+- `native/tests/plasma_popup.py`
 - `scripts/prepare-native-release.py`
 - `scripts/stage-native-ez.py`
 - `tests/test_ez_package.py`

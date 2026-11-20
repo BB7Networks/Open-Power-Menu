@@ -37,6 +37,8 @@ def main():
     for distro, prefix, os_id, os_version in [('Manjaro','native','manjaro','unknown'),
             ('Debian','install','debian','13'),('Kubuntu','install','ubuntu','26.04')]:
         directory = args.evidence/('opm-'+prefix+'-'+distro+'-'+args.commit)
+        if (directory/'native-runtime-smoke').read_text().strip() != 'passed':
+            raise ValueError('Independent minimal native runtime missing: '+distro)
         for platform in ('xcb','wayland'):
             if (directory/('ez-desktop-'+platform)).read_text().strip() != 'passed':
                 raise ValueError('Installed EZ desktop activation missing: '+distro+' '+platform)
@@ -69,7 +71,10 @@ def main():
     report.update(stage='Phase 1 review; stable publication NOT approved', ez_artifacts=artifacts,
                   baseline='2f889df3e5b29f49611f8cf37f41f15e86cad7c1', runtime_installation='Native and extracted EZ; offline')
     (args.output/'QUALIFICATION.json').write_text(json.dumps(report,indent=2)+'\n')
-    shutil.copy2(ROOT/'docs/EZ-INSTALLER-PHASE1.md',args.output/'PHASE1-REVIEW.md')
+    review = (ROOT/'docs/EZ-INSTALLER-PHASE1.md').read_text().replace(
+        '](images/phase1/', '](https://raw.githubusercontent.com/BB7Networks/Open-Power-Menu/'
+        + args.commit + '/docs/images/phase1/')
+    (args.output/'PHASE1-REVIEW.md').write_text(review)
     hashes=''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n'
                   for p in sorted(args.output.iterdir()) if p.is_file() and p.name != 'SHA256SUMS')
     (args.output/'SHA256SUMS').write_text(hashes)

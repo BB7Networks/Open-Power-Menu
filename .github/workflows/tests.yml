@@ -168,7 +168,7 @@ jobs:
       - name: Expose installation qualification failures
         if: failure()
         run: python3 scripts/report-ci-failure.py work/packaging-build.log
-      - name: Install, activate, reinstall, remove and roll back without Python
+      - name: Exercise EZ installation and rollback without PySide6 or a compiler
         run: docker run --rm --network none opm-native-package:test
       - name: Collect independent installation evidence
         run: |

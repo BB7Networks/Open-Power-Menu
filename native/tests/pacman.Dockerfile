@@ -57,7 +57,7 @@ RUN cmake -S src/Open-Power-Menu -B src/build -DOPM_INSTALL_TEST_HOOKS=ON && \
     python src/Open-Power-Menu/native/packaging/prepare-ez.py --allow-arch-test --bundle src/build/native-bundle --output /tmp/ez-test && unzip -q /tmp/ez-test/*.zip -d /tmp/ez-test/root && \
     python src/Open-Power-Menu/native/tests/packaging.py --bundle src/build/native-bundle --legacy /src/work/package-legacy --rc1-bundle /tmp/rc1-build/native-bundle --rc2-bundle /tmp/rc2-build/native-bundle --ez /tmp/ez-test/root/* -v
 
-FROM ${OPM_BASE_IMAGE}
+FROM ${OPM_BASE_IMAGE} AS native-runtime
 ARG OPM_ARCH_SNAPSHOT
 ARG OPM_RUNTIME_PYTHON=absent
 ENV OPM_TEST_RUNTIME_PYTHON=${OPM_RUNTIME_PYTHON}
@@ -65,8 +65,7 @@ RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
         printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
     fi
 RUN pacman -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
-    kirigami kservice kconfig kde-cli-tools dbus plasma-workspace && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
-COPY --from=build /tmp/ez-final/root/ /opt/opm-ez/
+    kirigami kservice kconfig kde-cli-tools dbus && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
 COPY --from=build /src/work/pacman-source/artifacts /opt/opm-artifacts
 RUN pacman -U --noconfirm /opt/opm-artifacts/*.pkg.tar.zst && \
     pacman -Q > /opt/opm-artifacts/runtime-packages.txt && \
@@ -83,9 +82,22 @@ RUN pacman -U --noconfirm /opt/opm-artifacts/*.pkg.tar.zst && \
         printf '%s\n%s\n' "$binary" "$libraries"; \
         case "$libraries" in *'not found'*) exit 1;; esac; \
     done
-RUN if bash /opt/opm-ez/*/install.sh --yes > /tmp/root-refusal.log 2>&1; then exit 1; fi && \
-    grep -q 'without sudo' /tmp/root-refusal.log
 COPY --chmod=0644 native/tests/package-runtime-smoke.sh /usr/local/libexec/opm-package-smoke.sh
 ENV LANG=C.UTF-8 OPM_TEST_BUNDLE=/usr/lib/open-power-menu-native/bundle OPM_TEST_SETUP=/usr/bin/open-power-menu-native-setup
+USER 1000:1000
+RUN --network=none sh /usr/local/libexec/opm-package-smoke.sh && printf 'passed\n' > /tmp/native-runtime-smoke
+
+# Preserve the independent minimal runtime test before adding Plasma, whose
+# distribution dependencies may include Python. OPM still requires no PySide6.
+FROM native-runtime
+USER 0:0
+RUN pacman -S --noconfirm --needed plasma-workspace && \
+    python3 -c 'import importlib.util; assert importlib.util.find_spec("PySide6") is None' && \
+    cp /tmp/native-runtime-smoke /opt/opm-artifacts/native-runtime-smoke && \
+    pacman -Q > /opt/opm-artifacts/runtime-packages.txt
+COPY --from=build /tmp/ez-final/root/ /opt/opm-ez/
+ENV OPM_TEST_RUNTIME_PYTHON=distro
+RUN if bash /opt/opm-ez/*/install.sh --yes > /tmp/root-refusal.log 2>&1; then exit 1; fi && \
+    grep -q 'without sudo' /tmp/root-refusal.log
 USER 1000:1000
 CMD ["sh", "/usr/local/libexec/opm-package-smoke.sh"]
