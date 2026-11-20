@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify qualified native assets before creating a GitHub prerelease."""
+"""Verify qualified native assets locally; this script cannot publish or tag."""
 import argparse
 import hashlib
 import io
@@ -155,13 +155,14 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--commit', required=True)
     parser.add_argument('--tag', required=True)
-    parser.add_argument('--staging', action='store_true', help='Verify final-version staging assets without publishing or tagging')
+    parser.add_argument('--allow-final-version', '--staging', dest='allow_final_version', action='store_true',
+                        help='Allow final-version assets; verification never publishes or tags')
     parser.add_argument('--distribution-evidence', type=Path,
                         help='Required by publication: artifacts from the same run for all other distributions')
     args = parser.parse_args()
     version = (ROOT/'native/VERSION').read_text().strip()
-    if args.tag != 'v'+version or ('-rc' not in version and not args.staging):
-        raise ValueError('Only the matching native prerelease tag may publish')
+    if args.tag != 'v'+version or ('-rc' not in version and not args.allow_final_version):
+        raise ValueError('Require the matching version and explicit final-version verification opt-in')
     current = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if current != args.commit or (args.artifacts/'SOURCE-COMMIT').read_text().strip() != current:
         raise ValueError('Checkout/artifact source commit mismatch')

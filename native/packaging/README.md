@@ -1,8 +1,10 @@
-# Complete native 2.1.0 bundle and EZ staging
+# Native 2.1.0 packaging and installation
 
-Phase 1 builds use the final version **2.1.0** for review. Stable tagging,
-publication and repository cleanup are not approved. No additional RC is created.
-See [Phase 1 installation and qualification](../../docs/EZ-INSTALLER-PHASE1.md).
+Build distribution-specific EZ installers and sealed bundles. Stable publication
+requires the [reviewed publication procedure](../../docs/PUBLISHING.md); no
+additional release candidate is created. User setup is in
+[installation](../../docs/INSTALLATION.md).
+
 Power actions can execute immediately; existing preferences/custom commands are
 preserved. Use private mocks for power acceptance and never install as root.
 
@@ -34,7 +36,7 @@ the published Manjaro binaries on these systems:
 Distribution builds record the exact Git commit in `bundle.json` and
 `SOURCE-COMMIT`. CMake discovers it from a checkout; archive builders must pass
 `-DOPM_SOURCE_COMMIT=<40-character-commit>`. The pacman preparation helper pins
-both the source checksum and commit automatically. The prerelease workflow
+both the source checksum and commit automatically. The stable publication workflow
 verifies the source tree and packaged bundle before publishing persistent assets.
 
 The bundle includes all three native applications, native CLI/installer,
@@ -122,7 +124,7 @@ PySide6, compiler or QML executable engine is required for installation/removal.
 A kernel supporting pidfds (Linux 5.3+) is needed to retire a running service.
 
 The Store widget requires the native backend separately. It does not download or
-run an installer. See docs/KDE-STORE.md and docs/TESTING.md in the source repository.
+run an installer. See [KDE Store requirements](../../docs/KDE-STORE.md) and [testing](../../docs/TESTING.md).
 
 
 ## 2.1 optional cleanup and rolling distributions
@@ -168,7 +170,7 @@ source commit, os-release and build/runtime package inventories for 90 days.
 Tag qualification publishes the verified Manjaro package, complete native bundle,
 source archive, checksums and qualification inventory as a GitHub prerelease.
 Actions artifacts alone are not public releases or physical Plasma certification.
-See [qualification results](../../docs/OPM-2.1-RESULTS.md) for the tested snapshots.
+See [qualification results](../../docs/history/2.1-development/OPM-2.1-RESULTS.md) for the tested snapshots.
 Keep distribution/version/CPU, hash, ELF, plugin and activation checks intact.
 Platform validation uses the plugins' advertised xcb/wayland capabilities and still
 loads them to check Qt compatibility; it does not depend on a particular filename.

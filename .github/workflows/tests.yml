@@ -294,9 +294,14 @@ jobs:
       - run: python -m pip install pytest
       - run: python -m pytest -q
       - run: python -m compileall -q openpowermenu tests run.py
+      - run: python scripts/audit-repository.py
+      - name: Verify the approved Phase 2 maintenance boundary
+        if: github.head_ref == 'maintenance/2.1.0-repository-cleanup' || github.ref == 'refs/heads/maintenance/2.1.0-repository-cleanup'
+        run: python scripts/audit-repository.py --phase2
       - name: Check every shell script
         run: |
-          for script in install.sh uninstall.sh scripts/*.sh tools/*.sh; do
+          shopt -s nullglob
+          for script in install.sh uninstall.sh scripts/*.sh tools/*.sh legacy/1.0.1/*.sh legacy/1.0.1/scripts/*.sh native/packaging/*.sh native/packaging/*.sh.in native/tests/*.sh; do
             bash -n "$script"
           done
   qt-runtime:
@@ -339,8 +344,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
 
   stage-ez:
-    name: Stage 2.1.0 EZ installers for Phase 1 review
-    if: github.event_name != 'pull_request' && startsWith(github.ref, 'refs/heads/release/2.1.0-')
+    name: Stage 2.1.0 EZ installers for review
+    if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/heads/release/2.1.0-') || startsWith(github.ref, 'refs/heads/maintenance/2.1.0-'))
     needs: [native-pacman, native-packaging, native-standalone, native-editor, native-runtime, portable, qt-runtime]
     runs-on: ubuntu-24.04
     permissions:
@@ -353,10 +358,14 @@ jobs:
           path: qualification-evidence
       - name: Verify exact source, native binaries and all three EZ archives
         run: |
-          python3 scripts/stage-native-ez.py --evidence qualification-evidence --output phase1-assets --commit "$GITHUB_SHA"
-          (cd phase1-assets && sha256sum -c SHA256SUMS)
+          python3 scripts/stage-native-ez.py --evidence qualification-evidence --output review-assets --commit "$GITHUB_SHA"
+          (cd review-assets && sha256sum -c SHA256SUMS)
+      - name: Validate the final public asset set without publishing
+        run: |
+          python3 scripts/stage-native-ez.py --publication --evidence qualification-evidence --output publication-check --commit "$GITHUB_SHA"
+          python3 scripts/publish-stable-release.py --assets publication-check --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         with:
-          name: opm-2.1.0-phase1-${{ github.sha }}
-          path: phase1-assets/
+          name: opm-2.1.0-review-${{ github.sha }}
+          path: review-assets/
           retention-days: 90

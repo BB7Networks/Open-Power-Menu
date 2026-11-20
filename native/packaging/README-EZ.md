@@ -1,12 +1,13 @@
 # Open Power Menu 2.1.0 — EZ installation
 
-This archive contains native binaries for **@LABEL@, x86-64**. It is a Phase 1
-stable-release preparation build for review, not the approved public stable release.
+This archive contains native binaries for **@LABEL@, x86-64**. Use a published versioned release or an explicitly reviewed Actions build
+matching SOURCE-COMMIT. An Actions build does not imply stable publication or
+physical desktop acceptance.
 Do not install these binaries on a different distribution. No compiler or Python
 is needed. An existing KDE Plasma 6 desktop and matching Qt/KDE runtime are required.
 
-1. Download the matching EZ ZIP and its external SHA-256 checksum from the linked
-   GitHub Actions staging run. Verify with `sha256sum -c <archive>.zip.sha256`.
+1. Download the matching EZ ZIP and its external SHA-256 checksum from the versioned release or reviewed
+   GitHub Actions run. Verify with `sha256sum -c <archive>.zip.sha256`.
 2. Extract the **whole** ZIP using KDE Ark or `unzip`. Open a terminal in the
    extracted `OpenPowerMenu-EZ-v2.1.0-…` folder. Paths containing spaces work.
 3. Run `bash install.sh` as your normal desktop user, **without sudo**. Read the

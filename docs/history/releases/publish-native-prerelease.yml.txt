@@ -1,0 +1,52 @@
+name: Qualify and publish native prerelease
+on:
+  push:
+    tags: ['v2.*-rc*']
+permissions:
+  contents: read
+concurrency:
+  group: native-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qualification:
+    uses: ./.github/workflows/tests.yml
+  publish:
+    needs: qualification
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: opm-native-Manjaro-${{ github.sha }}
+          path: qualified
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: opm-*-${{ github.sha }}
+          path: qualification-evidence
+      - name: Verify source, sealed artifacts and qualification evidence
+        run: |
+          python3 scripts/prepare-native-release.py --artifacts qualified --output release-assets \
+            --commit "$GITHUB_SHA" --tag "$GITHUB_REF_NAME" --distribution-evidence qualification-evidence
+          (cd release-assets && sha256sum -c SHA256SUMS)
+      - name: Publish the qualified assets as a prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git rev-list -n 1 "$GITHUB_REF_NAME")" = "$GITHUB_SHA"
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists; refusing to replace its assets.' >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" release-assets/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --latest=false \
+            --title "Open Power Menu $GITHUB_REF_NAME" --notes-file release-assets/RELEASE-NOTES.md
+          # A failed upload remains a draft. Publish only the verified full set.
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir downloaded
+          (cd downloaded && sha256sum -c SHA256SUMS)
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --draft=false --prerelease --latest=false

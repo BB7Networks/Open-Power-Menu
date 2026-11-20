@@ -119,7 +119,7 @@ plugin=org.kde.plasma.kickoff
             self.assertNotIn(forbidden, js + qml)
         for forbidden in ('visible = false', 'enabled = false', 'opacity = 0;', 'destroy('):
             self.assertNotIn(forbidden, js)
-        self.assertNotIn('panel-snapshot.sh', (ROOT/'scripts/install-core.sh').read_text())
+        self.assertNotIn('panel-snapshot.sh', (ROOT/'legacy/1.0.1/scripts/install-core.sh').read_text())
 
     def test_native_widget_settings_page_accepts_loader_properties(self):
         qml = (ROOT/'plasmoid/contents/ui/configGeneral.qml').read_text()
@@ -189,7 +189,7 @@ assert.throws(()=>context.prepare(root,[self,grid],self,12,2,59),/Could not find
         self.assertEqual(result.returncode,0,result.stderr)
 
     def test_upstream_supported_visibility_contract_documented(self):
-        integration = (ROOT/'INTEGRATION.md').read_text()
+        integration = (ROOT/'docs/history/0.x-and-1.0/INTEGRATION.md').read_text()
         for name in ('LayoutManager.js', 'AppletContainer.qml', 'shellcorona.cpp',
                      'HiddenStatus', 'activateLauncherMenu'):
             self.assertIn(name, integration)

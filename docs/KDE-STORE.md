@@ -1,13 +1,13 @@
 # KDE Store and complete native distribution
 
-OPM 2.1 development has two distinct distribution paths. The released 1.0.1
-installer remains available; no native package or Store listing has been
-published by this milestone.
+Native 2.1 has two distinct distribution paths. Historical native RC packages
+and the 1.0.1 installer remain available. Final stable and KDE Store publication
+require explicit review and approval.
 
 | Artifact | Contents | Requirements |
 | --- | --- | --- |
 | Complete native bundle | Plasma 6 widget, backend, editor, standalone, native CLI/transaction utility, activation/desktop integration and icon/docs | Matching distribution/CPU and documented Qt/KF6 runtime; Plasma 6 for widget use |
-| `.plasmoid` Store artifact | QML/JavaScript widget and metadata only | Separately installed native backend for configured menus, commands, editing and recovery |
+| `.plasmoid` Store artifact | QML/JavaScript widget, private native input plugin and metadata | Separately installed native backend for configured menus, commands, editing and recovery |
 
 The Store artifact is **not self-contained**. Adding it never downloads or runs
 an installer, executes shell commands, or installs system packages. If GetMenu
@@ -31,9 +31,10 @@ cmake --build build/package --target native-package --parallel 2
 ```
 
 This creates a labelled native tar.gz and checksum, plus
-`org.openpowermenu.start-2.1.0-dev.plasmoid` with `metadata.json` and `contents/`
-at the ZIP root. The legacy `scripts/build-release.sh` and widget helper remain
-1.0.1 release tooling; use the native CMake target for native development bundles.
+`org.openpowermenu.start-2.1.0.plasmoid` with `metadata.json` and `contents/`
+at the ZIP root. The legacy helpers under `legacy/1.0.1/scripts/` build compatibility fixtures
+only. Use the native CMake target; copying QML without its matching native input
+plugin is insufficient for keyboard dispatch.
 
 ## Backend-free basic mode investigation
 

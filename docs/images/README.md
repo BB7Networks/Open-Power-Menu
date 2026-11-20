@@ -33,5 +33,5 @@ at full size.
 <img src="combined-launcher.png" alt="Power User Menu with a combined launcher button" width="420">
 
 [Appearance and menu preferences](../../README.md#configure-your-menu) ·
-[Capture and release review](../RELEASE-1.0.1.md#screenshot-provenance) ·
-[Earlier capture notes](../MENU-FLYOUT-UX.md#screenshots)
+[Capture and release review](../history/releases/RELEASE-1.0.1.md#screenshot-provenance) ·
+[Earlier capture notes](../history/0.x-and-1.0/MENU-FLYOUT-UX.md#screenshots)
