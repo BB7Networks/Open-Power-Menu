@@ -72,6 +72,9 @@ wrong source, missing approval, pre-existing tags/releases, upload/download
 failures and final Stable/Latest flags. No real publish call occurs during tests.
 The documentation audit checks local links, baseline inventory destinations and
 protected runtime/gallery hashes. See [publishing](PUBLISHING.md).
+The `--phase2` inventory/hash check runs on the cleanup branch and its PR only;
+the local-link audit remains active on every branch. Later approved work can add
+files without rewriting this historical cleanup inventory.
 
 Before stable release, review cleanup and Phase 3, then perform physical desktop
 acceptance: Configure Save/reopen, harmless commands, flyouts, Escape/outside click,
