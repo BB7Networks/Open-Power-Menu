@@ -1,0 +1,130 @@
+{
+    "access_keys_enabled": true,
+    "anchor": "cursor",
+    "appearance": "native",
+    "auto_close_delay_ms": 1200,
+    "auto_close_on_pointer_leave": false,
+    "backup_retention": 10,
+    "button_icon": "",
+    "button_icon_mode": "launcher",
+    "confirm_power_actions": true,
+    "hide_original_launcher": false,
+    "launcher_applet_id": 0,
+    "menu": [
+        {
+            "access_key": "P",
+            "action": "applications"
+        },
+        {
+            "access_key": "O",
+            "action": "power"
+        },
+        {
+            "access_key": "V",
+            "action": "logs"
+        },
+        {
+            "access_key": "Y",
+            "action": "system"
+        },
+        {
+            "access_key": "M",
+            "action": "hardware"
+        },
+        {
+            "access_key": "W",
+            "action": "network"
+        },
+        {
+            "access_key": "K",
+            "action": "disks"
+        },
+        {
+            "action": "printers"
+        },
+        {
+            "action": "vms"
+        },
+        {
+            "separator": true
+        },
+        {
+            "access_key": "I",
+            "action": "terminal"
+        },
+        {
+            "access_key": "T",
+            "action": "monitor"
+        },
+        {
+            "access_key": "E",
+            "action": "files"
+        },
+        {
+            "access_key": "N",
+            "action": "settings"
+        },
+        {
+            "access_key": "R",
+            "action": "run"
+        },
+        {
+            "separator": true
+        },
+        {
+            "icon": "network-server",
+            "items": [
+                {
+                    "action": "remote"
+                }
+            ],
+            "submenu": "Remote & Work"
+        },
+        {
+            "access_key": "U",
+            "icon": "system-shutdown",
+            "items": [
+                {
+                    "access_key": "L",
+                    "action": "lock"
+                },
+                {
+                    "access_key": "I",
+                    "action": "logout"
+                },
+                {
+                    "access_key": "R",
+                    "action": "reboot"
+                },
+                {
+                    "access_key": "U",
+                    "action": "shutdown"
+                },
+                {
+                    "access_key": "S",
+                    "action": "sleep"
+                },
+                {
+                    "access_key": "H",
+                    "action": "hibernate"
+                }
+            ],
+            "submenu": "Shut down or sign out"
+        },
+        {
+            "access_key": "D",
+            "action": "show_desktop"
+        }
+    ],
+    "menu_custom_height": 600,
+    "menu_density": "standard",
+    "menu_height_mode": "auto",
+    "menu_icon_size": "standard",
+    "menu_width": "auto",
+    "power_confirmation": "system",
+    "show_access_key_hints": true,
+    "show_menu_icons": true,
+    "show_unavailable": false,
+    "submenu_hover_delay_ms": -1,
+    "version": 1
+}

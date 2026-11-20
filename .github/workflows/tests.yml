@@ -295,6 +295,8 @@ jobs:
       - run: python -m pytest -q
       - run: python -m compileall -q openpowermenu tests run.py
       - run: python scripts/audit-repository.py
+      - name: Verify native showcase assets and comparison provenance
+        run: python tools/showcase/check.py
       - name: Verify the approved Phase 2 maintenance boundary
         if: github.head_ref == 'maintenance/2.1.0-repository-cleanup' || github.ref == 'refs/heads/maintenance/2.1.0-repository-cleanup'
         run: python scripts/audit-repository.py --phase2

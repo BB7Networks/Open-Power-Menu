@@ -1,4 +1,10 @@
-# Screenshot gallery
+# Historical screenshot gallery
+
+These images are preserved from earlier releases. They are historical evidence,
+not the current native 2.1 configuration reference. See the [new native visual
+tour](../../README.md), [capture provenance](../SHOWCASE.md) and
+[2.1 image inventory](2.1/image-inventory.csv). All original filenames and pixels
+remain intact.
 
 ## Put it where you prefer
 

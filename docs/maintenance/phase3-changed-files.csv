@@ -1,0 +1,64 @@
+status,path,category
+modified,.github/workflows/tests.yml,documentation CI check
+modified,README.md,documentation
+modified,docs/COMPATIBILITY.md,documentation
+modified,docs/CONFIGURATION.md,documentation
+added,docs/FEATURES.md,documentation
+modified,docs/README.md,documentation
+added,docs/SHOWCASE.md,documentation
+added,docs/images/2.1/aero-dark.png,native screenshot
+added,docs/images/2.1/aero-light.png,native screenshot
+added,docs/images/2.1/configure-appearance.png,native screenshot
+added,docs/images/2.1/configure-application.png,native screenshot
+added,docs/images/2.1/configure-backups.png,native screenshot
+added,docs/images/2.1/configure-builtin.png,native screenshot
+added,docs/images/2.1/configure-custom-command.png,native screenshot
+added,docs/images/2.1/configure-general.png,native screenshot
+added,docs/images/2.1/configure-keyboard-hover.png,native screenshot
+added,docs/images/2.1/configure-launcher.png,native screenshot
+added,docs/images/2.1/configure-layout.png,native screenshot
+added,docs/images/2.1/configure-power.png,native screenshot
+added,docs/images/2.1/configure-submenu.png,native screenshot
+added,docs/images/2.1/density-comfortable.png,native screenshot
+added,docs/images/2.1/density-compact.png,native screenshot
+added,docs/images/2.1/density-standard.png,native screenshot
+added,docs/images/2.1/editing-destination.png,native screenshot
+added,docs/images/2.1/editing-reordered.png,native screenshot
+added,docs/images/2.1/editing-submenu.png,native screenshot
+added,docs/images/2.1/editing-unlocked.png,native screenshot
+added,docs/images/2.1/ez-provenance.json,capture/provenance data
+added,docs/images/2.1/ez-transcript.txt,capture/provenance data
+added,docs/images/2.1/height-custom.png,native screenshot
+added,docs/images/2.1/hero.png,native screenshot
+added,docs/images/2.1/hints-hidden.png,native screenshot
+added,docs/images/2.1/icons-hidden.png,native screenshot
+added,docs/images/2.1/icons-large.png,native screenshot
+added,docs/images/2.1/icons-small.png,native screenshot
+added,docs/images/2.1/image-inventory.csv,capture/provenance data
+added,docs/images/2.1/launcher-adopted-icon.png,native screenshot
+added,docs/images/2.1/launcher-applications.png,native screenshot
+added,docs/images/2.1/launcher-beside.png,native screenshot
+added,docs/images/2.1/manifest.json,capture/provenance data
+added,docs/images/2.1/menu-default.png,native screenshot
+added,docs/images/2.1/menu-standard.png,native screenshot
+added,docs/images/2.1/native-dark.png,native screenshot
+added,docs/images/2.1/native-defaults.json,capture/provenance data
+added,docs/images/2.1/placement-center.png,native screenshot
+added,docs/images/2.1/placement-left.png,native screenshot
+added,docs/images/2.1/placement-right.png,native screenshot
+added,docs/images/2.1/standalone.png,native screenshot
+added,docs/images/2.1/width-auto.png,native screenshot
+added,docs/images/2.1/width-narrow.png,native screenshot
+added,docs/images/2.1/width-wide.png,native screenshot
+modified,docs/images/README.md,documentation
+added,docs/maintenance/PHASE3-SHOWCASE.md,documentation
+added,docs/maintenance/phase3-changed-files.csv,documentation
+added,tools/showcase/CMakeLists.txt,capture and validation tooling
+added,tools/showcase/Dockerfile,capture and validation tooling
+added,tools/showcase/capture.py,capture and validation tooling
+added,tools/showcase/check.py,capture and validation tooling
+added,tools/showcase/editor.cpp,capture and validation tooling
+added,tools/showcase/export.py,capture and validation tooling
+added,tools/showcase/installer.py,capture and validation tooling
+added,tools/showcase/review-github.py,capture and validation tooling
+added,tools/showcase/run.py,capture and validation tooling

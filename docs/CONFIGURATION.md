@@ -33,3 +33,7 @@ Backups provide guarded preview/restore/delete and protected pre-restore copies.
 See [configuration recovery and application rollback](RECOVERY.md). Do not
 replace a working menu with the historical examples: use the editor to preserve
 existing layouts and custom commands.
+
+For exact allowed values, new-install defaults, built-in tools and source
+references, use the [verified native feature inventory](FEATURES.md). The
+[README tour](../README.md#configure-your-menu) shows the real current editor.

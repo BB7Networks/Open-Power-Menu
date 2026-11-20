@@ -31,3 +31,7 @@ acceptance, including mixed scaling, launcher variants and real panel placement.
 X11 translucent-panel ghosting and minor responsiveness work remain deferred.
 One Phase 1 X11 focus-readiness timeout did not recur on the unchanged debug
 retry; it is recorded evidence, not a confirmed or fixed production defect.
+
+The [native showcase](SHOWCASE.md) records a separate Debian 13 X11 capture
+environment (Qt 6.8.2, Plasma 6.3.6, 100% scale). Its genuine images do not extend
+the binary compatibility claims or certify physical compositor behavior.
