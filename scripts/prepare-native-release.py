@@ -137,7 +137,7 @@ def verify_distributions(root, commit, version):
             'applications': verify_applications(desktop/'applications.json'),
             'greeter': verify_greeter(desktop/'plasma-greeter'),
             'keyboard_seats': verify_keyboard(desktop/'plasma-keyboard'),
-            'runtime_smoke': 'passed', 'legacy_and_rc1_upgrade_rollback': 'passed'}
+            'runtime_smoke': 'passed', 'legacy_rc1_rc2_upgrade_rollback': 'passed'}
     arch = root/('opm-native-Arch-'+commit)
     if (arch/'SOURCE-COMMIT').read_text().strip() != commit:
         raise ValueError('Arch source mismatch')
@@ -155,11 +155,12 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--commit', required=True)
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--staging', action='store_true', help='Verify final-version staging assets without publishing or tagging')
     parser.add_argument('--distribution-evidence', type=Path,
                         help='Required by publication: artifacts from the same run for all other distributions')
     args = parser.parse_args()
     version = (ROOT/'native/VERSION').read_text().strip()
-    if args.tag != 'v'+version or '-rc' not in version:
+    if args.tag != 'v'+version or ('-rc' not in version and not args.staging):
         raise ValueError('Only the matching native prerelease tag may publish')
     current = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if current != args.commit or (args.artifacts/'SOURCE-COMMIT').read_text().strip() != current:

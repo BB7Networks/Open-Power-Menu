@@ -34,6 +34,11 @@ if [ -n "${OPM_TEST_SETUP:-}" ]; then
 else
     sh "$bundle/install.sh"
 fi
+# Exercise the shipped EZ entrypoint offline, still with fault hooks disabled.
+for ez in /opt/opm-ez/*; do
+    bash "$ez/install.sh" --check
+    bash "$ez/install.sh" --yes
+done
 unset OPM_INSTALL_CRASH_AFTER OPM_INSTALL_FAIL_AFTER
 "$XDG_BIN_HOME/open-power-menu" --version
 "$XDG_BIN_HOME/open-power-menu" --check

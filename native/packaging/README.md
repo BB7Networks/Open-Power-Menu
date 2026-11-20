@@ -1,11 +1,23 @@
-# Complete native v2.1.0-rc2 bundle
+# Complete native 2.1.0 bundle and EZ staging
 
-This is a prerelease for controlled physical testing. Stable 1.0.1 is unchanged.
-Read the [release notes](../../RELEASE-NOTES-v2.1.0-rc2.md), including the warning
-that Shutdown, Restart and Sign out can execute immediately. New installations
-follow KDE; upgrades preserve the previous preference and custom commands. Back up your
-personal configuration and use private mocks for keyboard power stress tests.
-Never run the installer as root. It does not install system dependencies.
+Phase 1 builds use the final version **2.1.0** for review. Stable tagging,
+publication and repository cleanup are not approved. No additional RC is created.
+See [Phase 1 installation and qualification](../../docs/EZ-INSTALLER-PHASE1.md).
+Power actions can execute immediately; existing preferences/custom commands are
+preserved. Use private mocks for power acceptance and never install as root.
+
+The EZ ZIP wraps the sealed native bundle and the existing transactional installer:
+
+```sh
+python3 native/packaging/prepare-ez.py --bundle build/package/native-bundle --output build/ez
+```
+
+Build on the corresponding Manjaro, Debian 13 or Kubuntu 26.04 system. Python is
+packaging tooling only; the extracted installer requires no Python/compiler.
+The wrapper verifies its complete SHA-256 inventory and target runtime, provides
+explicit install/upgrade prompts and dependency instructions, and never invokes
+a package manager. CI stages qualified ZIPs, native bundles, source and checksums
+for 90 days through GitHub Actions, without tagging or publishing a release.
 
 GUI interaction tests use `xvfb-run` and `xauth` in the disposable build image.
 Without that virtual input display, the offscreen fallback explicitly skips the
@@ -151,8 +163,8 @@ the base image's Python used by pacman-mirrors, while requiring PySide6 to be ab
 all three require no compiler for native installation and operation. This preserves
 unrelated system dependencies and does not make Python an OPM runtime dependency.
 
-CI retains candidate packages, bundles, the separate Store widget, checksums,
-source commit, os-release and build/runtime package inventories for seven days.
+CI retains staging packages, bundles, the separate Store widget, checksums,
+source commit, os-release and build/runtime package inventories for 90 days.
 Tag qualification publishes the verified Manjaro package, complete native bundle,
 source archive, checksums and qualification inventory as a GitHub prerelease.
 Actions artifacts alone are not public releases or physical Plasma certification.

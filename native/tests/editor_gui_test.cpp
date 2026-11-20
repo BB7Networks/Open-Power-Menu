@@ -333,6 +333,61 @@ class EditorGuiTests : public QObject {
         window->close();
     }
 
+    void powerConfirmationGeometry() {
+        QTemporaryDir temp;
+        Storage store(temp.filePath("menu.json"));
+        EditorSession session(store); EditorCatalog catalog;
+        QQmlApplicationEngine engine;
+        engine.rootContext()->setContextProperty("editorSession", &session);
+        engine.rootContext()->setContextProperty("editorCatalog", &catalog);
+        engine.load(QUrl("qrc:/editor/qml/Main.qml"));
+        QVERIFY(!engine.rootObjects().isEmpty());
+        auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().first());
+        QVERIFY(QTest::qWaitForWindowExposed(window));
+        const auto scheme = qEnvironmentVariable("OPM_TEST_COLOR_SCHEME");
+        if (!scheme.isEmpty())
+            QTRY_COMPARE(window->color().lightness() < 128, scheme == "BreezeDark");
+        auto *choice = window->findChild<QQuickItem *>("powerConfirmation");
+        QVERIFY(choice);
+        auto *popup = choice->property("popup").value<QObject *>();
+        QVERIFY(popup);
+        for (const auto size : {QSize(960,720), QSize(620,480), QSize(1280,900)}) {
+            window->resize(size); window->requestActivate();
+            choice->forceActiveFocus(Qt::TabFocusReason);
+            QTest::qWait(100);
+            const auto output = qEnvironmentVariable("OPM_QUALIFICATION_SCREENSHOTS");
+            if (!output.isEmpty()) {
+                QDir().mkpath(output);
+                QVERIFY(window->grabWindow().save(output+QString("/power-%1x%2.png").arg(size.width()).arg(size.height())));
+            }
+            // Closed-control keyboard selection is the native ComboBox contract.
+            // Popup sizing/contents are additionally exercised with mouse input.
+            const auto left = choice->mapToScene(QPointF()).x();
+            QVERIFY(left >= 0 && left+choice->width() <= window->width());
+            QVERIFY(choice->width() >= choice->implicitWidth()-1);
+            QVERIFY2(choice->width() <= choice->implicitWidth()+1, "Power Actions must use its natural width, not fill the form");
+            QTest::keyClick(window, Qt::Key_Down);
+            QCOMPARE(session.configuration()["power_confirmation"].toString(), "always");
+            QTest::keyClick(window, Qt::Key_Home);
+            QCOMPARE(session.configuration()["power_confirmation"].toString(), "system");
+            QTest::keyClick(window, Qt::Key_Space);
+            QTRY_VERIFY(popup->property("opened").toBool());
+            if (!output.isEmpty())
+                QVERIFY(window->grabWindow().save(output+QString("/power-open-%1x%2.png").arg(size.width()).arg(size.height())));
+            QVERIFY(popup->property("width").toReal() >= choice->implicitWidth()-1);
+            QVERIFY(clickText("Execute immediately", window));
+            QTRY_VERIFY(!popup->property("visible").toBool());
+            QCOMPARE(session.configuration()["power_confirmation"].toString(), "immediate");
+            choice->forceActiveFocus();
+            QTest::keyClick(window, Qt::Key_Home);
+            QCOMPARE(session.configuration()["power_confirmation"].toString(), "system");
+            QVERIFY(click(window,"saveConfiguration"));
+            QCOMPARE(store.load()["power_confirmation"].toString(), "system");
+
+        }
+        window->close();
+    }
+
     void portableDialogsCancelApplyAndRecover() {
         if (QGuiApplication::platformName() == "offscreen")
             QSKIP("Native popup input requires a display seat; install xvfb/xauth to run this case through CTest");
@@ -792,6 +847,13 @@ int main(int argc, char **argv) {
     write(appRoot + "/opm-unavailable-fixture.desktop",
           "[Desktop Entry]\nType=Application\nName=Unavailable "
           "fixture\nExec=/bin/true\nTryExec=opm-no-such-program\n");
+    const auto scheme = qEnvironmentVariable("OPM_TEST_COLOR_SCHEME");
+    if (!scheme.isEmpty()) {
+        if (scheme != "BreezeLight" && scheme != "BreezeDark") qFatal("Unknown test color scheme");
+        if (!QFile::copy("/usr/share/color-schemes/"+scheme+".colors",
+                         qEnvironmentVariable("XDG_CONFIG_HOME")+"/kdeglobals"))
+            qFatal("Cannot configure the private GUI color scheme");
+    }
     QCoreApplication::setAttribute(Qt::AA_DontUseNativeDialogs);
     QGuiApplication app(argc, argv);
     EditorGuiTests tests;
