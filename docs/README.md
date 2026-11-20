@@ -1,8 +1,8 @@
 # Native 2.1 documentation
 
-The native 2.1 source is being prepared for stable publication. Phases 1 and 2 were
-approved; the Phase 3 README and native showcase are under review. Physical
-acceptance and explicit publication approval are still required. Historical releases remain available.
+Guides for Open Power Menu 2.1.0: native installation, customization, keyboard
+navigation, KDE integration and recovery. [Release downloads](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0)
+include distribution-specific installers and exact source/checksum evidence.
 
 | Need | Guide |
 | --- | --- |
@@ -16,7 +16,7 @@ acceptance and explicit publication approval are still required. Historical rele
 | Run regression and private power tests | [Testing](TESTING.md) |
 | Build and contribute | [Native development](../native/README.md), [contributing](CONTRIBUTING.md) |
 | Package or prepare publication | [Packaging](../native/packaging/README.md), [publishing](PUBLISHING.md) |
-| Review earlier evidence | [History](history/README.md), [Phase 2 inventory](maintenance/PHASE2-CLEANUP.md) |
+| Review earlier evidence | [History](history/README.md), [cleanup inventory](maintenance/PHASE2-CLEANUP.md) |
 
 The [native visual tour](../README.md) uses genuine 2.1 captures. The
 [historical screenshot gallery](images/README.md) is preserved with its original

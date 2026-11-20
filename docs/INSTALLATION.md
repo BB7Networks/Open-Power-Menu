@@ -1,10 +1,6 @@
 # Install and upgrade native 2.1
 
-Version 2.1.0 is in stable-release preparation; it has not been published as the
-stable release. Reviewed build downloads are linked from the release-preparation
-PRs and [Actions](https://github.com/BB7Networks/Open-Power-Menu/actions/workflows/tests.yml).
-Actions artifacts require sign-in and expire after 90 days. After explicit
-approval, the persistent destination is the
+Download the distribution-specific EZ ZIP and matching `.sha256` from the
 [v2.1.0 release](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0).
 Historical [1.0.1](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v1.0.1),
 [RC1](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc1) and

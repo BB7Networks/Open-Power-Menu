@@ -14,9 +14,8 @@ One button, two menus, configurable shortcuts and a layout built around your wor
 nested Tools submenu. [See the actual defaults below](#out-of-the-box-and-make-it-yours).
 Click any screenshot for its full-resolution pixels.*
 
-**2.1.0 Stable is being prepared; stable downloads are not live yet.** This page
-previews the approved native source and its documentation. Final physical
-acceptance and publication approval remain required. Historical
+**Version 2.1.0** · [Downloads and release notes](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0).
+Historical
 [1.0.1](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v1.0.1),
 [RC1](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc1) and
 [RC2](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc2) remain available.
@@ -34,13 +33,10 @@ input plugin, icons, desktop integration and reversible installer. An existing
 KDE Plasma 6 desktop and matching system libraries are required; no Python,
 PySide6 or compiler is needed to run the native installation.
 
-The links below are the **planned final release destinations**, not currently
-available downloads. Until publication, use only an explicitly reviewed build
-from the [preparation PRs](https://github.com/BB7Networks/Open-Power-Menu/pulls)
-and [GitHub Actions](https://github.com/BB7Networks/Open-Power-Menu/actions/workflows/tests.yml).
-Actions downloads require sign-in and expire; they are staging artifacts.
+Download the ZIP and its matching checksum from the
+[v2.1.0 release](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0).
 
-| Distribution | Final EZ filename / planned download | External checksum |
+| Distribution | EZ installer | External checksum |
 | --- | --- | --- |
 | Manjaro KDE | [OpenPowerMenu-EZ-v2.1.0-Manjaro-x86_64.zip](https://github.com/BB7Networks/Open-Power-Menu/releases/download/v2.1.0/OpenPowerMenu-EZ-v2.1.0-Manjaro-x86_64.zip) | [ZIP SHA-256](https://github.com/BB7Networks/Open-Power-Menu/releases/download/v2.1.0/OpenPowerMenu-EZ-v2.1.0-Manjaro-x86_64.zip.sha256) |
 | Debian 13 KDE | [OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip](https://github.com/BB7Networks/Open-Power-Menu/releases/download/v2.1.0/OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip) | [ZIP SHA-256](https://github.com/BB7Networks/Open-Power-Menu/releases/download/v2.1.0/OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip.sha256) |
@@ -418,7 +414,7 @@ The standalone also accepts `--config`, `--anchor`, `--theme` and
 
 ### Compatibility
 
-| Binary target | Qualified Phase 1 snapshot | Boundary |
+| Binary target | Qualified runtime snapshot | Boundary |
 | --- | --- | --- |
 | Manjaro KDE x86-64 | Qt 6.11.2 / Plasma 6.7.5 | Matching Manjaro libraries; avoid partial Qt/KDE upgrades |
 | Debian 13 KDE x86-64 | Qt 6.8.2 / Plasma 6.3.6 | Debian 13 native payload and libraries |
@@ -478,6 +474,10 @@ and [native CMake development](native/README.md).
 - **Distribution boundaries:** use the matching native payload and libraries.
   Display scaling, third-party launchers, GPU/compositor behavior and physical
   panel layouts still need workstation acceptance.
+- **Acceptance scope:** the owner reported successful Manjaro EZ installation
+  and normal menu/Configure use. That does not establish real power-action or
+  physical held-key safety. An intermittent Kubuntu keyboard-test timeout remains
+  unresolved; see [qualification and limitations](docs/TESTING.md).
 
 The new screenshots are actual native UI from **Debian 13, Plasma 6.3.6, Qt
 6.8.2, X11/Xvfb + KWin, 100% scale**. Power-service endpoints are private mocks.

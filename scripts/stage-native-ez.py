@@ -74,15 +74,23 @@ def main():
     report.update(ez_artifacts=artifacts,
                   approved_phase1_baseline='0bf2f247ff6406d797112e8223dda4c9b4f0d59d',
                   runtime_installation='Native and extracted EZ; offline',
-                  physical_acceptance='Not established by automation; owner approval required before publication')
+                  physical_acceptance={
+                      'established_by_automation': False,
+                      'owner_reported_system': 'Manjaro KDE',
+                      'owner_reported_build': 'Earlier EZ installer preparation build; not an attestation of this integrated commit',
+                      'owner_reported_scope': ['EZ installation', 'normal menu use', 'Configure behavior'],
+                      'real_power_actions_established': False,
+                      'physical_held_key_safety_established': False,
+                      'final_source_approval': 'Required separately before publication'})
     (args.output/'QUALIFICATION.json').write_text(json.dumps(report,indent=2)+'\n')
     if not args.publication:
         (args.output/'REVIEW-STATUS.md').write_text(
             '# Open Power Menu 2.1.0 review artifacts\n\n'
             'Source commit: `'+args.commit+'`. Stable publication is not approved.\n'
             'These are distribution-specific review builds, not a public release.\n'
-            'Physical acceptance and the remaining documentation/release review are required.\n'
-            'The next public version is 2.1.0 Stable; no RC3 is created.\n')
+            'Final source, acceptance-scope and publication approval remain required.\n'
+            'Earlier Manjaro installation/menu/Configure acceptance does not establish real power-action or physical held-key safety.\n'
+            'The public target is 2.1.0 Stable.\n')
     release_assets.seal(args.output, args.commit, review=not args.publication)
     print('Verified 3 native EZ archives, native bundles, Manjaro package, source and all distribution evidence.')
 

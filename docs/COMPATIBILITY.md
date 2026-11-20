@@ -1,6 +1,6 @@
 # Native binary compatibility
 
-| EZ target | Qualified Phase 1 runtime | Binary boundary |
+| EZ target | Qualified runtime snapshot | Binary boundary |
 | --- | --- | --- |
 | Manjaro KDE x86-64 | Qt 6.11.2, Plasma 6.7.5 | Manjaro build and matching current distro libraries |
 | Debian 13 KDE x86-64 | Qt 6.8.2, Plasma 6.3.6 | Debian 13 libraries and Plasma 6 |
@@ -29,8 +29,15 @@ virtual KWin and QtTest input; they do not prove physical compositor shortcuts,
 activation tokens or absolute placement. A release still needs physical desktop
 acceptance, including mixed scaling, launcher variants and real panel placement.
 X11 translucent-panel ghosting and minor responsiveness work remain deferred.
-One Phase 1 X11 focus-readiness timeout did not recur on the unchanged debug
+One earlier X11 focus-readiness timeout did not recur on the unchanged debug
 retry; it is recorded evidence, not a confirmed or fixed production defect.
+
+The owner reported successful Manjaro EZ installation and normal menu/Configure
+use with the earlier installer build. This does **not** establish real power-action
+or physical held-key safety, or physical acceptance of every later source commit.
+An intermittent Kubuntu X11 hidden-launcher keyboard-test timeout also remains
+unresolved; [test evidence](TESTING.md#acceptance-scope-and-unresolved-results)
+distinguishes it from the earlier focus-readiness timeout.
 
 The [native showcase](SHOWCASE.md) records a separate Debian 13 X11 capture
 environment (Qt 6.8.2, Plasma 6.3.6, 100% scale). Its genuine images do not extend

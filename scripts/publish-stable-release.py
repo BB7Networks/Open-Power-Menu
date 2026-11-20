@@ -54,7 +54,9 @@ def publish(directory, commit, *, approved_commit, physical_accepted, github):
     if github.request('GET', BASE+'/releases/tags/'+TAG, missing_ok=True) is not None:
         raise ValueError('Release already exists; review any existing draft manually')
     body = (directory/'RELEASE-NOTES.md').read_text()
-    body += '\nPublication approved for source `'+commit+'` after owner-reported physical acceptance.\n'
+    body += '\nPublication approved for source `'+commit+'` after owner-reported physical acceptance. '
+    body += 'The recorded scope and limitations remain in `QUALIFICATION.json` and these release notes; '
+    body += 'normal-use acceptance and automated mock tests do not certify real power-action or physical held-key safety.\n'
     release = github.request('POST', BASE+'/releases', {
         'tag_name': TAG, 'target_commitish': commit, 'name': 'Open Power Menu '+TAG,
         'body': body, 'draft': True, 'prerelease': False, 'make_latest': 'false'})

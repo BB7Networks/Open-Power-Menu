@@ -1,9 +1,9 @@
-# Preparing and publishing native 2.1.0
+# Publishing native 2.1.0 Stable
 
-Phase 2 prepares this process; it does **not** authorize a tag, merge or release.
-Cleanup review, Phase 3 documentation review, physical workstation acceptance and
-explicit owner approval must precede final publication. The next public version
-is **2.1.0 Stable**, not RC3. Keep v1.0.1, RC1 and RC2 unchanged.
+Publication requires explicit owner approval of the exact source, qualification
+results and recorded physical-acceptance scope. Creating an integration PR or
+verifying assets does not authorize a merge, tag or release. The target is
+**2.1.0 Stable**. Keep v1.0.1, RC1 and RC2 unchanged.
 
 ## Source and qualification
 
@@ -17,7 +17,8 @@ Arch is an additional compatibility fixture, not a fourth advertised EZ target.
 Released 1.0.1/RC1/RC2 upgrade baselines stay pinned. All power endpoints are mocks.
 See [testing](TESTING.md) and [compatibility limits](COMPATIBILITY.md).
 
-Review branches produce `opm-2.1.0-review-<commit>` Actions artifacts. These are
+Review branches produce `opm-2.1.0-review-<commit>` and
+`opm-2.1.0-stable-verified-<commit>` Actions artifacts. These are
 review downloads with a retention period, not persistent public releases. To
 collect completed same-run evidence locally, use a **new** output directory:
 
@@ -49,7 +50,7 @@ Native bundles contain a concise installation guide with source-pinned links,
 license and current release notes. Historical reports remain in the source
 archive rather than masquerading as current installed instructions.
 
-## Approved stable publication (do not run during Phase 2)
+## Approved stable publication
 
 After reviews and physical acceptance, merge only with owner approval. GitHub
 must have the manually dispatched **Publish approved 2.1.0 Stable** workflow on
@@ -58,6 +59,18 @@ enter its exact 40-character commit, type `Publish v2.1.0 Stable`, and affirm
 physical acceptance. The workflow refuses a ref/approval mismatch, reruns the
 complete qualification matrix and consumes only artifacts from that same run.
 There is no push/tag/commit-message publication trigger.
+
+Preserve the approved source identity. A normal PR merge can retain the reviewed
+integration commit as an ancestor of `main`; the publisher may then select that
+unchanged release branch and exact commit. A squash, rebase or subsequent source
+edit creates a different commit and requires fresh qualification and approval.
+Never substitute a generated PR merge SHA for the reviewed push SHA in assets.
+
+Owner-reported Manjaro EZ installation and normal menu/Configure acceptance are
+limited evidence from the earlier installer build. They do not establish real
+power-action or physical held-key safety, or acceptance of every later commit.
+`QUALIFICATION.json` and release notes retain that distinction. The workflow's
+physical-acceptance input must not be inferred from a green automated run.
 
 `scripts/publish-stable-release.py` defaults to verification only. Actual
 publication additionally requires `--publish`, an exact `--approved-commit` and
@@ -72,8 +85,6 @@ response. Published links are persistent GitHub Release downloads:
 
 `https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0`
 
-That URL is the planned final destination, not a claim that stable is published.
-
 ## Failure handling and readiness limits
 
 A failed upload/download/verification leaves a draft, never a partial public
@@ -87,10 +98,13 @@ an absent release.
 Tests substitute a fake GitHub transport for missing approval, existing history,
 403s, corrupt/incomplete assets, upload/download failures and concurrent metadata
 or tag changes. These tests verify the mutation order and Stable/Latest flags;
-they do not prove a live publication. No real publisher, tag or release is invoked
-in this phase. Phase 3 and workstation acceptance remain release gates.
+they do not prove a live publication. Verification-only runs never create a
+draft, tag or public release. Exact-source and publication approval remain
+separate from automated qualification.
 
 Archived [legacy](history/releases/publish-legacy-release.yml.txt) and
 [prerelease](history/releases/publish-native-prerelease.yml.txt) publishers are
 historical text. Their original tags retain the original workflows. See the
-[Phase 2 review](maintenance/PHASE2-CLEANUP.md) for current CI evidence.
+[final integration review](maintenance/FINAL-INTEGRATION.md) for the current
+review boundary and the earlier [cleanup record](maintenance/PHASE2-CLEANUP.md)
+for historical evidence.

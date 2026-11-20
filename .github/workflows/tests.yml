@@ -371,3 +371,9 @@ jobs:
           name: opm-2.1.0-review-${{ github.sha }}
           path: review-assets/
           retention-days: 90
+      - name: Retain the verified stable asset set for publication review
+        uses: actions/upload-artifact@v4
+        with:
+          name: opm-2.1.0-stable-verified-${{ github.sha }}
+          path: publication-check/
+          retention-days: 90

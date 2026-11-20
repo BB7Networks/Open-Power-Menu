@@ -1,31 +1,35 @@
 # Open Power Menu changelog
 
-## 2.1.0 — prepared, not yet published
+## 2.1.0
 
-Native C++/Qt backend, editor and standalone; Plasma 6 widget with XInput2 held-key
-protection; KDE-native three-mode power confirmation; session/Configure reliability;
-distribution-specific native EZ installers and transactional recovery/rollback.
-Phase 1 sizes the Power Actions dropdown naturally. Phase 2 organizes historical
-material, prevents legacy source-install confusion and prepares verified stable
-publication. Physical acceptance, Phase 3 and explicit publication approval remain
-required. Historical releases and application behavior are preserved.
+- Native C++/Qt backend, Qt Quick/Kirigami Configure editor and Qt Widgets
+  standalone menu, with a Plasma 6 widget and native input plugin. Native
+  installations need no Python, PySide6 or compiler.
+- X11 popup-collapse and Meta+X reopening corrections, shared XInput2 held-key
+  protection across root/flyout windows, configurable Win+X-style access keys,
+  nested keyboard navigation and independent hint visibility.
+- KDE-native Shutdown, Restart and Sign out with Follow KDE system settings, Always
+  show confirmation and Execute immediately modes. Native Sleep/Hibernate capability,
+  authorization and inhibitor handling; explicit custom commands retain their
+  behavior. Power actions can execute immediately.
+- Persistent Configure/session-environment handling and a naturally sized Power
+  Actions dropdown. Preserve configuration migration, protected selections,
+  custom layouts, shortcuts, original launchers and panel layouts.
+- Complete native EZ installers for qualified Manjaro KDE, Debian 13 KDE and
+  Kubuntu 26.04 x86-64 runtimes; sealed native bundles, the Manjaro package,
+  exact-source archives, checksums and distribution qualification evidence.
+- Transactional installation, upgrades from 1.0.1/RC1/RC2, recovery and rollback.
+  Keep historical components and compatibility tests; native installation
+  entrypoints no longer direct new users through the legacy Python installer.
+- Comprehensive documentation and 39 genuine native screenshots, explicitly
+  separating the installed defaults from customized examples. Existing galleries
+  and release history remain available.
 
-
-## 2.1.0-dev — unreleased
-
-The native rewrite and usability improvements share one public target: **2.1.0**,
-directly after stable **1.0.1**. `2.0.0-dev` was an internal milestone; there is no
-public 2.0.0 release. Historical migration and performance evidence is retained.
-
-- Shared entry access keys, Windows-inspired presets, nested navigation and optional hints in the widget and native standalone menu.
-- Native editor assignment/collision feedback, independent binding reset, master enable and hint preferences, with Undo/Redo.
-- Configurable pointer-leave delay from 0.5 to 5.0 seconds in 0.1-second steps; the existing disabled default remains unchanged.
-- Native Sleep/Hibernate capability checks through KDE and logind, Polkit authorization and inhibitor enforcement. Existing KDE shutdown/restart/logout confirmation calls are preserved.
-- Optional, read-only PySide6 review after a successful legacy upgrade; keep is recommended, notice state is separate, and the installer never removes packages.
-- Separate Arch and Manjaro package/upgrade CI with checksum-pinned sources, sealed native bundles, runtime dependency checks and retained development artifacts; physical Plasma acceptance remains a release gate.
-- Qt platform-plugin validation follows advertised xcb/wayland capabilities while retaining load/ABI checks across rolling-distribution filename changes.
-- Optional dependency queries have bounded time/output, preserve wrapped pacman reverse-dependency lists and serialize one-time notice state.
-
+X11 translucent-panel ghosting and minor responsiveness remain deferred. An
+intermittent Kubuntu keyboard-test timeout remains unresolved. Owner-reported
+Manjaro installation and normal menu/Configure acceptance do not establish real
+power-action or physical held-key safety. See [release notes](RELEASE-NOTES-v2.1.0.md)
+and [test limitations](docs/TESTING.md#acceptance-scope-and-unresolved-results).
 
 ## 1.0.1 - first public release
 

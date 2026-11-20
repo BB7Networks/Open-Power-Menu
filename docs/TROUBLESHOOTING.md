@@ -30,7 +30,7 @@ existing gates. Diagnostics must not request focus or dispatch extra actions.
 The physically verified X11 Qt.Tool/transient-parent correction is preserved.
 
 Known limitations: translucent-panel text ghosting and minor responsiveness are
-deferred. One Phase 1 private X11 focus-readiness timeout did not recur on an
+deferred. One earlier private X11 focus-readiness timeout did not recur on an
 unchanged debug retry; its cause is unconfirmed. Physical acceptance remains
 required before stable publication. Wayland placement/activation and releases
 outside OPM have the documented compositor/fail-closed limitations.

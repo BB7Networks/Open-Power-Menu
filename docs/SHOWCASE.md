@@ -3,7 +3,7 @@
 The [README](../README.md) contains **39 real native captures** from approved
 source **`4e11393c4d289c453044130d79dc54a23049c32c`**, version **2.1.0**.
 No production code was changed to make these images. The existing historical
-images and frozen Phase 2 inventories remain unchanged.
+images and frozen historical inventories remain unchanged.
 
 [Full manifest](images/2.1/manifest.json) · [Exact image inventory](images/2.1/image-inventory.csv) ·
 [Feature audit](FEATURES.md) · [Historical gallery](images/README.md)
@@ -172,18 +172,19 @@ the disposable container when finished; retain raw captures outside Git as neede
 source/runtime consistency, zero power requests, the controlled setting differences,
 equal hint/icon geometry, genuinely different width/density/height, adaptive flyout
 direction, accessible clickable README images and successful EZ transcript steps.
-The normal repository audit checks local links and Markdown anchors. No Phase 2
-inventory is regenerated.
+The normal repository audit checks local links and Markdown anchors. Frozen
+historical inventories are not regenerated.
 
 `--baseline` additionally verifies both frozen CSV records against the approved
 commit and confirms 219 runtime/test/build/legacy/historical-image paths remain
-unchanged. This extra Phase 3 review boundary is separate from normal future
+unchanged. This historical documentation-review boundary is separate from normal future
 asset checks. CI runs the normal asset check alongside the existing portable
 suite; application qualification remains enabled.
 
-The [Phase 3 review record](maintenance/PHASE3-SHOWCASE.md) records exact local and
-CI results, live GitHub desktop/mobile/light/dark review, external-link limits,
-and the changed-file inventory. The GitHub review requires `github.githubassets.com`
+The [original showcase review record](maintenance/PHASE3-SHOWCASE.md) records local
+and CI results, the GitHub review procedure, external-link limits and changed-file
+inventory. [Final integration review](maintenance/FINAL-INTEGRATION.md) records the
+current presentation acceptance status. The GitHub review requires `github.githubassets.com`
 for actual site styling; the tool refuses unstyled pages instead of treating
 missing CSS as a README layout defect. The capture infrastructure had preselection
 setup issues (private activation environment, output permissions, panel spacers,
@@ -205,6 +206,6 @@ or production change was introduced.
   narrower filtering can be reviewed separately.
 - The full styled GitHub review needs its asset host allowed by the environment.
   Content/image decoding without CSS is not accepted as visual qualification.
-- Stable v2.1.0 download links are prepared and explicitly marked unpublished.
-  No release, tag, merge, workstation installation or historical-release change
-  belongs to this documentation phase.
+- Capture provenance stays pinned to the original application source. Final
+  integration preserves every image and its manifest; documentation and release
+  evidence updates do not imply that the application UI was recaptured.
