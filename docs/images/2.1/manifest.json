@@ -14260,16 +14260,16 @@
       "source_frame_sha256": "78200088dbecec93ac889820f6a18bf58cff6c199e78569f25b2c0b88395508f",
       "crop_ltrb": [
         0,
-        20,
+        178,
         352,
         1000
       ],
       "pixels": [
         352,
-        980
+        822
       ],
-      "sha256": "e8eca1041ec36802d3548ce5d14ec9da191c1e2e41f140d5f64f91829e69125e",
-      "bytes": 77285,
+      "sha256": "84e8e140ff74e8bbfa78ca8a1ac98abf6a09d580defce61d75be6882b0435867",
+      "bytes": 48204,
       "method": "QScreen.grabWindow(0); unchanged installed application"
     },
     {
@@ -14279,16 +14279,16 @@
       "source_frame_sha256": "ba02242b9c5c16bb1abc043b9dae7b4f657ed8c71feade0b5bdbf3d157decff3",
       "crop_ltrb": [
         0,
-        20,
+        178,
         352,
         1000
       ],
       "pixels": [
         352,
-        980
+        822
       ],
-      "sha256": "809ab7947c7fffc5d2cfd6ed0e47f83c5a32a9be1898faa8a91ae83126a197af",
-      "bytes": 77162,
+      "sha256": "42d82c5dc1cdc86302eeb199dfa9e607abf5f51fbaa5b12062d345e73d217f2d",
+      "bytes": 48110,
       "method": "QScreen.grabWindow(0); unchanged installed application"
     },
     {
@@ -14298,16 +14298,16 @@
       "source_frame_sha256": "610bc5614eeb79a64e254d6b616dcc944c8bc00a4ba1a58c3f3e2652fb3a8edc",
       "crop_ltrb": [
         0,
-        20,
+        178,
         352,
         1000
       ],
       "pixels": [
         352,
-        980
+        822
       ],
-      "sha256": "43daa4da91023dbc579a643fb0ead0912c6e4fda8cda823770e3bbcc83da5651",
-      "bytes": 75580,
+      "sha256": "e2a28263568fd01cdd6a548be096ecee166cdf5ab94600e62af13c552e8805e1",
+      "bytes": 46483,
       "method": "QScreen.grabWindow(0); unchanged installed application"
     },
     {
@@ -14317,16 +14317,16 @@
       "source_frame_sha256": "9caffcf332e4398d7bbacfa8eacbbe94864fa1cfbcf9b0039f0ac8a959375a06",
       "crop_ltrb": [
         0,
-        535,
+        538,
         352,
         1000
       ],
       "pixels": [
         352,
-        465
+        462
       ],
-      "sha256": "4b40bd3e646c63e0c742ac0225f98bc35153725d6a52d7e6602788fb0aefcdf5",
-      "bytes": 31043,
+      "sha256": "0b397bd51c5f56ab8303522c6dba4d6d89f2b847a78ab70fbbe3012619fead74",
+      "bytes": 30575,
       "method": "QScreen.grabWindow(0); unchanged installed application"
     },
     {

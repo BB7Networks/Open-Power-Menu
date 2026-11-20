@@ -44,6 +44,12 @@ def main():
         assert [int(row['width']),int(row['height'])]==expected['pixels']
     cases=manifest['cases'];base=cases['menu-standard']
     assert len(cases)==24
+    inventory_text=(ROOT/'docs/FEATURES.md').read_text()
+    defaults=json.loads((ASSETS/'native-defaults.json').read_text())
+    for key in defaults:
+        if key not in ('version','menu'):assert '`'+key+'`' in inventory_text, 'Undocumented preference: '+key
+    actions=set(json.loads((ROOT/'openpowermenu/data/actions.json').read_text()))|{'sleep','hibernate'}
+    for key in actions:assert '| `'+key+'` |' in inventory_text, 'Undocumented built-in: '+key
     assert cases['menu-default']['profile']=='default'
     assert cases['menu-default']['settings']==json.loads((ASSETS/'native-defaults.json').read_text()), 'Default capture must use the exact native defaults'
     assert base['settings']['menu']!=cases['menu-default']['settings']['menu'], 'Customized example must differ from defaults'

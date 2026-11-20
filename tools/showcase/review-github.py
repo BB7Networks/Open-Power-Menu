@@ -29,8 +29,17 @@ def main():
             for scheme in ('light','dark'):
                 name=label+'-'+scheme
                 context=browser.new_context(viewport={'width':width,'height':height},device_scale_factor=1,color_scheme=scheme)
-                page=context.new_page();response=page.goto(args.url,wait_until='domcontentloaded',timeout=60000)
+                page=context.new_page();failed_styles=[]
+                page.on('requestfailed',lambda request:failed_styles.append(request.url)
+                    if request.resource_type=='stylesheet' else None)
+                response=page.goto(args.url,wait_until='networkidle',timeout=60000)
                 assert response and response.status==200,(name,response.status if response else None)
+                # Unstyled GitHub HTML can still contain every image. It is not
+                # evidence of a faithful layout or light/dark rendering review.
+                assert not failed_styles,(name,'GitHub stylesheets blocked',failed_styles)
+                page.wait_for_function('''() => getComputedStyle(document.documentElement)
+                    .getPropertyValue('--bgColor-default').trim().length > 0 &&
+                    !getComputedStyle(document.body).fontFamily.includes('Times New Roman')''',timeout=30000)
                 article=page.locator('article.markdown-body').first
                 article.wait_for(timeout=30000)
                 page.wait_for_function("document.querySelectorAll('article.markdown-body img').length >= 39",timeout=30000)
@@ -44,6 +53,7 @@ def main():
                       colorMode:document.documentElement.dataset.colorMode,
                       prefersDark:matchMedia('(prefers-color-scheme: dark)').matches,
                       bodyBackground:getComputedStyle(document.body).backgroundColor,
+                      themeBackground:getComputedStyle(document.documentElement).getPropertyValue('--bgColor-default').trim(),
                       articleBackground:getComputedStyle(article).backgroundColor,
                       images:[...article.querySelectorAll('img')].map(image=>({
                         src:image.currentSrc,alt:image.alt,width:image.naturalWidth,height:image.naturalHeight,
@@ -62,8 +72,10 @@ def main():
                     target.scroll_into_view_if_needed()
                     page.screenshot(path=str(args.output/(name+'-'+section+'.png')))
                 metrics['view']=name;reports.append(metrics)
+                (args.output/'github-review.json').write_text(json.dumps(reports,indent=2)+'\n')
                 print(name,'PASS',len(metrics['images']),'loaded linked images',flush=True)
                 context.close()
+            assert reports[-1]['themeBackground']!=reports[-2]['themeBackground'], 'Light/dark styles did not differ'
         browser.close()
     (args.output/'github-review.json').write_text(json.dumps(reports,indent=2)+'\n')
 

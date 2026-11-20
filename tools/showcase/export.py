@@ -59,7 +59,9 @@ def main():
     for preset,case in [('narrow','width-narrow'),('auto','menu-standard'),('wide','width-wide')]:
         save('width-'+preset,case,args.captures/case/'screen.png',(0,450,466,1000))
     for name in ('editing-unlocked','editing-reordered','editing-destination','editing-submenu'):
-        crop=(0,20,352,1000) if name!='editing-submenu' else (0,535,352,1000)
+        state=next(row['state'] for row in cases['editing']['captures'] if row['name']==name)
+        top=state['popup']['window']['geometry'][1]
+        crop=(0,max(0,top-12),352,1000)
         save(name,'editing',args.captures/'editing'/(name+'.png'),crop)
     records=json.loads((args.editor_captures/'editor/editor-captures.json').read_text())
     for row in records:
@@ -78,7 +80,7 @@ def main():
         'cases':cases,'images':images,'installer':json.loads((args.installer/'provenance.json').read_text())}
     (args.output/'manifest.json').write_text(json.dumps(manifest,indent=2)+'\n')
     with (args.output/'image-inventory.csv').open('w',newline='') as stream:
-        writer=csv.DictWriter(stream,fieldnames=['file','case','width','height','bytes','sha256']);writer.writeheader()
+        writer=csv.DictWriter(stream,fieldnames=['file','case','width','height','bytes','sha256'],lineterminator='\n');writer.writeheader()
         for row in images:writer.writerow({**{key:row[key] for key in ('file','case','bytes','sha256')},'width':row['pixels'][0],'height':row['pixels'][1]})
     print(f'Exported {len(images)} genuine captures; {sum(r["bytes"] for r in images):,} PNG bytes')
 

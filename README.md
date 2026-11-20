@@ -6,7 +6,7 @@ Open Power Menu brings fast, familiar access to system tools, applications and
 power controls to KDE Plasma—alongside the application launcher you already use.
 One button, two menus, configurable shortcuts and a layout built around your workflow.
 
-**Make it yours — an example customized layout**
+**Customized example:** a shorter root menu with two nested flyouts.
 
 <a href="docs/images/2.1/hero.png"><img src="docs/images/2.1/hero.png" alt="Customized example, not the default layout: native OPM launcher, a rearranged Power User Menu and two nested Remote & Work flyouts" width="900"></a>
 
@@ -110,7 +110,7 @@ The appearance comparisons below keep this **customized example layout** fixed
 while varying one preference at a time. [Exact default JSON](docs/images/2.1/native-defaults.json)
 and [all defaults](docs/FEATURES.md#preferences-and-defaults) are available for reference.
 
-## One button. Two menus.
+## One button. Two menus
 
 Keep the launcher and favorites you already know. With OPM's default mouse
 behavior, **left-click opens your application launcher** and **right-click opens

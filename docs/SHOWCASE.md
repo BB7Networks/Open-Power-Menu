@@ -90,11 +90,17 @@ python3 scripts/audit-repository.py
 ```
 
 The [capture Dockerfile](../tools/showcase/Dockerfile) lists the Debian build,
-Plasma, desktop-application and font dependencies. It is a reproduction recipe;
-the recorded run used the existing isolated Debian qualification container with
-those dependencies, rather than rebuilding this newly added image definition.
-Exact recorded package versions are above; later distro snapshots may render
-differently and should get a new manifest.
+Plasma, desktop-application and font dependencies. Its fresh image build was
+qualified by rebuilding the native payload and capture driver, reproducing the
+exact-default and Configure cases, and running the real EZ check/install. The
+39 published images remain from the original isolated Debian capture sessions
+recorded in the manifest. Exact recorded packages are above; later distro
+snapshots may render differently and should get a new manifest.
+
+Use an x86-64 Linux Docker host. In a managed network, preserve the supplied
+HTTP(S) proxy and ensure its hostname resolves in Docker’s build namespace. The
+recorded fresh build needed that existing proxy DNS mapping; it did not bypass
+the managed proxy or change its allowed-host policy.
 
 ```sh
 docker build -f tools/showcase/Dockerfile -t opm-showcase-debian .
@@ -177,7 +183,9 @@ suite; application qualification remains enabled.
 
 The [Phase 3 review record](maintenance/PHASE3-SHOWCASE.md) records exact local and
 CI results, live GitHub desktop/mobile/light/dark review, external-link limits,
-and the changed-file inventory. The capture infrastructure had preselection
+and the changed-file inventory. The GitHub review requires `github.githubassets.com`
+for actual site styling; the tool refuses unstyled pages instead of treating
+missing CSS as a README layout defect. The capture infrastructure had preselection
 setup issues (private activation environment, output permissions, panel spacers,
 KDE menu prefix and one temporary driver lifetime bug); those were corrected and
 the delivered captures/checks completed successfully. No application workaround
@@ -195,6 +203,8 @@ or production change was introduced.
   spacers, because its discovery is generic. Select the actual application
   launcher. That existing UX is visible in the screenshot and remains unchanged;
   narrower filtering can be reviewed separately.
+- The full styled GitHub review needs its asset host allowed by the environment.
+  Content/image decoding without CSS is not accepted as visual qualification.
 - Stable v2.1.0 download links are prepared and explicitly marked unpublished.
   No release, tag, merge, workstation installation or historical-release change
   belongs to this documentation phase.
