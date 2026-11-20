@@ -357,6 +357,10 @@ jobs:
         run: |
           python3 scripts/stage-native-ez.py --evidence qualification-evidence --output review-assets --commit "$GITHUB_SHA"
           (cd review-assets && sha256sum -c SHA256SUMS)
+      - name: Validate the final public asset set without publishing
+        run: |
+          python3 scripts/stage-native-ez.py --publication --evidence qualification-evidence --output publication-check --commit "$GITHUB_SHA"
+          python3 scripts/publish-stable-release.py --assets publication-check --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         with:
           name: opm-2.1.0-review-${{ github.sha }}
