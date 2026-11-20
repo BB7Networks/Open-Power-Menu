@@ -1,5 +1,16 @@
 # Open Power Menu changelog
 
+## 2.1.0 — prepared, not yet published
+
+Native C++/Qt backend, editor and standalone; Plasma 6 widget with XInput2 held-key
+protection; KDE-native three-mode power confirmation; session/Configure reliability;
+distribution-specific native EZ installers and transactional recovery/rollback.
+Phase 1 sizes the Power Actions dropdown naturally. Phase 2 organizes historical
+material, prevents legacy source-install confusion and prepares verified stable
+publication. Physical acceptance, Phase 3 and explicit publication approval remain
+required. Historical releases and application behavior are preserved.
+
+
 ## 2.1.0-dev — unreleased
 
 The native rewrite and usability improvements share one public target: **2.1.0**,

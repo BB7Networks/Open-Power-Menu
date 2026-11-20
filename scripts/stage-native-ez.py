@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify and collect Phase 1 artifacts. This script cannot tag or publish."""
+"""Verify and collect native review or stable-release artifacts. This script cannot tag or publish."""
 import argparse
 import hashlib
 import importlib.util
@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import tarfile
 import tempfile
+
+import release_assets
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -25,11 +27,12 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--commit', required=True)
+    parser.add_argument('--publication', action='store_true', help='Prepare public content; never publish or tag')
     args = parser.parse_args()
     release = module('release', ROOT/'scripts/prepare-native-release.py')
     ez = module('ez', ROOT/'native/packaging/prepare-ez.py')
     manjaro = args.evidence/('opm-native-Manjaro-'+args.commit)
-    subprocess.run(['python3', str(ROOT/'scripts/prepare-native-release.py'), '--staging',
+    subprocess.run(['python3', str(ROOT/'scripts/prepare-native-release.py'), '--allow-final-version',
                     '--artifacts', str(manjaro), '--output', str(args.output),
                     '--commit', args.commit, '--tag', 'v2.1.0',
                     '--distribution-evidence', str(args.evidence)], check=True)
@@ -68,16 +71,19 @@ def main():
             artifacts.append({'distribution':distro,'name':path.name,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
         shutil.copy2(Path(str(archive)+'.sha256'),args.output/(archive.name+'.sha256'))
     report = json.loads((args.output/'QUALIFICATION.json').read_text())
-    report.update(stage='Phase 1 review; stable publication NOT approved', ez_artifacts=artifacts,
-                  baseline='2f889df3e5b29f49611f8cf37f41f15e86cad7c1', runtime_installation='Native and extracted EZ; offline')
+    report.update(ez_artifacts=artifacts,
+                  approved_phase1_baseline='0bf2f247ff6406d797112e8223dda4c9b4f0d59d',
+                  runtime_installation='Native and extracted EZ; offline',
+                  physical_acceptance='Not established by automation; owner approval required before publication')
     (args.output/'QUALIFICATION.json').write_text(json.dumps(report,indent=2)+'\n')
-    review = (ROOT/'docs/EZ-INSTALLER-PHASE1.md').read_text().replace(
-        '](images/phase1/', '](https://raw.githubusercontent.com/BB7Networks/Open-Power-Menu/'
-        + args.commit + '/docs/images/phase1/')
-    (args.output/'PHASE1-REVIEW.md').write_text(review)
-    hashes=''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n'
-                  for p in sorted(args.output.iterdir()) if p.is_file() and p.name != 'SHA256SUMS')
-    (args.output/'SHA256SUMS').write_text(hashes)
+    if not args.publication:
+        (args.output/'REVIEW-STATUS.md').write_text(
+            '# Open Power Menu 2.1.0 review artifacts\n\n'
+            'Source commit: `'+args.commit+'`. Stable publication is not approved.\n'
+            'These are distribution-specific review builds, not a public release.\n'
+            'Physical acceptance and the remaining documentation/release review are required.\n'
+            'The next public version is 2.1.0 Stable; no RC3 is created.\n')
+    release_assets.seal(args.output, args.commit, review=not args.publication)
     print('Verified 3 native EZ archives, native bundles, Manjaro package, source and all distribution evidence.')
 
 

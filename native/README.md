@@ -1,18 +1,18 @@
-# Native v2.1.0-rc2
+# Native 2.1 development
 
 The native backend, recovery operations and Qt Quick/Kirigami configuration
 editor and an optional Qt Widgets standalone frontend are implemented.
-The native release identifies itself as **2.1.0-rc2**. Use its complete native
+The native release identifies itself as **2.1.0**. Use its complete native
 bundle or Manjaro package, not the legacy Python/source installer retained for
 1.0.1 compatibility tests. All shipped native executables, bundle metadata and
 the packaged widget use `native/VERSION`; the legacy Python and source-widget
 metadata remain 1.0.1 and are not the native distribution metadata.
-See the [RC notes](../RELEASE-NOTES-v2.1.0-rc2.md), including the immediate-power
+See the [prepared release notes](../RELEASE-NOTES-v2.1.0.md), including the immediate-power
 warning, tested runtime limits and rollback instructions.
 
 See the [architecture and dependency inventory](../docs/architecture/0001-native-runtime.md),
-[migration status](../docs/architecture/native-migration-status.md) and
-[version roadmap](../docs/architecture/ROADMAP.md).
+[migration status](../docs/history/2.1-development/architecture/native-migration-status.md) and
+[version roadmap](../docs/history/2.1-development/architecture/ROADMAP.md).
 
 ## Backend build
 
@@ -22,7 +22,7 @@ Core/DBus development packages and Qt Test for tests. Debian/Ubuntu packages:
 `cmake ninja gcc qt6-base kconfig`. KConfigCore provides KDE's standard kiosk
 authorization checks for Shutdown, Restart and Sign out. Complete editor/package
 builds require it. A Qt-only backend preview can still build, but disables these
-three actions rather than bypassing KDE policy. Ordinary future binary installations must not
+three actions rather than bypassing KDE policy. Native binary installations do not
 require a compiler.
 
 ```bash
@@ -57,7 +57,7 @@ Editor/widget and standalone builds also need XCB and its XInput extension
 beside the executables and included in `native-bundle`; the installer checks it
 before replacing an installation. Copying QML alone is insufficient: missing or
 incompatible input guards disable menu keyboard dispatch. No plugin is installed
-into Plasma's system QML directories. See [held-key stabilization](../docs/HELD-KEY-STABILIZATION.md)
+into Plasma's system QML directories. See [held-key stabilization](../docs/history/2.1-development/HELD-KEY-STABILIZATION.md)
 for physical-key handling, regression results and safe mock-only acceptance.
 
 ```bash
@@ -83,8 +83,8 @@ applications use `kioclient6 exec` or `kioclient exec` with the desktop-file
 path so KDE handles Terminal, Path, field codes and D-Bus activation. Install
 that KDE helper for application selection; previously configured argv are
 preserved. KConfig reads panel metadata for launcher discovery without writing
-panel settings. Widget snapshot history is displayed read-only; its installer
-helper has not yet been ported.
+panel settings. Widget snapshot history is displayed read-only; the native transactional installer
+owns complete application installation snapshots and rollback.
 
 For a staged developer install:
 
@@ -110,7 +110,7 @@ build/native/native/open-power-menu-native --config /path/to/test-menu.json --du
 The loader merges missing defaults in ordinary OPM UTF-8 JSON and preserves
 unknown metadata, including signed 64-bit integers. It rejects non-UTF-8
 sources, integers outside signed 64-bit range and JSON nesting beyond 256;
-these cases need compatibility work before cutover. Integer settings still
+these are explicit native validation limits. Integer settings still
 reject decimal/exponent notation and booleans as in the Python model.
 
 Reads are bounded to 4 MiB, descriptor-relative and refuse symlink traversal.
@@ -143,7 +143,8 @@ Default bus name: `org.openpowermenu.NativePreview`. Object path and interface
 remain `/OpenPowerMenu` and `org.openpowermenu.Service`. The explicit
 `--bus-name org.openpowermenu.Service` option is for isolated widget integration
 testing; it refuses an existing service owner and never stops that process.
-It is not the normal installed service until UI/installer parity is complete.
+The installed native dispatcher supplies the production bus name; direct
+development invocations keep the preview name.
 
 Supported methods: `Ping`, `GetMenu`, `GetIntegration`, `Run`, `Edit`,
 `BeginLayoutEdit`, `SaveLayoutEdit`, `CancelLayoutEdit`, `KeepLayoutEdit`.
@@ -200,15 +201,14 @@ Default invocation opens the menu independently of Plasma or a backend service.
 supported; `--config FILE` selects a disposable profile. `--list` and `--check`
 print native normalized menu JSON rather than the legacy textual tree. These
 read-only diagnostics (and help/version) need no display. Service/widget/editor
-operations remain on their dedicated existing native executables; the native
-standalone does not replace the legacy command wrapper in this milestone.
+operations remain on their dedicated existing native executables; the installed native dispatcher launches the standalone for its normal menu operation.
 
 The configuration is read without writes for each process opening. Commands
 resolve against the validated opening snapshot, never action data or supplied
 argv. If availability changes the normalized tree before selection, execution
 is refused; reopen to refresh it. Detached applications survive the menu process.
-The existing power catalog retains KDE's normal confirmations. Pointer dismissal
-uses the existing preference and configurable 500–5000 ms delay (1200 ms default) across all submenus;
+Built-in power actions follow the configured three-mode KDE policy; explicit custom commands retain their behavior. Pointer dismissal
+uses the existing preference and configurable saved configurable delay across all submenus;
 keyboard navigation suspends it until mouse movement resumes.
 
 Wayland uses a frameless root toplevel and a single activation request. The
@@ -227,8 +227,8 @@ dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb build/standalone/native/
 dbus-run-session -- sh native/tests/standalone-wayland.sh build/standalone/native/native-standalone-tests
 ```
 
-Both staging and these recipes leave production binaries, activation, shortcuts,
-widget and the 1.0.1 EZ installer unchanged. Physical Plasma, mixed fractional-DPI
+Both staging and these recipes use disposable profiles; they do not install into
+a working desktop. Historical 1.0.1 assets remain unchanged. Physical Plasma, mixed fractional-DPI
 monitors, work-area/panel variations and launcher activation remain release gates.
 
 ## Complete native installation and upgrades
@@ -241,9 +241,9 @@ upgrades without Python or a compiler. The 1.0.1 release installer is retained.
 
 See [package installation and exact runtime dependencies](packaging/README.md),
 [transaction architecture](../docs/architecture/0003-native-packaging.md), and
-[Store requirements](../docs/KDE-STORE.md). Debian 13 amd64 is the tested native
-bundle baseline. Other distributions/architectures require matching builds and
-acceptance; a Debian binary is not a Manjaro package. Physical Plasma acceptance
+[Store requirements](../docs/KDE-STORE.md). Manjaro, Debian 13 and Kubuntu 26.04 x86-64 have independent qualification;
+see [compatibility](../docs/COMPATIBILITY.md). Other distributions/architectures
+require matching builds and acceptance; a Debian binary is not a Manjaro package. Physical Plasma acceptance
 remains mandatory before publishing or changing the normal released download.
 
 ## Stabilized selection and activation contract
@@ -252,4 +252,4 @@ Native 2.1 menu keys are opaque, expiring presentation identities. Clients must
 use the key returned by `GetMenu`, not construct positional paths. The widget
 uses `StartRun`/`RunResult` for request-specific asynchronous power completion;
 legacy `Run` returns its final boolean through a delayed reply. See the
-[runtime stabilization contract and tests](../docs/OPM-2.1-RUNTIME-STABILIZATION.md).
+[runtime stabilization contract and tests](../docs/history/2.1-development/OPM-2.1-RUNTIME-STABILIZATION.md).

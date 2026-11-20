@@ -1,11 +1,11 @@
 # Open Power Menu
 
-**Native v2.1.0-rc2** is a prerelease for controlled physical testing. Stable
-**v1.0.1** remains unchanged. Use the [RC release notes and native installation
-instructions](RELEASE-NOTES-v2.1.0-rc2.md) and the
-[GitHub prerelease](https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0-rc2).
-The legacy Python/source installer documentation below applies to stable 1.0.1;
-use the native package or complete native bundle for this candidate.
+**Native 2.1.0 is in stable-release preparation.** Phase 1 is approved; repository
+cleanup is under review. Physical acceptance and final publication approval are
+still required. Stable 1.0.1 and the historical RC releases remain unchanged.
+Use the [native installation guide](docs/INSTALLATION.md) and matching
+distribution-specific EZ package. The source checkout's root scripts only explain
+installation; they do not install the legacy Python application.
 
 **Warning: Shutdown, Restart and Sign out can execute immediately.** New installs
 follow KDE's confirmation setting; upgrades preserve the existing choice.
@@ -29,12 +29,14 @@ application launcher you already like.
 Keep your favorites, launcher and panel. OPM adds quick access to system tools
 without insisting on an entire desktop makeover.
 
-**Version 1.0.1** is the first public release of Open Power Menu.
-Download the complete installer from [GitHub Releases](https://github.com/BB7Networks/Open-Power-Menu/releases),
-or install directly from the source repository. See the
-[release review and compatibility notes](docs/RELEASE-1.0.1.md).
+The native backend, Configure editor and standalone menu require no Python
+runtime or compiler. See [compatibility](docs/COMPATIBILITY.md) for the three
+qualified binary targets and [current documentation](docs/README.md).
 
 ## See it in action
+
+The existing gallery is retained from earlier releases; the native 2.1 gallery
+refresh is a separately reviewed documentation phase.
 
 | Left side | Center | Right side |
 | --- | --- | --- |
@@ -56,49 +58,40 @@ or install directly from the source repository. See the
 - **Choose the appearance.** Follow your desktop theme or use Dark Aero, choose
   the launcher button icon, and show or hide menu entry icons.
 - **Close automatically if you prefer.** An optional setting closes the menu
-  1.2 seconds after the pointer leaves it and its submenus. It stays open during
+  after the configured delay when the pointer leaves it and its submenus. It stays open during
   keyboard navigation and layout editing.
 - **Recover confidently.** Configuration backups, Undo/Redo and restore controls
   help you experiment without manually editing JSON files.
 
 ## Install
 
-You need **KDE Plasma 6**, Python 3, PySide6 (QtCore, QtDBus and QtWidgets) and
-`kpackagetool6`. Run the installer as your normal desktop user, **without sudo**.
+Use the complete native EZ ZIP for **Manjaro KDE**, **Debian 13 KDE** or
+**Kubuntu 26.04**, x86-64. It includes the backend, editor, standalone, widget,
+native input plugin and reversible installer. Match your distribution and
+verify the external checksum before extracting. Run as your desktop user,
+**without sudo**, inside the extracted EZ directory:
 
-1. Download **OpenPowerMenu-EZ-v1.0.1.zip** from [Releases](https://github.com/BB7Networks/Open-Power-Menu/releases).
-2. Extract the entire ZIP and open a terminal inside the extracted
-   `OpenPowerMenu-v1.0.1` directory.
-3. Run:
-
-   ```bash
-   bash install.sh
-   ```
-
-4. Right-click your Plasma panel → **Add Widgets**. Add **Open Power Menu Start
-   Button** to the same panel as your existing launcher.
-5. Right-click OPM and select the **settings icon**. In General, choose your
-   launcher and test both mouse buttons before optionally hiding its original button.
-
-If PySide6 is missing on Manjaro, setup asks before using the system package
-manager. It never silently installs packages or restarts Plasma.
-
-**Installing from source instead:** choose **Code → Download ZIP** on this
-repository, extract the entire archive, and run `bash install.sh` in it.
-If you already use Git:
-
-```bash
-git clone https://github.com/BB7Networks/Open-Power-Menu.git
-cd Open-Power-Menu
+```sh
+bash install.sh --check
 bash install.sh
 ```
 
-**Upgrading:** extract the newer complete package and run `bash install.sh`
-again. Your saved menu, launcher settings and recovery history are preserved.
+The same command upgrades 1.0.1, RC1, RC2 or reinstalls 2.1.0 while preserving
+configuration, shortcuts, launcher selection and recovery history. Keep the
+existing applet for upgrades. For a new setup, add **Open Power Menu Start Button**
+through Plasma's Add Widgets and select the original launcher in Configure.
+Never remove the original launcher.
 
-The separate `.plasmoid` download contains only the widget. It does **not**
-install the Python backend; use the complete EZ installer for a working setup.
-See [KDE Store information](docs/KDE-STORE.md).
+Read [downloads, checksums and installation](docs/INSTALLATION.md),
+[runtime compatibility](docs/COMPATIBILITY.md), and [rollback](docs/RECOVERY.md).
+System dependencies are checked and explained; the EZ wrapper does not install
+them automatically or restart Plasma. Native code uses the distro Qt/KDE runtime.
+
+A **Code → Download ZIP** archive is source, not an EZ installer. Developers use
+[the native CMake build](native/README.md). Legacy Python installation machinery
+is retained only for compatibility tests under `legacy/1.0.1/`.
+The separate `.plasmoid` needs its matching native backend and plugin; see
+[KDE Store information](docs/KDE-STORE.md).
 
 ## Everyday use
 
@@ -120,7 +113,7 @@ commands; Configure → Layout also offers Duplicate and Undo/Redo.
 
 The **refresh** icon reloads an open menu and retries the backend if it was
 unavailable. Opening the menu normally already refreshes its contents.
-See [editing and keyboard controls](docs/IN-MENU-EDITING.md).
+See [editing and keyboard controls](docs/CONFIGURATION.md).
 
 ## Configure your menu
 
@@ -137,7 +130,7 @@ space in menu rows while keeping launcher and toolbar icons visible.
 Custom commands run with your usual permissions. Enter an executable and its
 arguments, such as `dolphin ~/Documents`; shell operators such as pipes and `&&`
 are not interpreted. The installed-application picker handles desktop entries
-for you. See [configuration, backups and recovery](docs/EDITOR-RECOVERY.md).
+for you. See [configuration, backups and recovery](docs/RECOVERY.md).
 
 ## Quick troubleshooting
 
@@ -157,9 +150,9 @@ If the original launcher button was hidden, restore it with:
 ~/.local/bin/open-power-menu --show-launcher-button
 ```
 
-To uninstall, remove only the OPM widget, then run `bash uninstall.sh` from the
-complete package. Your original launcher, configuration and recovery history
-remain. See [recovery and removal](docs/EDITOR-RECOVERY.md).
+To uninstall, remove only the OPM widget, then run `bash install.sh --uninstall` from the
+retained native EZ directory. Your original launcher, configuration and recovery history
+remain. See [recovery and removal](docs/RECOVERY.md).
 
 ## Compatibility and contributing
 
@@ -170,14 +163,10 @@ Display scaling, panel placement and compositor behavior can vary by desktop.
 [Report a bug](https://github.com/BB7Networks/Open-Power-Menu/issues) with your
 distribution, Plasma/Qt versions, launcher and steps to reproduce it.
 Contributors can start with [contributing](docs/CONTRIBUTING.md),
-[testing](docs/TESTING.md), [adapters](docs/ADAPTERS.md),
-[shortcut troubleshooting](docs/NATIVE-SHORTCUT-CASCADE.md) and
-[release preparation](docs/PUBLISHING.md).
-
-The v2.1 development branch introduces a [native Qt backend, configuration editor and standalone menu](native/README.md).
-See the [architecture and dependency review](docs/architecture/0001-native-runtime.md)
-and [migration status](docs/architecture/native-migration-status.md) for completed
-work, physical desktop gates and the remaining installation milestone. The
-released 1.0.1 installation still uses Python/PySide6.
+[testing](docs/TESTING.md), [native development](native/README.md), and
+[publication preparation](docs/PUBLISHING.md). The
+[architecture decisions](docs/architecture/0001-native-runtime.md) and
+[development history](docs/history/README.md) distinguish current native behavior
+from earlier Python and migration milestones.
 
 Independent community project, not affiliated with KDE. **MIT license:** [LICENSE](LICENSE).
