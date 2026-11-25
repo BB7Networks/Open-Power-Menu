@@ -26,6 +26,10 @@ OpenGL and no hardware render nodes. The stock distribution compositor and
 libraries remain intact. All Wayland fixtures check the standard D-Bus
 `Compositing.active` property before testing; a socket alone cannot qualify a
 failed renderer. This environment adaptation still requires fresh CI evidence.
+The runner audit also found `CONFIG_UDMABUF=y`: a built-in driver can have no
+loadable module. Setup therefore checks its registered device before invoking
+modprobe, instead of mistaking a failed module lookup for a missing driver.
+It neither replaces the runner kernel nor installs foreign graphics libraries.
 
 ## Debian root/flyout geometry
 

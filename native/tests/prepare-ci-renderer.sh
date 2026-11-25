@@ -21,14 +21,17 @@ for module in udmabuf vgem vkms; do
     fi
 done
 ls -ld /dev/udmabuf /dev/dri /sys/class/misc/udmabuf 2>/dev/null || true
-# Hosted images can omit modules for their running Azure kernel. Install only
-# that kernel's distribution package; never substitute a different kernel.
-if ! modinfo udmabuf; then
-    sudo apt-get update
-    sudo apt-get install --yes --reinstall "linux-modules-$kernel_release"
+# udmabuf may be built into the runner kernel (CONFIG_UDMABUF=y), in which
+# case modinfo/modprobe can report no module despite an available device.
+if [ ! -r /sys/class/misc/udmabuf/dev ]; then
+    sudo modprobe udmabuf
 fi
-sudo modprobe udmabuf
+if [ ! -c /dev/udmabuf ]; then
+    sudo udevadm trigger --action=add --subsystem-match=misc --sysname-match=udmabuf
+    sudo udevadm settle
+fi
 test -c /dev/udmabuf
 sudo chgrp 1000 /dev/udmabuf
 sudo chmod 0660 /dev/udmabuf
 ls -l /dev/udmabuf
+printf '::notice title=Software buffer device::udmabuf %s\n' "$(cat /sys/class/misc/udmabuf/dev)"
