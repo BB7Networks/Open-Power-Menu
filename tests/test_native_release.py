@@ -126,3 +126,20 @@ def test_greeter_rejects_invisible_confirmation_and_early_countdown(tmp_path):
     (tmp_path/'results.json').write_text(json.dumps(cases))
     with pytest.raises(ValueError, match='mismatch'):
         release.verify_greeter(tmp_path)
+
+
+def test_x11_greeter_evidence_cannot_certify_wayland(tmp_path):
+    greeter_evidence(tmp_path)
+    with pytest.raises(ValueError,match='platform mismatch'):
+        release.verify_greeter(tmp_path,'wayland')
+
+
+def test_wayland_only_keyboard_evidence_cannot_replace_dual_session_profile(tmp_path):
+    for visibility in ('visible','hidden'):
+        seat=tmp_path/('wayland-'+visibility);seat.mkdir()
+        (seat/'stress.json').write_text(json.dumps([{'fixture':True}]*7))
+        (seat/'results.json').write_text(json.dumps([{'fixture':True}]*12))
+        (seat/'requests.jsonl').write_text(('{}\n')*25)
+    assert len(release.verify_keyboard(tmp_path,('wayland',)))==2
+    with pytest.raises(FileNotFoundError):
+        release.verify_keyboard(tmp_path)

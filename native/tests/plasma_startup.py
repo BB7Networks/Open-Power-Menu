@@ -17,6 +17,7 @@ import sys
 import time
 import tempfile
 from fixture_evidence import Evidence
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
 ROOT = SCRIPT.parents[2]
@@ -277,10 +278,11 @@ def session(args):
         else:
             binary=case/'bin/kwin_wayland'; binary.parent.mkdir()
             shutil.copyfile(shutil.which('kwin_wayland'), binary); binary.chmod(0o700)
-            spawn([str(binary), '--virtual', '--width', str(args.width), '--height', str(args.height),
+            compositor=spawn([str(binary), '--virtual', '--width', str(args.width), '--height', str(args.height),
                    '--scale', str(args.scale), '--output-count', str(args.outputs), '--no-lockscreen',
                    '--no-global-shortcuts', '--socket', os.environ['WAYLAND_DISPLAY']], 'kwin.log')
             wait_for(lambda: (Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
+            wait_for(lambda:compositor_active(compositor))
         spawn([sys.executable, str(SCRIPT), '--backend'], 'backend.jsonl')
         for phase in (['fresh'] if args.single_start else ['fresh', 'shell-restart']):
             evidence.begin(phase)
@@ -394,6 +396,7 @@ def session(args):
             wait_for(lambda: subprocess.run(['qdbus6','org.kde.plasmashell','/PlasmaShell'],capture_output=True).returncode != 0)
         requests=[json.loads(line)['request'] for line in (case/'backend.jsonl').read_text().splitlines() if '"request"' in line]
         assert set(requests) <= {'GetIntegration','GetMenu','PowerCapabilitiesPending'}, requests
+        if args.platform=='wayland':assert compositor_active(compositor)
         print('PASS',case.name,flush=True)
     except BaseException:
         evidence.failure(processes,states={phase:read_states(case/f'{phase}.log')[-12:]
@@ -439,7 +442,7 @@ def main():
             env={**os.environ,'XDG_CONFIG_HOME':str(case/'config'),'XDG_DATA_HOME':str(case/'data'),
                  'XDG_CACHE_HOME':str(case/'cache'),'XDG_STATE_HOME':str(case/'state'),'XDG_RUNTIME_DIR':runtime.name,
                  'DISPLAY':'','WAYLAND_DISPLAY':'opm-startup-test','QT_QPA_PLATFORM':platform,
-                 'QT_QUICK_BACKEND':'software','KWIN_COMPOSE':'Q','KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6',
+                 'QT_QUICK_BACKEND':'software','KWIN_COMPOSE':os.environ.get('OPM_TEST_KWIN_COMPOSE','Q'),'KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6',
                  'OPM_MENU_DELAY':str(menu_delay),'OPM_PREF_DELAY':str(pref_delay),
                  'OPM_ICON_SIZE':'standard' if name=='slow-menu' else 'large',
                  'OPM_CUSTOM_HEIGHT':'600' if name=='slow-menu' else '460',

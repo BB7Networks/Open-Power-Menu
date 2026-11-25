@@ -20,6 +20,7 @@ from plasma_popup import prepare
 import plasma_popup
 from plasma_startup import wait_for
 from fixture_evidence import Evidence, tail
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
 
@@ -259,10 +260,7 @@ def session(args):
             compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen','--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log')
             wait_for(lambda:(Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
             def compositor_ready():
-                assert compositor.poll() is None, 'Private KWin exited before compositing was ready'
-                reply=subprocess.run(['qdbus6','org.kde.KWin','/Compositor',
-                    'org.kde.kwin.Compositing.active'],capture_output=True,text=True)
-                return reply.returncode==0 and reply.stdout.strip()=='true'
+                return compositor_active(compositor)
             # A Wayland socket alone can precede a fatal renderer failure.
             wait_for(compositor_ready)
         plasma=spawn(['plasmashell','--no-respawn'],'plasma.log')

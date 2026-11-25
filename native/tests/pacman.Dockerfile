@@ -18,7 +18,7 @@ RUN pacman --disable-download-timeout -Syu --noconfirm --needed base-devel cmake
     plasma-desktop plasma-workspace kwin discover dolphin konsole systemsettings powerdevil plasma-nm print-manager \
     plasma-systemmonitor kinfocenter ksystemlog partitionmanager virt-manager krdc && \
     case "$OPM_SESSION_PROFILE" in \
-        plasma67-x11) pacman -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
+        plasma67-x11) pacman --disable-download-timeout -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
         manjaro-wayland) ! command -v kwin_x11;; \
         *) exit 1;; \
     esac && command -v kwin_wayland && \
@@ -26,29 +26,28 @@ RUN pacman --disable-download-timeout -Syu --noconfirm --needed base-devel cmake
 # Qualify the primary Manjaro software manager as well as Discover. This is
 # dependency setup in a disposable test image, never application runtime logic.
 RUN . /etc/os-release && if [ "$ID" = manjaro ]; then \
-      if pacman -Si pamac-gtk >/dev/null 2>&1; then pacman -S --noconfirm --needed pamac-gtk; \
-      else pacman -S --noconfirm --needed pamac-gtk3; fi; fi
+      if pacman --disable-download-timeout -Si pamac-gtk >/dev/null 2>&1; then pacman --disable-download-timeout -S --noconfirm --needed pamac-gtk; \
+      else pacman --disable-download-timeout -S --noconfirm --needed pamac-gtk3; fi; fi
 WORKDIR /src
 COPY --chown=1000:1000 . /src
 USER 1000:1000
 ENV LANG=C.UTF-8
 WORKDIR /src/work/pacman-source
-RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
-    mkdir artifacts && \
+RUN sha256sum -c SOURCE.sha256 && mkdir artifacts && \
+    python /src/scripts/qualification_profiles.py --profile "$OPM_SESSION_PROFILE" --output artifacts/session-coverage.json && \
+    pacman -Q > artifacts/packages.txt && makepkg --noconfirm --nocolor && \
     cp ./*.pkg.tar.zst SOURCE-COMMIT SOURCE.sha256 open-power-menu-source.tar.gz artifacts/ && \
     sha256sum ./*.pkg.tar.zst > artifacts/PACKAGE.sha256 && \
     cp src/build/OpenPowerMenu-*.tar.gz src/build/OpenPowerMenu-*.sha256 src/build/*.plasmoid artifacts/ && \
     python src/Open-Power-Menu/native/packaging/prepare-ez.py --allow-arch-test --bundle src/build/native-bundle --output /tmp/ez-final && unzip -q /tmp/ez-final/*.zip -d /tmp/ez-final/root && \
     cp /tmp/ez-final/*.zip /tmp/ez-final/*.sha256 artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
-    python src/Open-Power-Menu/scripts/qualification_profiles.py --profile "$OPM_SESSION_PROFILE" --output artifacts/session-coverage.json && \
     XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python src/Open-Power-Menu/native/tests/application_resolution.py \
       --probe src/build/native/native-application-probe --live-audit artifacts/applications.json && \
-    printf '%s\n' 'Stable 2.1.0 preparation artifacts; publication not approved. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt && \
-    xvfb-run -a sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* xcb artifacts && \
-    dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh src/Open-Power-Menu/native/tests/standalone-wayland.sh sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* wayland artifacts
-# Xvfb above exercises the xcb application plugin, not a KDE X11 session. CI
-# separately requires every session in the validated profile, with no network.
+    printf '%s\n' 'Stable 2.1.0 preparation artifacts; publication not approved. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt
+# CI exercises the sealed EZ payload on both application platforms and every
+# supported session. Plasma 6.8 uses a software buffer device passed only to
+# that offline test container; Docker build steps have no render device.
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
 RUN cmake -S /src/work/package-rc1 -B /tmp/rc1-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
@@ -69,7 +68,7 @@ ENV OPM_TEST_RUNTIME_PYTHON=${OPM_RUNTIME_PYTHON}
 RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
         printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
     fi
-RUN pacman -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
+RUN pacman --disable-download-timeout -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
     kirigami kservice kconfig kde-cli-tools dbus && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
 COPY --from=build /src/work/pacman-source/artifacts /opt/opm-artifacts
 RUN pacman -U --noconfirm /opt/opm-artifacts/*.pkg.tar.zst && \
@@ -96,7 +95,7 @@ RUN --network=none sh /usr/local/libexec/opm-package-smoke.sh && printf 'passed\
 # distribution dependencies may include Python. OPM still requires no PySide6.
 FROM native-runtime
 USER 0:0
-RUN pacman -S --noconfirm --needed plasma-workspace && \
+RUN pacman --disable-download-timeout -S --noconfirm --needed plasma-workspace && \
     python3 -c 'import importlib.util; assert importlib.util.find_spec("PySide6") is None' && \
     cp /tmp/native-runtime-smoke /opt/opm-artifacts/native-runtime-smoke && \
     pacman -Q > /opt/opm-artifacts/runtime-packages.txt

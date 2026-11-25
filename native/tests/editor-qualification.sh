@@ -2,13 +2,14 @@
 # Run inside the disposable compiled image, with networking disabled. Record
 # versions/source before tests so a failure still leaves collectible evidence.
 set -eu
+umask 022
 cd /src
 evidence=/tmp/qualification
 mkdir "$evidence"
 cp /etc/os-release "$evidence/os-release"
 dpkg-query -W > "$evidence/packages.txt"
 date -u
-dpkg-query -W plasma-workspace kwin-x11 kwin-wayland libqt6core6t64 libkf6coreaddons6
+dpkg-query -W plasma-workspace kwin-x11 kwin-wayland libqt6core6t64 libkf6coreaddons6 | sed 's/^/OPM_RUNTIME_VERSION /'
 printf '%s\n' "$OPM_SOURCE_COMMIT" > "$evidence/SOURCE-COMMIT"
 finish() {
     result=$?

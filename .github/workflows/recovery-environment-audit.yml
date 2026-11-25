@@ -22,6 +22,15 @@ jobs:
             snapshot: '2026/09/27'
     steps:
       - uses: actions/checkout@v4
+      - name: Provide a software buffer device on this disposable runner
+        if: matrix.distro == 'Manjaro'
+        run: |
+          sudo modprobe udmabuf
+          test -c /dev/udmabuf
+          sudo chgrp 1000 /dev/udmabuf
+          sudo chmod 0660 /dev/udmabuf
+          uname -r
+          ls -l /dev/udmabuf
       - name: Inspect actual repositories without mixing distribution packages
         shell: bash
         run: |
@@ -29,21 +38,25 @@ jobs:
           mkdir -p work
           docker pull '${{ matrix.image }}'
           docker image inspect '${{ matrix.image }}' --format '{{json .RepoDigests}}' > work/image-digest.txt
+          render_args=()
+          if [ '${{ matrix.distro }}' = Manjaro ]; then
+            render_args=(--device /dev/udmabuf --env OPM_TEST_KWIN_COMPOSE=O2 --env KWIN_RENDER_NODES= --env KWIN_DISABLE_VULKAN=1 --env LIBGL_ALWAYS_SOFTWARE=1)
+          fi
           set +e
-          docker run --rm -e OPM_ARCH_SNAPSHOT='${{ matrix.snapshot }}' '${{ matrix.image }}' bash -c '
+          docker run --rm "${render_args[@]}" --mount type=bind,src="$GITHUB_WORKSPACE/native/tests",dst=/opm-tests,readonly -e OPM_ARCH_SNAPSHOT='${{ matrix.snapshot }}' '${{ matrix.image }}' bash -c '
             set -euo pipefail
             if [ -n "$OPM_ARCH_SNAPSHOT" ]; then
               printf "Server = https://archive.archlinux.org/repos/%s/\$repo/os/\$arch\n" "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist
             fi
             date -u
             cat /etc/os-release
-            pacman -Syu --noconfirm --needed plasma-workspace kwin qt6-base kcoreaddons kconfig kservice libplasma
+            pacman --disable-download-timeout -Syu --noconfirm --needed plasma-workspace kwin qt6-base kcoreaddons kconfig kservice libplasma
             pacman -Q
             printf "OPM_RUNTIME_VERSION "
             pacman -Q plasma-workspace kwin qt6-base kcoreaddons kconfig kservice libplasma | tr "\n" ";"
             printf "\n"
-            if pacman -Si kwin-x11; then
-              pacman -S --noconfirm --needed kwin-x11
+            if pacman --disable-download-timeout -Si kwin-x11; then
+              pacman --disable-download-timeout -S --noconfirm --needed kwin-x11
               printf "OPM_X11_PACKAGE "
               pacman -Q kwin-x11
             else
@@ -53,6 +66,11 @@ jobs:
               printf "OPM_COMPOSITOR %s " "$binary"
               command -v "$binary" || true
             done
+            if [ -c /dev/udmabuf ]; then
+              (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
+              runuser -u "$(id -nu 1000)" -- dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh /opm-tests/standalone-wayland.sh /bin/true
+              printf "OPM_RENDERER software OpenGL via udmabuf; active compositor verified\n"
+            fi
             date -u
           ' 2>&1 | tee work/environment.log
           result=${PIPESTATUS[0]}

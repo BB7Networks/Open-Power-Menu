@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSaveFile>
 #include <QTimer>
 #include <cstdio>
 #include <cstring>
@@ -31,9 +32,12 @@ int main(int argc, char **argv) {
                             "XDG_RUNTIME_DIR", "QT_QPA_PLATFORM", "XDG_ACTIVATION_TOKEN", "DESKTOP_STARTUP_ID",
                             "OPM_TEST_PRIVATE_VALUE", "OPM_TEST_SHELL_SECRET"})
         if (qEnvironmentVariableIsSet(key)) result[key] = qEnvironmentVariable(key);
-    QFile output(config + ".environment.json");
+    // The parent waits for this path to exist. Publish the completed evidence
+    // atomically, otherwise it can parse the empty file between open/write.
+    QSaveFile output(config + ".environment.json");
     if (!output.open(QIODevice::WriteOnly)) return 4;
-    output.write(QJsonDocument(result).toJson()); output.close();
+    const auto data = QJsonDocument(result).toJson();
+    if (output.write(data) != data.size() || !output.commit()) return 4;
     const auto mode = qEnvironmentVariable("OPM_EDITOR_TEST_MODE");
     if (mode == "exit") { std::fputs("Simulated Qt display initialization failure\n", stderr); return 7; }
     if (mode == "clean-exit") return 0;

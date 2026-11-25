@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
         std::printf("%s\n", bytes.constData()); std::fflush(stdout);
     };
     QSocketNotifier notifier(xcb_get_file_descriptor(connection), QSocketNotifier::Read);
-    QObject::connect(&notifier, &QSocketNotifier::activated, &app, [&] {
+    auto drain = [&] {
         while (auto *event = xcb_poll_for_event(connection)) {
             if ((event->response_type & 127) == XCB_GE_GENERIC) {
                 const auto *raw = reinterpret_cast<xcb_input_raw_key_press_event_t *>(event);
@@ -60,12 +60,16 @@ int main(int argc, char **argv) {
         if (xcb_connection_has_error(connection)) {
             write({{"event", "server-disconnected"}}); app.exit(7);
         }
-    });
+    };
+    QObject::connect(&notifier, &QSocketNotifier::activated, &app, drain);
     xcb_window_t previous = XCB_WINDOW_NONE;
     QTimer timer;
     QObject::connect(&timer, &QTimer::timeout, &app, [&] {
         auto current = focus();
         if (current != previous) { previous = current; write({{"event", "focus"}}); }
+        // A synchronous read-only reply can queue XI2 events in libxcb without
+        // leaving bytes on its socket. Drain that queue as well as FD wakeups.
+        drain();
     });
     timer.start(20);
     write({{"event", "ready"}});

@@ -72,6 +72,14 @@ jobs:
           container=$(docker create --network none opm-native-pacman:test)
           docker cp "$container:/opt/opm-artifacts" work/qualified-dev
           docker rm "$container"
+      - name: Provide software rendering buffers on the disposable Manjaro runner
+        if: matrix.session_profile == 'manjaro-wayland'
+        run: |
+          sudo modprobe udmabuf
+          test -c /dev/udmabuf
+          sudo chgrp 1000 /dev/udmabuf
+          sudo chmod 0660 /dev/udmabuf
+          ls -l /dev/udmabuf
       - name: Qualify every supported private session on the target distro
         shell: bash
         run: |
@@ -80,7 +88,11 @@ jobs:
             --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
             --build-arg OPM_SESSION_PROFILE=${{ matrix.session_profile }} \
             -f native/tests/pacman.Dockerfile -t opm-native-desktop:test .
-          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
+          render_args=()
+          if [ '${{ matrix.session_profile }}' = manjaro-wayland ]; then
+            render_args=(--device /dev/udmabuf --env OPM_TEST_KWIN_COMPOSE=O2 --env KWIN_RENDER_NODES= --env KWIN_DISABLE_VULKAN=1)
+          fi
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 "${render_args[@]}" \
             opm-native-desktop:test sh /src/native/tests/pacman-desktop.sh)
           trap 'docker rm -f "$container" >/dev/null' EXIT
           set +e

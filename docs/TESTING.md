@@ -35,6 +35,9 @@ Wayland activate the installed backend/editor as Qt application platforms. KDE
 session coverage is explicit: current Manjaro Plasma 6.8 requires Wayland; pinned
 Arch Plasma 6.7 and Debian/Kubuntu retain both sessions. The native Wayland greeter
 runs on each distribution as well. Missing session evidence fails asset verification.
+The Manjaro runner supplies `/dev/udmabuf` for KWin 6.8's software OpenGL virtual
+compositor. The offline container receives no hardware GPU or privileged mode;
+tests require active compositing before accepting the private Wayland seat.
 
 ## Private power and keyboard tests
 

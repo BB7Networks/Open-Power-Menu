@@ -12,6 +12,11 @@ for argument in sys.argv[1:]:
     # Docker repeats the entire RUN command on failure; it must not crowd the
     # useful Qt/Python assertion and its Actual/Expected context out of the log.
     raw = path.read_text(errors='replace').splitlines()
+    for line in raw:
+        for marker in ('OPM_RUNTIME_VERSION ', 'OPM_SESSION_COVERAGE '):
+            if marker in line:
+                message=line.split(marker,1)[1][:2800].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+                print('::error title='+path.name+' qualified runtime::'+message)
     # Keep the exact inner assertion and fixture state even when its JSON line
     # exceeds Docker/GitHub's ordinary tail limits. Split annotations below the
     # 4 KiB limit; never let a repeated Docker RUN command replace this evidence.

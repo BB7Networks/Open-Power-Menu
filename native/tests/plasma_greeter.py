@@ -18,6 +18,7 @@ import time
 from xml.sax.saxutils import escape
 from fixture_evidence import Evidence
 import private_greeter_wayland
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
 
@@ -105,10 +106,11 @@ def session(args):
             spawn(['kwin_x11'], 'kwin.log')
         else:
             binary=case/'kwin_wayland';shutil.copyfile(shutil.which('kwin_wayland'),binary);binary.chmod(0o700)
-            spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen',
+            compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen',
                    '--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log',
                   {**os.environ,'KWIN_WAYLAND_NO_PERMISSION_CHECKS':'1'})
             wait_for(lambda:(Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
+            wait_for(lambda:compositor_active(compositor))
         subprocess.run(['dbus-update-activation-environment', 'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SYSTEM_BUS_ADDRESS', 'QT_QPA_PLATFORM', 'QT_QUICK_BACKEND', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR', 'XDG_CURRENT_DESKTOP', 'OPM_POWER_RECORD'], check=True)
         spawn([sys.executable, SCRIPT, '--recorder'], 'policy.log')
         wait_for(lambda: 'SAFE_RECORDER_READY' in (case/'policy.log').read_text())
@@ -178,6 +180,7 @@ def session(args):
             report.append({'platform':args.platform,'action': action, 'mode': mode, 'confirm': confirm, 'kde_confirm': kde,
                            'countdown': countdown, 'elapsed': time.monotonic()-began, 'visible': confirm, 'result': result})
         (case/'results.json').write_text(json.dumps(report, indent=2)+'\n')
+        if args.platform=='wayland':assert compositor_active(compositor)
         print('PASS: real greeter, native countdown and private immediate routes:', len(report), 'cases.', flush=True)
     except BaseException:
         evidence.failure(processes,requests=records(),windows=windows())

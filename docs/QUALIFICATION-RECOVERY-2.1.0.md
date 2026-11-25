@@ -17,6 +17,16 @@ Exact versions and required binaries are recorded in `session-coverage.json`.
 Missing or mismatched profiles fail verification; no session is silently skipped.
 See [compatibility boundaries](COMPATIBILITY.md).
 
+The first recovery run reached Manjaro's private Wayland seat, then failed
+compositor readiness. KWin 6.8's virtual backend supports OpenGL, while the
+fixture requested QPainter. Its software render device also requires
+`/dev/udmabuf`. CI now provisions that buffer device on the disposable GitHub
+runner and passes it only to the offline Manjaro test container, using software
+OpenGL and no hardware render nodes. The stock distribution compositor and
+libraries remain intact. All Wayland fixtures check the standard D-Bus
+`Compositing.active` property before testing; a socket alone cannot qualify a
+failed renderer. This environment adaptation still requires fresh CI evidence.
+
 ## Debian root/flyout geometry
 
 Eleven independent local `xcb-ready` cases using the original application source
@@ -56,6 +66,21 @@ XI2 admission, focus handling and X11 popup protections are unchanged.
 An additional private run timed out waiting for X input focus during opening
 after the held-U scenario. That is a separate unresolved observation. Later
 passes do not diagnose or fix it; retain it in publication review.
+
+## Additional fixture failures exposed during recovery
+
+Pinned Arch reached the editor-launch suite and exposed an empty JSON read.
+The test probe created its evidence path before writing its contents, while the
+parent used path existence as readiness. The probe now commits that file
+atomically with `QSaveFile`; the assertions and product launcher are unchanged.
+The corrected local editor-launch suite passed.
+
+Archived package transfers also exceeded pacman's ten-second connection or
+low-speed limits. Dependency installation disables that transfer timeout while
+retaining the overall CI deadline, signatures and fixed repository snapshot.
+Offline qualification explicitly uses umask 022, matching installation tests'
+secure ancestor requirements; an inherited umask 0000 correctly caused the
+local dependency fixture to refuse an unsafe directory.
 
 ## Evidence and qualification gates
 
