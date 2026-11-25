@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 import tempfile
+from fixture_evidence import Evidence
 
 SCRIPT = Path(__file__).resolve()
 ROOT = SCRIPT.parents[2]
@@ -233,6 +234,7 @@ def wait_for(predicate, timeout=15):
 
 def session(args):
     case = Path(args.output).resolve()
+    evidence = Evidence(case,args.platform)
     assert (case/'runtime-path.txt').read_text()==os.environ['XDG_RUNTIME_DIR']
     processes, files = [], []
     def spawn(command, name, env=None, pass_fds=()):
@@ -270,6 +272,7 @@ def session(args):
             wait_for(lambda: (Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
         spawn([sys.executable, str(SCRIPT), '--backend'], 'backend.jsonl')
         for phase in (['fresh'] if args.single_start else ['fresh', 'shell-restart']):
+            evidence.begin(phase)
             log = case/f'{phase}.log'
             shell = spawn(['plasmashell', '--no-respawn'], log.name)
             if phase == 'fresh':
@@ -362,6 +365,8 @@ def session(args):
                 shown=wait_for(lambda: next((s for s in reversed(read_states(log)) if s['flyout'] and s['flyout']['visible']),None))
                 assert shown['flyout']['appearance']==os.environ['OPM_APPEARANCE'], shown
                 assert shown['flyout']['doesNotAcceptFocus'], 'Mouse-opened X11 flyout stole focus'
+                evidence.record('root-flyout-geometry',first_visibility=first[-1],before_hover=states[-1],shown=shown,
+                                focus=evidence.focus())
                 assert shown['window'][3]==first[-1]['window'][3], shown
                 if os.environ['OPM_APPEARANCE']=='aero-light':
                     assert shown['flyout']['text']=='#24394b' and shown['flyout']['surface']=='#eaf1f7', shown
@@ -375,7 +380,12 @@ def session(args):
         requests=[json.loads(line)['request'] for line in (case/'backend.jsonl').read_text().splitlines() if '"request"' in line]
         assert set(requests) <= {'GetIntegration','GetMenu','PowerCapabilitiesPending'}, requests
         print('PASS',case.name,flush=True)
+    except BaseException:
+        evidence.failure(processes,states={phase:read_states(case/f'{phase}.log')[-12:]
+                                          for phase in ('fresh','shell-restart')})
+        raise
     finally:
+        evidence.record('teardown-begin',processes=[{'pid':p.pid,'returncode':p.poll()} for p in processes])
         for p in reversed(processes): stop(p)
         for f in files: f.close()
 

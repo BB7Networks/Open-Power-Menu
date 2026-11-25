@@ -19,6 +19,7 @@ import time
 from plasma_popup import prepare
 import plasma_popup
 from plasma_startup import wait_for
+from fixture_evidence import Evidence, tail
 
 SCRIPT = Path(__file__).resolve()
 
@@ -66,6 +67,19 @@ def background():
 
 def instrument(case):
     prepare(case)
+    # Holding I while invoking Meta+X can also activate the distribution's
+    # Meta+I default. Its asynchronously launched System Settings window then
+    # receives the deliberate repress. Isolate that unrelated application
+    # shortcut in this disposable profile; keep the real OPM Meta+X path and
+    # all physical input/release and exact mock-count assertions unchanged.
+    settings=Path('/usr/share/kglobalaccel/systemsettings.desktop')
+    if settings.is_file():
+        overrides=case/'data/kglobalaccel';overrides.mkdir()
+        source=settings.read_text()
+        assert 'X-KDE-Shortcuts=' in source
+        (overrides/settings.name).write_text('\n'.join(
+            'X-KDE-Shortcuts=' if line.startswith('X-KDE-Shortcuts=') else line
+            for line in source.splitlines())+'\n')
     path=case/'data/plasma/plasmoids/org.openpowermenu.start/contents/ui/main.qml'
     source=path.read_text().replace('import QtQuick\n','import QtQuick\nimport QtTest\n',1)
     source=source.replace('function handleKey(event) {', 'function handleKey(event) { console.info("OPM_KEY_ROOT",Date.now(),event.key,event.isAutoRepeat);')
@@ -135,6 +149,7 @@ printf '%s\\n' '{"member":"Lock","arguments":[]}' >> "$OPM_POWER_RECORD"
 
 def session(args):
     case=Path(args.output)
+    evidence=Evidence(case,args.platform)
     os.environ['DBUS_SYSTEM_BUS_ADDRESS']=os.environ['DBUS_SESSION_BUS_ADDRESS']
     processes=[]; files=[]; sequence=0
     def spawn(command,name,pipe=False):
@@ -176,7 +191,7 @@ def session(args):
         # Zero delay deliberately includes genuine same-millisecond presses
         # mislabeled by Qt. Only native physical evidence can distinguish them.
         if args.platform=='xcb':
-            print('INPUT',values,'focus',command('xdotool','getwindowfocus'),'active',command('xprop','-root','_NET_ACTIVE_WINDOW'),flush=True)
+            evidence.record('key-click',keys=values,focus=evidence.focus(),requests=len(records()))
             command('xdotool','key','--clearmodifiers','--delay','0',*values)
         else: packet(keys=[v.upper() if len(v)==1 else v for v in values])
     def open_menu():
@@ -222,6 +237,11 @@ def session(args):
             processes.append(p);os.close(write);assert select.select([read],[],[],10)[0]
             os.environ['DISPLAY']=':'+os.read(read,64).decode().strip();os.close(read)
             command('dbus-update-activation-environment','DISPLAY')
+            os.environ['OPM_PRIVATE_X11_EVIDENCE']=os.environ['DISPLAY']
+            probe=Path(os.environ.get('OPM_TEST_X11_PROBE',str(Path(args.backend).parent/'native-x11-input-probe')))
+            assert probe.is_file(), 'Build the private XI2 evidence probe'
+            spawn([probe],'xinput.jsonl')
+            wait_for(lambda:'"event":"ready"' in tail(case/'xinput.jsonl'))
         fixture=spawn([sys.executable,SCRIPT,'--power-fixture'],'fixture.log',pipe=True)
         assert select.select([fixture.stdout],[],[],10)[0]
         assert fixture.stdout.readline().strip()=='SAFE_FIXTURE_READY'
@@ -272,6 +292,7 @@ def session(args):
                                ('r','promptReboot' if confirm else 'logoutAndReboot'),
                                ('i','promptLogout' if confirm else 'logout'),
                                ('s','SuspendWithFlags'),('h','HibernateWithFlags'),('l','Lock')]:
+                evidence.begin('ordinary-'+key+'-confirmation-'+str(confirm))
                 before=len(records());open_menu()
                 # Consecutive submenu/access keys have no artificial pause.
                 keys('u',key)
@@ -305,6 +326,7 @@ def session(args):
         # A held U opens the submenu, but its genuine X server auto-repeat
         # must never choose Shutdown. Release and a fresh press selects once.
         if args.held_repeat and args.platform=='xcb':
+            evidence.begin('held-U-server-autorepeat')
             configure(True);before=len(records());open_menu()
             command('xdotool','keydown','u')
             try:
@@ -320,11 +342,13 @@ def session(args):
         if args.held_repeat:
             stress=[]
             def down(key):
+                evidence.record('key-down',key=key,focus=evidence.focus(),requests=len(records()))
                 if args.platform=='xcb': command('xdotool','keydown',key.lower() if len(key)==1 else key)
                 else: packet(keys=[key],kind='press')
             def up(key):
                 if args.platform=='xcb': command('xdotool','keyup',key.lower() if len(key)==1 else key)
                 else: packet(keys=[key],kind='release')
+                evidence.record('key-up-sent',key=key,focus=evidence.focus(),requests=len(records()))
             def repeats(key):
                 if args.platform=='xcb':
                     # Genuine server repeats plus duplicate down events, with
@@ -335,6 +359,7 @@ def session(args):
                     # QtTest press events explicitly report isAutoRepeat=false.
                     for _ in range(4): down(key)
             configure(False)
+            evidence.begin('held-U-focus-transfer-dismiss-reopen-release-rapid-U-U')
             before=len(records());open_menu();down('U')
             try:
                 repeats('U');assert len(records())==before
@@ -352,6 +377,7 @@ def session(args):
             # Repeated key events after acceptance cannot select another action
             # after the root/flyout are opened again while that key remains down.
             for key,method in [('R','logoutAndReboot'),('I','logout'),('S','SuspendWithFlags'),('H','HibernateWithFlags'),('L','Lock')]:
+                evidence.begin('held-'+key+'-dismiss-reopen-deliberate-repress-'+method)
                 before=len(records());open_menu();keys('u');down(key)
                 try:
                     wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
@@ -369,6 +395,7 @@ def session(args):
             # A key pressed outside the menu cannot turn into a selection when
             # the popup opens. Release, then two zero-delay presses still work.
             if args.platform=='xcb':
+                evidence.begin('held-before-opening')
                 before=len(records());down('U')
                 try:
                     open_menu();repeats('U');assert len(records())==before
@@ -376,6 +403,7 @@ def session(args):
                 finally: up('U')
                 keys('u','u');wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
                 stress.append({'case':'held-before-opening','requests':1})
+            evidence.begin('held-Escape-returns-one-level-only')
             before=len(records());open_menu();keys('u');down('Escape')
             try:
                 repeats('Escape');assert state()['expanded']
@@ -387,12 +415,20 @@ def session(args):
         (case/'results.json').write_text(json.dumps(report,indent=2)+'\n')
         if args.platform=='wayland': assert compositor_ready(), 'Private compositor stopped during keyboard tests'
         print('PASS',args.platform,'hidden',args.hidden,'requests',len(records()),flush=True)
+    except BaseException:
+        evidence.failure(processes,state=state(),requests=records())
+        for line in tail(case/'plasma.log',200000).splitlines():
+            if any(token in line for token in ('OPM_KEY_', 'OPM_RELEASE_', 'InputGuard.')):
+                print('OPM_INPUT_EVIDENCE '+line[:3000],flush=True)
+        raise
     finally:
+        evidence.record('teardown-begin',processes=[{'pid':p.pid,'returncode':p.poll()} for p in processes])
         for p in reversed(processes):
             if p.poll() is None:
                 p.terminate()
                 try:p.wait(timeout=5)
                 except subprocess.TimeoutExpired:p.kill();p.wait()
+            evidence.record('process-ended',pid=p.pid,command=str(p.args[0]),returncode=p.returncode)
             if p.stdout:p.stdout.close()
         for output in files:output.close()
 

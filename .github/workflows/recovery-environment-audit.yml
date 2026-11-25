@@ -1,0 +1,74 @@
+name: Recovery environment audit
+on:
+  push:
+    branches: [release/2.1.0-qualification-recovery]
+    paths: [.github/workflows/recovery-environment-audit.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    name: Inspect ${{ matrix.distro }} repository and compositors
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distro: Manjaro
+            image: manjarolinux/base:latest
+            snapshot: ''
+          - distro: Arch-pinned-X11
+            image: archlinux:base-20260927.0.600689@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040
+            snapshot: '2026/09/27'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect actual repositories without mixing distribution packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p work
+          docker pull '${{ matrix.image }}'
+          docker image inspect '${{ matrix.image }}' --format '{{json .RepoDigests}}' > work/image-digest.txt
+          set +e
+          docker run --rm -e OPM_ARCH_SNAPSHOT='${{ matrix.snapshot }}' '${{ matrix.image }}' bash -c '
+            set -euo pipefail
+            if [ -n "$OPM_ARCH_SNAPSHOT" ]; then
+              printf "Server = https://archive.archlinux.org/repos/%s/\$repo/os/\$arch\n" "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist
+            fi
+            date -u
+            cat /etc/os-release
+            pacman -Syu --noconfirm --needed plasma-workspace kwin qt6-base kcoreaddons kconfig kservice libplasma
+            pacman -Q
+            printf "OPM_RUNTIME_VERSION "
+            pacman -Q plasma-workspace kwin qt6-base kcoreaddons kconfig kservice libplasma | tr "\n" ";"
+            printf "\n"
+            if pacman -Si kwin-x11; then
+              pacman -S --noconfirm --needed kwin-x11
+              printf "OPM_X11_PACKAGE "
+              pacman -Q kwin-x11
+            else
+              printf "OPM_X11_PACKAGE absent from current repositories\n"
+            fi
+            for binary in kwin_x11 kwin_wayland startplasma-x11 startplasma-wayland; do
+              printf "OPM_COMPOSITOR %s " "$binary"
+              command -v "$binary" || true
+            done
+            date -u
+          ' 2>&1 | tee work/environment.log
+          result=${PIPESTATUS[0]}
+          python3 - <<'PY'
+          from pathlib import Path
+          for line in Path('work/environment.log').read_text().splitlines():
+              if line.startswith('OPM_'):
+                  print('::notice title=Runtime audit::'+line.replace('%','%25'))
+          PY
+          test "$result" -eq 0
+      - name: Expose package failures
+        if: failure()
+        run: python3 scripts/report-ci-failure.py work/environment.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: recovery-environment-${{ matrix.distro }}-${{ github.sha }}
+          path: work/
+          retention-days: 90
