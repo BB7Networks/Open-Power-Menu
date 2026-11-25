@@ -280,6 +280,7 @@ def main():
             (case/'config/kwinrc').write_text('[Compositing]\nEnabled=true\nBackend=OpenGL\nGLCore=true\n[Plugins]\nslidingpopupsEnabled=true\nblurEnabled=true\ncontrastEnabled=true\n')
         with tempfile.TemporaryDirectory(prefix='opm-popup-') as runtime:
             env = {**os.environ, 'XDG_RUNTIME_DIR': runtime, 'DISPLAY': '', 'WAYLAND_DISPLAY': '',
+                   'QT_FORCE_STDERR_LOGGING': '1',
                    'QT_QPA_PLATFORM': 'xcb', 'QT_SCALE_FACTOR': str(args.scale), 'QT_QUICK_BACKEND': 'software', 'KDE_FULL_SESSION': 'true',
                    'KDE_SESSION_VERSION': '6'}
             if args.dismissal:

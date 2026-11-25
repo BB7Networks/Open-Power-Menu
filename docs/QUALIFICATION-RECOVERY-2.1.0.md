@@ -30,6 +30,8 @@ The runner audit also found `CONFIG_UDMABUF=y`: a built-in driver can have no
 loadable module. Setup therefore checks its registered device before invoking
 modprobe, instead of mistaking a failed module lookup for a missing driver.
 It neither replaces the runner kernel nor installs foreign graphics libraries.
+The [follow-up runtime audit](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/45632368124)
+verified active compositing with the stock Manjaro packages and software OpenGL.
 
 ## Debian root/flyout geometry
 
@@ -88,6 +90,13 @@ network retries. This retries downloads only; no test assertion is retried.
 Offline qualification explicitly uses umask 022, matching installation tests'
 secure ancestor requirements; an inherited umask 0000 correctly caused the
 local dependency fixture to refuse an unsafe directory.
+
+The expanded pinned-Arch suite then reached popup startup but captured an empty
+`fresh.log`, with Plasma, KWin and Xvfb still alive. Keyboard and greeter fixtures
+already force Qt diagnostics to stderr; startup and pointer fixtures now do the
+same, so journal-default Qt builds expose the samples those tests consume.
+The parent also prints the saved pre-teardown failure record explicitly before
+bounded log tails, preventing X server warnings from crowding it out.
 
 ## Evidence and qualification gates
 

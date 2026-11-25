@@ -442,6 +442,7 @@ def main():
             env={**os.environ,'XDG_CONFIG_HOME':str(case/'config'),'XDG_DATA_HOME':str(case/'data'),
                  'XDG_CACHE_HOME':str(case/'cache'),'XDG_STATE_HOME':str(case/'state'),'XDG_RUNTIME_DIR':runtime.name,
                  'DISPLAY':'','WAYLAND_DISPLAY':'opm-startup-test','QT_QPA_PLATFORM':platform,
+                 'QT_FORCE_STDERR_LOGGING':'1',
                  'QT_QUICK_BACKEND':'software','KWIN_COMPOSE':os.environ.get('OPM_TEST_KWIN_COMPOSE','Q'),'KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6',
                  'OPM_MENU_DELAY':str(menu_delay),'OPM_PREF_DELAY':str(pref_delay),
                  'OPM_ICON_SIZE':'standard' if name=='slow-menu' else 'large',
@@ -463,7 +464,10 @@ def main():
             if result != 0:
                 # Failed Docker RUN layers are not downloadable artifacts. Keep
                 # useful fixture diagnostics in the CI log itself.
-                for filename in ['session.log','kwin.log','backend.jsonl']:
+                failure=case/'failure.json'
+                if failure.is_file():
+                    print('OPM_FIXTURE '+json.dumps(json.loads(failure.read_text())),flush=True)
+                for filename in ['session.log','kwin.log','backend.jsonl','fresh.log','shell-restart.log']:
                     path=case/filename
                     if path.exists():
                         print(f'{case.name}/{filename}:',flush=True)
