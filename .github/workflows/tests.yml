@@ -9,6 +9,7 @@ jobs:
   native-pacman:
     name: Native ${{ matrix.label }} package and upgrades
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -18,13 +19,13 @@ jobs:
             image: archlinux:base-20260927.0.600689@sha256:b21322c663be387c0ed9cbc7bbbfe18e41633ad4e7b7c77cfad45f128be20040
             snapshot: '2026/09/27'
             runtime_python: absent
-            test_x11: 'ON'
+            session_profile: plasma67-x11
           - distro: Manjaro
             label: Manjaro
             image: manjarolinux/base:latest
             snapshot: ''
             runtime_python: distro
-            test_x11: 'ON'
+            session_profile: manjaro-wayland
     steps:
       - uses: actions/checkout@v4
       - name: Prepare checksum-pinned native source and released upgrade baseline
@@ -46,7 +47,7 @@ jobs:
           docker build --progress=plain --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
             --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
             --build-arg OPM_RUNTIME_PYTHON=${{ matrix.runtime_python }} \
-            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
+            --build-arg OPM_SESSION_PROFILE=${{ matrix.session_profile }} \
             -f native/tests/pacman.Dockerfile -t opm-native-pacman:test . 2>&1 | tee work/pacman-build.log
       - name: Expose failed qualification details in the check result
         if: failure()
@@ -71,58 +72,35 @@ jobs:
           container=$(docker create --network none opm-native-pacman:test)
           docker cp "$container:/opt/opm-artifacts" work/qualified-dev
           docker rm "$container"
-      - name: Qualify private keyboard seats on the target distro
+      - name: Provide software rendering buffers on the disposable Manjaro runner
+        if: matrix.session_profile == 'manjaro-wayland'
+        run: bash native/tests/prepare-ci-renderer.sh
+      - name: Qualify every supported private session on the target distro
         shell: bash
         run: |
           set -euo pipefail
           docker build --target build --build-arg OPM_BASE_IMAGE=${{ matrix.image }} \
             --build-arg OPM_ARCH_SNAPSHOT=${{ matrix.snapshot }} \
-            --build-arg OPM_TEST_X11=${{ matrix.test_x11 }} \
-            -f native/tests/pacman.Dockerfile -t opm-native-keyboard:test .
-          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
-            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_keyboard.py \
-            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-            --output /tmp/plasma-keyboard --held-repeat)
+            --build-arg OPM_SESSION_PROFILE=${{ matrix.session_profile }} \
+            -f native/tests/pacman.Dockerfile -t opm-native-desktop:test .
+          render_args=()
+          if [ '${{ matrix.session_profile }}' = manjaro-wayland ]; then
+            render_args=(--device /dev/udmabuf --env OPM_TEST_KWIN_COMPOSE=O2 --env KWIN_RENDER_NODES= --env KWIN_DISABLE_VULKAN=1)
+          fi
+          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 "${render_args[@]}" \
+            opm-native-desktop:test sh /src/native/tests/pacman-desktop.sh)
           trap 'docker rm -f "$container" >/dev/null' EXIT
           set +e
-          docker start --attach "$container" 2>&1 | tee work/pacman-keyboard.log
+          docker start --attach "$container" 2>&1 | tee work/pacman-desktop.log
           status=${PIPESTATUS[0]}
           set -e
-          docker cp "$container:/tmp/plasma-keyboard" work/qualified-dev/keyboard-tests
+          docker cp "$container:/tmp/desktop-qualification/." work/qualified-dev/
           test "$status" -eq 0
           test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
-      - name: Expose private seat failures in the check result
+          test "$(cat work/qualified-dev/desktop-tests-result)" = passed
+      - name: Expose private session failures in the check result
         if: failure()
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          for seat in sorted(Path('work/qualified-dev/keyboard-tests').glob('*')):
-              for name in ('session.log', 'kwin.log', 'plasma.log'):
-                  path = seat/name
-                  if not path.is_file():
-                      continue
-                  lines = [line for line in path.read_text(errors='replace').splitlines()
-                           if 'OPM_POPUP_TRACE' not in line]
-                  message = '\n'.join(lines)[-2800:]
-                  message = message.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
-                  print('::error title=Private seat ' + seat.name + ' ' + name + '::' + message)
-          PY
-      - name: Verify the real KDE greeter with private power recorders
-        shell: bash
-        run: |
-          set -euo pipefail
-          container=$(docker create --network none --env LIBGL_ALWAYS_SOFTWARE=1 \
-            opm-native-keyboard:test python src/Open-Power-Menu/native/tests/plasma_greeter.py \
-            --backend /src/work/pacman-source/src/build/native/open-power-menu-native \
-            --output /tmp/plasma-greeter)
-          trap 'docker rm -f "$container" >/dev/null' EXIT
-          set +e
-          docker start --attach "$container" 2>&1 | tee work/pacman-greeter.log
-          status=${PIPESTATUS[0]}
-          set -e
-          docker cp "$container:/tmp/plasma-greeter" work/qualified-dev/greeter-tests
-          test "$status" -eq 0
-          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
+        run: python3 scripts/report-ci-failure.py work/pacman-build.log work/pacman-desktop.log
       - name: Verify the Manjaro release asset set before tagging
         if: matrix.distro == 'Manjaro'
         run: |
@@ -130,6 +108,7 @@ jobs:
             --commit "$GITHUB_SHA" --tag "v$(cat native/VERSION)" --staging
           (cd work/release-verified && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: opm-native-${{ matrix.distro }}-${{ github.sha }}
           path: work/qualified-dev/
@@ -217,28 +196,42 @@ jobs:
             image: ubuntu:26.04
     steps:
       - uses: actions/checkout@v4
-      - name: Build and test native editor and distribution desktop
+      - name: Compile native editor and distribution desktop fixture
         shell: bash
         run: |
           set -o pipefail
           mkdir -p work
-          docker build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test . 2>&1 | tee work/editor-build.log
+          docker build --target build --progress=plain --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor-build:test . 2>&1 | tee work/editor-build.log
+      - name: Qualify private desktop and retain evidence before removing the fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          container=$(docker create --network none opm-native-editor-build:test)
+          trap 'docker rm -f "$container" >/dev/null' EXIT
+          set +e
+          docker start --attach "$container" 2>&1 | tee work/editor-tests.log
+          status=${PIPESTATUS[0]}
+          set -e
+          docker cp "$container:/tmp/qualification" work/qualification
+          test "$status" -eq 0
+          test "$(docker inspect --format '{{.State.ExitCode}}' "$container")" -eq 0
+          test "$(cat work/qualification/test-exit-status)" -eq 0
       - name: Expose desktop qualification failures
         if: failure()
-        run: python3 scripts/report-ci-failure.py work/editor-build.log
+        run: python3 scripts/report-ci-failure.py work/editor-build.log work/editor-tests.log
+      - name: Build independent runtime after successful qualification
+        run: docker build --build-arg OPM_DEB_IMAGE=${{ matrix.image }} --build-arg OPM_SOURCE_COMMIT=${{ github.sha }} -f native/tests/editor.Dockerfile -t opm-native-editor:test .
       - name: Run GUI without Python or a compiler
         run: docker run --rm --network none opm-native-editor:test
-      - name: Collect desktop and power qualification evidence
-        run: |
-          mkdir -p work
-          container=$(docker create --network none opm-native-editor:test)
-          docker cp "$container:/opt/opm-evidence" work/qualification
-          docker rm "$container"
-          printf '%s\n' passed > work/qualification/runtime-smoke
+      - name: Record successful independent runtime qualification
+        run: printf '%s\n' passed > work/qualification/runtime-smoke
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: opm-desktop-${{ matrix.distro }}-${{ github.sha }}
-          path: work/qualification/
+          path: |
+            work/qualification/
+          if-no-files-found: error
           retention-days: 90
   native-runtime:
     name: Native Qt backend

@@ -416,7 +416,7 @@ The standalone also accepts `--config`, `--anchor`, `--theme` and
 
 | Binary target | Qualified runtime snapshot | Boundary |
 | --- | --- | --- |
-| Manjaro KDE x86-64 | Qt 6.11.2 / Plasma 6.7.5 | Matching Manjaro libraries; avoid partial Qt/KDE upgrades |
+| Manjaro KDE x86-64 | Qt 6.12.0 / Plasma 6.8.2 | Native Wayland session and matching Manjaro libraries; avoid partial Qt/KDE upgrades |
 | Debian 13 KDE x86-64 | Qt 6.8.2 / Plasma 6.3.6 | Debian 13 native payload and libraries |
 | Kubuntu 26.04 x86-64 | Qt 6.10.2 / Plasma 6.6.7 | Ubuntu 26.04 KDE runtime and native payload |
 
@@ -425,6 +425,10 @@ same distro name works. Each distribution builds its own payload and records
 exact packages/source identity in `QUALIFICATION.json`. Arch remains a pinned
 regression target; there is no public Arch EZ compatibility claim. Other systems
 and architectures need their own source build and qualification.
+
+The earlier Manjaro Qt 6.11.2 / Plasma 6.7.5 build is a separate snapshot.
+Plasma 6.8 removed its native X11 session. X11 protections remain tested on
+pinned Plasma 6.7 and Debian/Kubuntu; the new Manjaro payload targets Wayland.
 
 The widget targets **Plasma 6**. Building the complete native editor requires
 **Qt 6.6 or later**, matching KF6 Config/Service, Kirigami and the documented
@@ -476,8 +480,9 @@ and [native CMake development](native/README.md).
   panel layouts still need workstation acceptance.
 - **Acceptance scope:** the owner reported successful Manjaro EZ installation
   and normal menu/Configure use. That does not establish real power-action or
-  physical held-key safety. An intermittent Kubuntu keyboard-test timeout remains
-  unresolved; see [qualification and limitations](docs/TESTING.md).
+  physical held-key safety. The Kubuntu held-I test interference was diagnosed;
+  a separate X11 opening-focus timeout remains unresolved. See
+  [qualification and limitations](docs/TESTING.md).
 
 The new screenshots are actual native UI from **Debian 13, Plasma 6.3.6, Qt
 6.8.2, X11/Xvfb + KWin, 100% scale**. Power-service endpoints are private mocks.

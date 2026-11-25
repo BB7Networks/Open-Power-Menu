@@ -31,7 +31,13 @@ packaging/upgrades. Package tests use exact released 1.0.1/RC1/RC2 source baseli
 private profiles, fault-injection builds, and separately sealed hooks-OFF payloads.
 Minimal runtime images prove Python absence where applicable; full Plasma images
 then exercise the EZ entrypoint without PySide6 or compilers. Both X11 and virtual
-Wayland activate the installed backend/editor. CI paths follow the cleanup inventory.
+Wayland activate the installed backend/editor as Qt application platforms. KDE
+session coverage is explicit: current Manjaro Plasma 6.8 requires Wayland; pinned
+Arch Plasma 6.7 and Debian/Kubuntu retain both sessions. The native Wayland greeter
+runs on each distribution as well. Missing session evidence fails asset verification.
+The Manjaro runner supplies `/dev/udmabuf` for KWin 6.8's software OpenGL virtual
+compositor. The offline container receives no hardware GPU or privileged mode;
+tests require active compositing before accepting the private Wayland seat.
 
 ## Private power and keyboard tests
 
@@ -49,11 +55,15 @@ D-Bus services; real XTest input on X11 and QtTest input on virtual KWin Wayland
 exercise root/flyout holds, fresh-flag repeats, rapid deliberate presses, release
 in another window, focus loss, reopening, navigation, custom/disabled keys and
 both launcher-visibility states. Records are `requests.jsonl`, `results.json`,
-`stress.json` and `plasma.log`. A held U must open once without dispatch; release
+`stress.json`, `plasma.log`, `events.jsonl` and X11 `xinput.jsonl`. On failure,
+`failure.json` records the assertion, focus, geometry, requests and process state
+before teardown. A held U must open once without dispatch; release
 and a deliberate next U must dispatch exactly once to the mock.
 
 The real greeter tests also use private final power endpoints. They cover all
-three confirmation modes, KDE settings and countdown/cancellation. No live
+three confirmation modes, KDE settings and countdown/cancellation. Wayland uses
+the stock native layer-shell greeter, a read-only KWin window observer and Escape
+input on the isolated compositor. No live
 shutdown, restart, sign-out, suspend, hibernate or lock is an acceptable test.
 
 For physical input in a private nested X11 seat, follow the existing
@@ -93,13 +103,13 @@ Automated power tests use private mocks exclusively.
 An [earlier Kubuntu CI run](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/44805592504)
 timed out at `native/tests/plasma_keyboard.py:365`, waiting for the expected second
 mock action after deliberate release/repress in the X11 hidden-launcher stress
-case. The retained log does not establish the cause. Three complete runs of the
-same production/test source passed, including the approved documentation
-commit's [push](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/44808026042)
-and [PR](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/44808034597)
-runs. The timeout remains unresolved; later passes are not a diagnosis or fix.
+case. Recovery reproduced this as competing Meta+I shortcut interference:
+System Settings received the physical release/repress while OPM was closed.
+The fixture now isolates that unrelated default shortcut, preserving the real
+OPM shortcut and all exact safety assertions. See the
+[timestamped recovery evidence](QUALIFICATION-RECOVERY-2.1.0.md).
 
-A separate earlier X11 focus-readiness timeout did not recur on an unchanged
-retry. Keep both findings, deferred panel ghosting and responsiveness limits
+A separate X11 opening-focus timeout recurred during recovery and remains
+unresolved. Keep that finding, deferred panel ghosting and responsiveness limits
 visible in release review. Final integration evidence belongs to its exact
 source commit and qualification run, as recorded in `QUALIFICATION.json`.

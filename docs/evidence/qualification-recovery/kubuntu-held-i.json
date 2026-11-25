@@ -1,0 +1,315 @@
+{
+  "application_source": "a27f1c7e10be8b25b0d42eb2f48c3a9aafea0085",
+  "fixture": "Original sequence with read-only XI2/focus/lifecycle instrumentation; before shortcut isolation",
+  "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+  "failure_time_ms": 1795613005844,
+  "assertion": "Traceback (most recent call last):\n  File \"/src/native/tests/plasma_keyboard.py\", line 378, in session\n    keys(key.lower());wait_for(lambda:len(records())==before+2)\n                      ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/src/native/tests/plasma_startup.py\", line 231, in wait_for\n    raise AssertionError('Timed out waiting for isolated Plasma: see retained logs')\nAssertionError: Timed out waiting for isolated Plasma: see retained logs\n",
+  "focus": {
+    "window": "25165837",
+    "properties": "WM_CLASS(STRING) = \"systemsettings\", \"systemsettings\"\n_NET_WM_NAME(UTF8_STRING) = \"Quick Settings  \u2014 System Settings\"\n_NET_WM_PID(CARDINAL) = 4791\n_NET_WM_WINDOW_TYPE(ATOM) = _NET_WM_WINDOW_TYPE_NORMAL",
+    "active": "_NET_ACTIVE_WINDOW(WINDOW): window id # 0x180000d"
+  },
+  "processes_at_assertion": [
+    {
+      "pid": 4216,
+      "command": "Xvfb",
+      "returncode": null
+    },
+    {
+      "pid": 4220,
+      "command": "/evidence/probe-build/native/native-x11-input-probe",
+      "returncode": null
+    },
+    {
+      "pid": 4221,
+      "command": "/usr/bin/python3",
+      "returncode": null
+    },
+    {
+      "pid": 4223,
+      "command": "/evidence/original-build/native/open-power-menu-native",
+      "returncode": null
+    },
+    {
+      "pid": 4224,
+      "command": "kwin_x11",
+      "returncode": null
+    },
+    {
+      "pid": 4225,
+      "command": "/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld",
+      "returncode": null
+    },
+    {
+      "pid": 4226,
+      "command": "plasmashell",
+      "returncode": null
+    },
+    {
+      "pid": 4290,
+      "command": "/usr/bin/python3",
+      "returncode": null
+    }
+  ],
+  "mock_request_count": 19,
+  "last_mock_request": {
+    "interface": "org.kde.Shutdown",
+    "path": "/Shutdown",
+    "member": "logout",
+    "arguments": []
+  },
+  "expanded_at_failure": false,
+  "input_tail": [
+    {
+      "event": "press",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2484780,
+      "source": 5,
+      "time_ms": 1795612989474
+    },
+    {
+      "event": "press",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 133,
+      "server_time": 2484831,
+      "source": 5,
+      "time_ms": 1795612989525
+    },
+    {
+      "event": "press",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 53,
+      "server_time": 2484849,
+      "source": 5,
+      "time_ms": 1795612989543
+    },
+    {
+      "event": "release",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 133,
+      "server_time": 2484872,
+      "source": 5,
+      "time_ms": 1795612989566
+    },
+    {
+      "event": "release",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 133,
+      "server_time": 2484872,
+      "source": 5,
+      "time_ms": 1795612989573
+    },
+    {
+      "event": "release",
+      "focus": 20971532,
+      "repeat": false,
+      "scan": 53,
+      "server_time": 2484878,
+      "source": 5,
+      "time_ms": 1795612989573
+    },
+    {
+      "event": "focus",
+      "focus": 12582967,
+      "time_ms": 1795612989918
+    },
+    {
+      "event": "press",
+      "focus": 12582967,
+      "repeat": false,
+      "scan": 30,
+      "server_time": 2485247,
+      "source": 5,
+      "time_ms": 1795612989942
+    },
+    {
+      "event": "release",
+      "focus": 12582967,
+      "repeat": false,
+      "scan": 30,
+      "server_time": 2485247,
+      "source": 5,
+      "time_ms": 1795612989942
+    },
+    {
+      "event": "focus",
+      "focus": 12583006,
+      "time_ms": 1795612989978
+    },
+    {
+      "event": "focus",
+      "focus": 25165837,
+      "time_ms": 1795612990061
+    },
+    {
+      "event": "press",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486055,
+      "source": 5,
+      "time_ms": 1795612990750
+    },
+    {
+      "event": "press",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486075,
+      "source": 5,
+      "time_ms": 1795612990769
+    },
+    {
+      "event": "press",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486093,
+      "source": 5,
+      "time_ms": 1795612990787
+    },
+    {
+      "event": "release",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486107,
+      "source": 5,
+      "time_ms": 1795612990802
+    },
+    {
+      "event": "press",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486134,
+      "source": 5,
+      "time_ms": 1795612990828
+    },
+    {
+      "event": "release",
+      "focus": 25165837,
+      "repeat": false,
+      "scan": 31,
+      "server_time": 2486134,
+      "source": 5,
+      "time_ms": 1795612990829
+    },
+    {
+      "event": "focus",
+      "focus": 1,
+      "time_ms": 1795613005978
+    }
+  ],
+  "teardown": [
+    {
+      "time_ms": 1795613005845,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "teardown-begin",
+      "processes": [
+        {
+          "pid": 4216,
+          "returncode": null
+        },
+        {
+          "pid": 4220,
+          "returncode": null
+        },
+        {
+          "pid": 4221,
+          "returncode": null
+        },
+        {
+          "pid": 4223,
+          "returncode": null
+        },
+        {
+          "pid": 4224,
+          "returncode": null
+        },
+        {
+          "pid": 4225,
+          "returncode": null
+        },
+        {
+          "pid": 4226,
+          "returncode": null
+        },
+        {
+          "pid": 4290,
+          "returncode": null
+        }
+      ]
+    },
+    {
+      "time_ms": 1795613005853,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4290,
+      "command": "/usr/bin/python3",
+      "returncode": -15
+    },
+    {
+      "time_ms": 1795613005969,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4226,
+      "command": "plasmashell",
+      "returncode": 0
+    },
+    {
+      "time_ms": 1795613005971,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4225,
+      "command": "/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld",
+      "returncode": -15
+    },
+    {
+      "time_ms": 1795613006035,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4224,
+      "command": "kwin_x11",
+      "returncode": 15
+    },
+    {
+      "time_ms": 1795613006037,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4223,
+      "command": "/evidence/original-build/native/open-power-menu-native",
+      "returncode": -15
+    },
+    {
+      "time_ms": 1795613006040,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4221,
+      "command": "/usr/bin/python3",
+      "returncode": -15
+    },
+    {
+      "time_ms": 1795613006041,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4220,
+      "command": "/evidence/probe-build/native/native-x11-input-probe",
+      "returncode": -15
+    },
+    {
+      "time_ms": 1795613006046,
+      "scenario": "held-I-dismiss-reopen-deliberate-repress-logout",
+      "event": "process-ended",
+      "pid": 4216,
+      "command": "Xvfb",
+      "returncode": 0
+    }
+  ]
+}

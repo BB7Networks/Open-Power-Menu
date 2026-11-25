@@ -16,6 +16,9 @@ import sys
 import tempfile
 import time
 from xml.sax.saxutils import escape
+from fixture_evidence import Evidence
+import private_greeter_wayland
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
 
@@ -72,10 +75,11 @@ def session(args):
     os.environ['DBUS_SYSTEM_BUS_ADDRESS'] = os.environ['DBUS_SESSION_BUS_ADDRESS']
     bus = QDBusConnection.sessionBus()
     case = Path(args.output)
+    evidence=Evidence(case,args.platform)
     processes, logs = [], []
-    def spawn(command, name):
+    def spawn(command, name, env=None):
         log = (case/name).open('w'); logs.append(log)
-        child = subprocess.Popen(list(map(str, command)), stdout=log, stderr=log)
+        child = subprocess.Popen(list(map(str, command)), stdout=log, stderr=log, env=env)
         processes.append(child)
         return child
     def call(member, *values):
@@ -88,20 +92,30 @@ def session(args):
         path = case/'requests.jsonl'
         return [json.loads(line) for line in path.read_text().splitlines()] if path.exists() else []
     def windows():
+        if args.platform=='wayland': return private_greeter_wayland.windows(case)
         result = subprocess.run(['xdotool', 'search', '--onlyvisible', '--class', 'ksmserver-logout-greeter'], capture_output=True, text=True)
         return result.stdout.split()
     try:
-        read, write = os.pipe()
-        log = (case/'display.log').open('w'); logs.append(log)
-        display = subprocess.Popen(['Xvfb', '-screen', '0', '1280x800x24', '-displayfd', str(write), '-nolisten', 'tcp'], pass_fds=(write,), stdout=log, stderr=log)
-        processes.append(display); os.close(write)
-        assert select.select([read], [], [], 10)[0]
-        os.environ['DISPLAY'] = ':'+os.read(read, 64).decode().strip(); os.close(read)
-        subprocess.run(['dbus-update-activation-environment', 'DISPLAY', 'DBUS_SYSTEM_BUS_ADDRESS', 'QT_QPA_PLATFORM', 'QT_QUICK_BACKEND', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR', 'XDG_CURRENT_DESKTOP', 'OPM_POWER_RECORD'], check=True)
+        if args.platform=='xcb':
+            read, write = os.pipe()
+            log = (case/'display.log').open('w'); logs.append(log)
+            display = subprocess.Popen(['Xvfb', '-screen', '0', '1280x800x24', '-displayfd', str(write), '-nolisten', 'tcp'], pass_fds=(write,), stdout=log, stderr=log)
+            processes.append(display); os.close(write)
+            assert select.select([read], [], [], 10)[0]
+            os.environ['DISPLAY'] = ':'+os.read(read, 64).decode().strip(); os.close(read)
+            spawn(['kwin_x11'], 'kwin.log')
+        else:
+            binary=case/'kwin_wayland';shutil.copyfile(shutil.which('kwin_wayland'),binary);binary.chmod(0o700)
+            compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen',
+                   '--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log',
+                  {**os.environ,'KWIN_WAYLAND_NO_PERMISSION_CHECKS':'1'})
+            wait_for(lambda:(Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
+            wait_for(lambda:compositor_active(compositor))
+        subprocess.run(['dbus-update-activation-environment', 'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SYSTEM_BUS_ADDRESS', 'QT_QPA_PLATFORM', 'QT_QUICK_BACKEND', 'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME', 'XDG_RUNTIME_DIR', 'XDG_CURRENT_DESKTOP', 'OPM_POWER_RECORD'], check=True)
         spawn([sys.executable, SCRIPT, '--recorder'], 'policy.log')
         wait_for(lambda: 'SAFE_RECORDER_READY' in (case/'policy.log').read_text())
-        spawn(['kwin_x11'], 'kwin.log')
         wait_for(lambda: bus.interface().isServiceRegistered('org.kde.KWin').value())
+        if args.platform=='wayland': private_greeter_wayland.observe(case)
         spawn(['plasmashell', '--no-respawn'], 'plasma.log')
         config = case/'config/open-power-menu/menu.json'; config.parent.mkdir(parents=True, exist_ok=True)
         config.write_text('{"menu":[]}')
@@ -116,6 +130,7 @@ def session(args):
         # activatable until the countdown case; immediate requests follow it.
         cases = [case for case in cases if case[3]] + [('always', True, 'shutdown', True, True)] + [case for case in cases if not case[3]]
         for mode, kde, action, confirm, countdown in cases:
+            evidence.begin(f'{args.platform}-{mode}-{action}-kde{kde}-countdown{countdown}')
             config_value = {'menu': [{'action': action}], 'confirm_power_actions': confirm}
             if 'power_confirmation' in defaults: config_value['power_confirmation'] = mode
             config.write_text(json.dumps(config_value))
@@ -140,13 +155,21 @@ def session(args):
                 time.sleep(2)
                 assert windows(), 'Greeter disappeared before cancellation'
                 assert len(records()) == before, 'Confirmation executed before cancellation'
-                subprocess.run([sys.executable, SCRIPT, '--screenshot', str(case/(mode+'-'+action+'-kde'+str(kde)+'.png'))], check=True)
+                if args.platform=='xcb':
+                    subprocess.run([sys.executable, SCRIPT, '--screenshot', str(case/(mode+'-'+action+'-kde'+str(kde)+'.png'))], check=True)
+                else:
+                    # Wayland disallows another client's QScreen.grabWindow.
+                    # Retain the compositor's real mapped-window/geometry proof.
+                    shown=windows()
+                    assert all(w['geometry'][2]>0 and w['geometry'][3]>0 for w in shown), shown
+                    evidence.record('native-greeter-visible',windows=shown)
                 if countdown:
                     wait_for(lambda: len(records()) == before+1, 40)
                     assert time.monotonic()-began >= 25, 'Stock KDE countdown completed unexpectedly early'
                     assert records()[-1]['member'] == 'logoutAndShutdown'
                 else:
-                    subprocess.run(['xdotool', 'key', 'Escape'], check=True)
+                    if args.platform=='xcb': subprocess.run(['xdotool', 'key', 'Escape'], check=True)
+                    else: private_greeter_wayland.escape()
                 wait_for(lambda: not windows())
                 wait_for(lambda: not bus.interface().isServiceRegistered('org.kde.LogoutPrompt').value())
                 assert len(records()) == before+int(countdown)
@@ -154,11 +177,16 @@ def session(args):
                 wait_for(lambda: len(records()) == before+1)
                 assert records()[-1]['member'] == {'shutdown': 'logoutAndShutdown', 'reboot': 'logoutAndReboot', 'logout': 'logout'}[action]
                 assert not windows()
-            report.append({'action': action, 'mode': mode, 'confirm': confirm, 'kde_confirm': kde,
+            report.append({'platform':args.platform,'action': action, 'mode': mode, 'confirm': confirm, 'kde_confirm': kde,
                            'countdown': countdown, 'elapsed': time.monotonic()-began, 'visible': confirm, 'result': result})
         (case/'results.json').write_text(json.dumps(report, indent=2)+'\n')
+        if args.platform=='wayland':assert compositor_active(compositor)
         print('PASS: real greeter, native countdown and private immediate routes:', len(report), 'cases.', flush=True)
+    except BaseException:
+        evidence.failure(processes,requests=records(),windows=windows())
+        raise
     finally:
+        evidence.record('teardown-begin')
         for child in reversed(processes):
             if child.poll() is None:
                 child.terminate()
@@ -170,6 +198,7 @@ def session(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend'); parser.add_argument('--output')
+    parser.add_argument('--platform',choices=['xcb','wayland'],default='xcb')
     parser.add_argument('--session', action='store_true'); parser.add_argument('--recorder', action='store_true')
     parser.add_argument('--shutdown', action='store_true'); parser.add_argument('--screenshot')
     args = parser.parse_args()
@@ -189,15 +218,17 @@ def main():
     bus_config = case/'bus.conf'
     bus_config.write_text('<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen><auth>EXTERNAL</auth><servicedir>'+escape(str(case/'services'))+'</servicedir><policy context="default"><allow send_destination="*"/><allow receive_sender="*"/><allow own="*"/></policy></busconfig>')
     with tempfile.TemporaryDirectory(prefix='opm-greeter-') as runtime:
-        env = {**os.environ, 'HOME': str(case/'home'), 'DISPLAY': '', 'WAYLAND_DISPLAY': '', 'XDG_RUNTIME_DIR': runtime,
-               'QT_QPA_PLATFORM': 'xcb', 'QT_QUICK_BACKEND': 'software', 'QT_FORCE_STDERR_LOGGING': '1',
+        (Path(runtime)/'.opm-private-greeter').write_text('private mocked greeter\n')
+        env = {**os.environ, 'HOME': str(case/'home'), 'DISPLAY': '', 'WAYLAND_DISPLAY': 'opm-greeter-test' if args.platform=='wayland' else '', 'XDG_RUNTIME_DIR': runtime,
+               'QT_QPA_PLATFORM': args.platform, 'QT_QUICK_BACKEND': 'software', 'QT_FORCE_STDERR_LOGGING': '1',
                'XDG_CURRENT_DESKTOP': 'KDE', 'KDE_FULL_SESSION': 'true', 'KDE_SESSION_VERSION': '6',
                'OPM_POWER_RECORD': str(case/'requests.jsonl')}
         env.pop('KWIN_COMPOSE', None)
+        if args.platform=='wayland': env['KWIN_COMPOSE']=os.environ.get('OPM_TEST_KWIN_COMPOSE','Q')
         env.update({f'XDG_{key.upper()}_HOME': str(case/key) for key in ('config', 'data', 'cache', 'state')})
         with (case/'session.log').open('w') as log:
             run = subprocess.run(['dbus-run-session', '--config-file', bus_config, '--', sys.executable, SCRIPT,
-                                  '--session', '--backend', args.backend, '--output', case], env=env, stdout=log, stderr=subprocess.STDOUT, timeout=180)
+                                  '--session', '--platform',args.platform,'--backend', args.backend, '--output', case], env=env, stdout=log, stderr=subprocess.STDOUT, timeout=180)
         if run.returncode:
             print((case/'session.log').read_text(), file=sys.stderr)
             raise AssertionError('Private real-greeter qualification failed: '+str(case))

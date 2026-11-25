@@ -19,8 +19,27 @@ import time
 from plasma_popup import prepare
 import plasma_popup
 from plasma_startup import wait_for
+from fixture_evidence import Evidence, tail
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
+
+
+def observed_flyout_return(log, offset):
+    """Require this input's show/hide transition, not an earlier hidden sample."""
+    with log.open('rb') as stream:
+        stream.seek(offset)
+        lines=stream.read().decode(errors='replace').splitlines()
+    shown=False
+    for line in lines:
+        if 'OPM_POPUP_TRACE ' not in line:continue
+        try:row=json.loads(line.split('OPM_POPUP_TRACE ',1)[1])
+        except ValueError:continue
+        if row.get('callback')!='flyout.visibleChanged':continue
+        visible=row['details']['window']['visible']
+        if visible:shown=True
+        elif shown:return True
+    return False
 
 
 def power_fixture():
@@ -66,6 +85,19 @@ def background():
 
 def instrument(case):
     prepare(case)
+    # Holding I while invoking Meta+X can also activate the distribution's
+    # Meta+I default. Its asynchronously launched System Settings window then
+    # receives the deliberate repress. Isolate that unrelated application
+    # shortcut in this disposable profile; keep the real OPM Meta+X path and
+    # all physical input/release and exact mock-count assertions unchanged.
+    settings=Path('/usr/share/kglobalaccel/systemsettings.desktop')
+    if settings.is_file():
+        overrides=case/'data/kglobalaccel';overrides.mkdir()
+        source=settings.read_text()
+        assert 'X-KDE-Shortcuts=' in source
+        (overrides/settings.name).write_text('\n'.join(
+            'X-KDE-Shortcuts=' if line.startswith('X-KDE-Shortcuts=') else line
+            for line in source.splitlines())+'\n')
     path=case/'data/plasma/plasmoids/org.openpowermenu.start/contents/ui/main.qml'
     source=path.read_text().replace('import QtQuick\n','import QtQuick\nimport QtTest\n',1)
     source=source.replace('function handleKey(event) {', 'function handleKey(event) { console.info("OPM_KEY_ROOT",Date.now(),event.key,event.isAutoRepeat);')
@@ -135,6 +167,7 @@ printf '%s\\n' '{"member":"Lock","arguments":[]}' >> "$OPM_POWER_RECORD"
 
 def session(args):
     case=Path(args.output)
+    evidence=Evidence(case,args.platform)
     os.environ['DBUS_SYSTEM_BUS_ADDRESS']=os.environ['DBUS_SESSION_BUS_ADDRESS']
     processes=[]; files=[]; sequence=0
     def spawn(command,name,pipe=False):
@@ -176,9 +209,18 @@ def session(args):
         # Zero delay deliberately includes genuine same-millisecond presses
         # mislabeled by Qt. Only native physical evidence can distinguish them.
         if args.platform=='xcb':
-            print('INPUT',values,'focus',command('xdotool','getwindowfocus'),'active',command('xprop','-root','_NET_ACTIVE_WINDOW'),flush=True)
+            evidence.record('key-click',keys=values,focus=evidence.focus(),requests=len(records()))
             command('xdotool','key','--clearmodifiers','--delay','0',*values)
         else: packet(keys=[v.upper() if len(v)==1 else v for v in values])
+    def popup_has_input_focus():
+        if args.platform!='xcb':return True
+        focused=subprocess.run(['xdotool','getwindowfocus'],capture_output=True,text=True)
+        window=focused.stdout.strip()
+        # PointerRoot/None is an expected intermediate state while KWin
+        # restores focus. Keep observing; it is not an input-ready window.
+        if focused.returncode or not window.isdigit() or int(window)<=1:return False
+        props=subprocess.run(['xprop','-id',window,'_NET_WM_PID','_NET_WM_WINDOW_TYPE'],capture_output=True,text=True)
+        return props.returncode==0 and ('= '+str(plasma.pid)) in props.stdout and '_KDE_NET_WM_WINDOW_TYPE_APPLET_POPUP' in props.stdout
     def open_menu():
         if app_id:
             command('xdotool','windowactivate','--sync',app_id)
@@ -195,10 +237,6 @@ def session(args):
         if args.platform=='xcb':
             # Qt's grouped active state can precede XSetInputFocus. Wait for
             # actual delivery to the applet, without requesting focus ourselves.
-            def popup_has_input_focus():
-                focused=command('xdotool','getwindowfocus')
-                props=command('xprop','-id',focused,'_NET_WM_PID','_NET_WM_WINDOW_TYPE')
-                return ('= '+str(plasma.pid)) in props and '_KDE_NET_WM_WINDOW_TYPE_APPLET_POPUP' in props
             wait_for(popup_has_input_focus)
     config=case/'config/open-power-menu/menu.json'; config.parent.mkdir(exist_ok=True)
     def configure(confirm,custom=False):
@@ -222,6 +260,11 @@ def session(args):
             processes.append(p);os.close(write);assert select.select([read],[],[],10)[0]
             os.environ['DISPLAY']=':'+os.read(read,64).decode().strip();os.close(read)
             command('dbus-update-activation-environment','DISPLAY')
+            os.environ['OPM_PRIVATE_X11_EVIDENCE']=os.environ['DISPLAY']
+            probe=Path(os.environ.get('OPM_TEST_X11_PROBE',str(Path(args.backend).parent/'native-x11-input-probe')))
+            assert probe.is_file(), 'Build the private XI2 evidence probe'
+            spawn([probe],'xinput.jsonl')
+            wait_for(lambda:'"event":"ready"' in tail(case/'xinput.jsonl'))
         fixture=spawn([sys.executable,SCRIPT,'--power-fixture'],'fixture.log',pipe=True)
         assert select.select([fixture.stdout],[],[],10)[0]
         assert fixture.stdout.readline().strip()=='SAFE_FIXTURE_READY'
@@ -229,20 +272,13 @@ def session(args):
         spawn([args.backend,'--service','--bus-name','org.openpowermenu.Service'],'backend.log')
         if args.platform=='xcb':
             spawn(['kwin_x11'],'kwin.log')
-            shortcut_daemon=shutil.which('kglobalacceld') or next((str(path) for path in
-                (Path('/usr/lib/kglobalacceld'),Path('/usr/libexec/kglobalacceld'),
-                 Path('/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld')) if path.is_file()),None)
-            assert shortcut_daemon, 'kglobalacceld is required for the private Meta+X fixture'
-            spawn([shortcut_daemon],'shortcuts.log')
+            spawn([plasma_popup.shortcut_daemon()],'shortcuts.log')
         else:
             binary=case/'bin/kwin_wayland'; shutil.copyfile(shutil.which('kwin_wayland'),binary);binary.chmod(0o700)
             compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen','--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log')
             wait_for(lambda:(Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
             def compositor_ready():
-                assert compositor.poll() is None, 'Private KWin exited before compositing was ready'
-                reply=subprocess.run(['qdbus6','org.kde.KWin','/Compositor',
-                    'org.kde.kwin.Compositing.active'],capture_output=True,text=True)
-                return reply.returncode==0 and reply.stdout.strip()=='true'
+                return compositor_active(compositor)
             # A Wayland socket alone can precede a fatal renderer failure.
             wait_for(compositor_ready)
         plasma=spawn(['plasmashell','--no-respawn'],'plasma.log')
@@ -272,6 +308,7 @@ def session(args):
                                ('r','promptReboot' if confirm else 'logoutAndReboot'),
                                ('i','promptLogout' if confirm else 'logout'),
                                ('s','SuspendWithFlags'),('h','HibernateWithFlags'),('l','Lock')]:
+                evidence.begin('ordinary-'+key+'-confirmation-'+str(confirm))
                 before=len(records());open_menu()
                 # Consecutive submenu/access keys have no artificial pause.
                 keys('u',key)
@@ -281,12 +318,22 @@ def session(args):
                 assert records()[-1]['member']==method, records()[-1]
                 assert state()['hideOriginalLauncher']==args.hidden
                 report.append({'confirmation':confirm,'keys':['Meta+X','U',key.upper()],'request':records()[-1]})
-        before=len(records());open_menu();keys('u','Escape')
-        wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible'])
+        evidence.begin('escape-flyout-then-root')
+        before=len(records());open_menu()
+        log=case/'plasma.log';offset=log.stat().st_size
+        keys('u','Escape')
+        # A hidden snapshot can precede U opening the flyout. It does not prove
+        # Escape returned to the parent. Observe the actual transition before
+        # injecting the next key, then require native root input focus again.
+        wait_for(lambda:observed_flyout_return(log,offset))
+        wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible']
+                 and popup_has_input_focus())
         keys('Escape');wait_for(lambda:not state()['expanded']);assert len(records())==before
+        evidence.begin('arrow-enter-navigation')
         open_menu();keys('Down','Right','Down','Up','Return')
         wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
         assert records()[-1]['member']=='promptShutDown'
+        evidence.begin('modified-access-keys-ignored')
         before=len(records());open_menu();keys('u')
         wait_for(lambda:state()['popup']['flyout']['window']['visible'] and state()['popup']['flyout']['window']['active'])
         if args.platform=='xcb':
@@ -296,8 +343,11 @@ def session(args):
         assert len(records())==before
         assert not state()['layoutEditing']
         assert state()['popup']['flyout']['window']['visible']
-        keys('Left');wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible'])
+        evidence.begin('left-to-parent-then-escape')
+        keys('Left');wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible']
+                             and popup_has_input_focus())
         keys('Escape');wait_for(lambda:not state()['expanded'])
+        evidence.begin('custom-access-keys')
         configure(False,custom=True);before=len(records());open_menu();keys('u','r','d')
         assert len(records())==before
         keys('z');wait_for(lambda:len(records())==before+1);assert records()[-1]['member']=='logoutAndShutdown'
@@ -305,6 +355,7 @@ def session(args):
         # A held U opens the submenu, but its genuine X server auto-repeat
         # must never choose Shutdown. Release and a fresh press selects once.
         if args.held_repeat and args.platform=='xcb':
+            evidence.begin('held-U-server-autorepeat')
             configure(True);before=len(records());open_menu()
             command('xdotool','keydown','u')
             try:
@@ -320,11 +371,13 @@ def session(args):
         if args.held_repeat:
             stress=[]
             def down(key):
+                evidence.record('key-down',key=key,focus=evidence.focus(),requests=len(records()))
                 if args.platform=='xcb': command('xdotool','keydown',key.lower() if len(key)==1 else key)
                 else: packet(keys=[key],kind='press')
             def up(key):
                 if args.platform=='xcb': command('xdotool','keyup',key.lower() if len(key)==1 else key)
                 else: packet(keys=[key],kind='release')
+                evidence.record('key-up-sent',key=key,focus=evidence.focus(),requests=len(records()))
             def repeats(key):
                 if args.platform=='xcb':
                     # Genuine server repeats plus duplicate down events, with
@@ -335,6 +388,7 @@ def session(args):
                     # QtTest press events explicitly report isAutoRepeat=false.
                     for _ in range(4): down(key)
             configure(False)
+            evidence.begin('held-U-focus-transfer-dismiss-reopen-release-rapid-U-U')
             before=len(records());open_menu();down('U')
             try:
                 repeats('U');assert len(records())==before
@@ -352,6 +406,7 @@ def session(args):
             # Repeated key events after acceptance cannot select another action
             # after the root/flyout are opened again while that key remains down.
             for key,method in [('R','logoutAndReboot'),('I','logout'),('S','SuspendWithFlags'),('H','HibernateWithFlags'),('L','Lock')]:
+                evidence.begin('held-'+key+'-dismiss-reopen-deliberate-repress-'+method)
                 before=len(records());open_menu();keys('u');down(key)
                 try:
                     wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
@@ -369,6 +424,7 @@ def session(args):
             # A key pressed outside the menu cannot turn into a selection when
             # the popup opens. Release, then two zero-delay presses still work.
             if args.platform=='xcb':
+                evidence.begin('held-before-opening')
                 before=len(records());down('U')
                 try:
                     open_menu();repeats('U');assert len(records())==before
@@ -376,6 +432,7 @@ def session(args):
                 finally: up('U')
                 keys('u','u');wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
                 stress.append({'case':'held-before-opening','requests':1})
+            evidence.begin('held-Escape-returns-one-level-only')
             before=len(records());open_menu();keys('u');down('Escape')
             try:
                 repeats('Escape');assert state()['expanded']
@@ -387,12 +444,20 @@ def session(args):
         (case/'results.json').write_text(json.dumps(report,indent=2)+'\n')
         if args.platform=='wayland': assert compositor_ready(), 'Private compositor stopped during keyboard tests'
         print('PASS',args.platform,'hidden',args.hidden,'requests',len(records()),flush=True)
+    except BaseException:
+        evidence.failure(processes,state=state(),requests=records())
+        for line in tail(case/'plasma.log',200000).splitlines():
+            if any(token in line for token in ('OPM_KEY_', 'OPM_RELEASE_', 'InputGuard.')):
+                print('OPM_INPUT_EVIDENCE '+line[:3000],flush=True)
+        raise
     finally:
+        evidence.record('teardown-begin',processes=[{'pid':p.pid,'returncode':p.poll()} for p in processes])
         for p in reversed(processes):
             if p.poll() is None:
                 p.terminate()
                 try:p.wait(timeout=5)
                 except subprocess.TimeoutExpired:p.kill();p.wait()
+            evidence.record('process-ended',pid=p.pid,command=str(p.args[0]),returncode=p.returncode)
             if p.stdout:p.stdout.close()
         for output in files:output.close()
 
@@ -441,6 +506,9 @@ def main():
                 if run.returncode:
                     # A failed Docker layer is not available for later artifact
                     # collection. Preserve the component diagnostics in its log.
+                    failure=case/'failure.json'
+                    if failure.is_file():
+                        print('OPM_FIXTURE '+json.dumps(json.loads(failure.read_text())),flush=True)
                     for name in ('session.log', 'plasma.log', 'kwin.log', 'backend.log',
                                  'fixture.log', 'application.log', 'shortcuts.log'):
                         path = case/name

@@ -16,6 +16,8 @@ import subprocess
 import sys
 import time
 import tempfile
+from fixture_evidence import Evidence
+from private_compositor import active as compositor_active
 
 SCRIPT = Path(__file__).resolve()
 ROOT = SCRIPT.parents[2]
@@ -221,6 +223,17 @@ def read_states(path):
     return rows
 
 
+def validate_flyout_root(before, shown):
+    # Plasma can resolve its theme margins after first exposure (captured
+    # 12 -> 8 px). The OPM content must remain identical and fit the CURRENT
+    # frame margins; comparing two outer heights assumes margins never change.
+    assert shown['open'] and shown['window'][4] and shown['flyout']['visible'], shown
+    assert shown['preferred']==before['preferred']==shown['min']==shown['max'], shown
+    assert shown['actual']==shown['preferred'], shown
+    assert abs(shown['window'][3]-shown['preferred']-shown['padding'])<=2, shown
+    assert shown['window'][3]<=shown['area'], shown
+
+
 def wait_for(predicate, timeout=15):
     until = time.monotonic()+timeout
     while time.monotonic() < until:
@@ -233,6 +246,7 @@ def wait_for(predicate, timeout=15):
 
 def session(args):
     case = Path(args.output).resolve()
+    evidence = Evidence(case,args.platform)
     assert (case/'runtime-path.txt').read_text()==os.environ['XDG_RUNTIME_DIR']
     processes, files = [], []
     def spawn(command, name, env=None, pass_fds=()):
@@ -264,12 +278,14 @@ def session(args):
         else:
             binary=case/'bin/kwin_wayland'; binary.parent.mkdir()
             shutil.copyfile(shutil.which('kwin_wayland'), binary); binary.chmod(0o700)
-            spawn([str(binary), '--virtual', '--width', str(args.width), '--height', str(args.height),
+            compositor=spawn([str(binary), '--virtual', '--width', str(args.width), '--height', str(args.height),
                    '--scale', str(args.scale), '--output-count', str(args.outputs), '--no-lockscreen',
                    '--no-global-shortcuts', '--socket', os.environ['WAYLAND_DISPLAY']], 'kwin.log')
             wait_for(lambda: (Path(os.environ['XDG_RUNTIME_DIR'])/os.environ['WAYLAND_DISPLAY']).is_socket())
+            wait_for(lambda:compositor_active(compositor))
         spawn([sys.executable, str(SCRIPT), '--backend'], 'backend.jsonl')
         for phase in (['fresh'] if args.single_start else ['fresh', 'shell-restart']):
+            evidence.begin(phase)
             log = case/f'{phase}.log'
             shell = spawn(['plasmashell', '--no-respawn'], log.name)
             if phase == 'fresh':
@@ -359,10 +375,16 @@ def session(args):
                     print('X11 pointer traversal passed across separators and command rows',flush=True)
                 x,y=map(round,states[-1]['firstRow'])
                 subprocess.run(['xdotool','mousemove',str(x),str(y)],check=True)
-                shown=wait_for(lambda: next((s for s in reversed(read_states(log)) if s['flyout'] and s['flyout']['visible']),None))
+                def current_flyout():
+                    samples=read_states(log)
+                    current=samples[-1] if samples else None
+                    return current if current and current['flyout'] and current['flyout']['visible'] else None
+                shown=wait_for(current_flyout)
                 assert shown['flyout']['appearance']==os.environ['OPM_APPEARANCE'], shown
                 assert shown['flyout']['doesNotAcceptFocus'], 'Mouse-opened X11 flyout stole focus'
-                assert shown['window'][3]==first[-1]['window'][3], shown
+                evidence.record('root-flyout-geometry',first_visibility=first[-1],before_hover=states[-1],shown=shown,
+                                focus=evidence.focus())
+                validate_flyout_root(first[-1],shown)
                 if os.environ['OPM_APPEARANCE']=='aero-light':
                     assert shown['flyout']['text']=='#24394b' and shown['flyout']['surface']=='#eaf1f7', shown
                 elif os.environ['OPM_APPEARANCE']=='aero':
@@ -374,8 +396,14 @@ def session(args):
             wait_for(lambda: subprocess.run(['qdbus6','org.kde.plasmashell','/PlasmaShell'],capture_output=True).returncode != 0)
         requests=[json.loads(line)['request'] for line in (case/'backend.jsonl').read_text().splitlines() if '"request"' in line]
         assert set(requests) <= {'GetIntegration','GetMenu','PowerCapabilitiesPending'}, requests
+        if args.platform=='wayland':assert compositor_active(compositor)
         print('PASS',case.name,flush=True)
+    except BaseException:
+        evidence.failure(processes,states={phase:read_states(case/f'{phase}.log')[-12:]
+                                          for phase in ('fresh','shell-restart')})
+        raise
     finally:
+        evidence.record('teardown-begin',processes=[{'pid':p.pid,'returncode':p.poll()} for p in processes])
         for p in reversed(processes): stop(p)
         for f in files: f.close()
 
@@ -387,7 +415,7 @@ def main():
     parser.add_argument('--session',action='store_true')
     parser.add_argument('--backend',action='store_true')
     parser.add_argument('--single-start',action='store_true', help='Check a fresh private shell without restarting it')
-    parser.add_argument('--platform',choices=['xcb','wayland'],default='xcb')
+    parser.add_argument('--platform',choices=['xcb','wayland'])
     parser.add_argument('--panel-edge',choices=['bottom','top','left','right'],default='bottom')
     parser.add_argument('--width',type=int,default=1280)
     parser.add_argument('--height',type=int,default=800)
@@ -398,7 +426,7 @@ def main():
     if args.session: return session(args)
     output=Path(args.output).resolve();output.mkdir(parents=True,exist_ok=True)
     # Delays alter reply order, never readiness correctness. Third case is warm.
-    for platform in ['xcb','wayland']:
+    for platform in ([args.platform] if args.platform else ['xcb','wayland']):
         for name,mode,density,theme,menu_delay,pref_delay,width,height,scale,outputs,edge in [
             ('slow-menu','auto','standard','native',1400,50,1280,800,1,1,args.panel_edge),
             ('slow-preferences','custom','comfortable','aero-light',50,5600,1024,640,1,1,args.panel_edge),
@@ -414,7 +442,8 @@ def main():
             env={**os.environ,'XDG_CONFIG_HOME':str(case/'config'),'XDG_DATA_HOME':str(case/'data'),
                  'XDG_CACHE_HOME':str(case/'cache'),'XDG_STATE_HOME':str(case/'state'),'XDG_RUNTIME_DIR':runtime.name,
                  'DISPLAY':'','WAYLAND_DISPLAY':'opm-startup-test','QT_QPA_PLATFORM':platform,
-                 'QT_QUICK_BACKEND':'software','KWIN_COMPOSE':'Q','KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6',
+                 'QT_FORCE_STDERR_LOGGING':'1',
+                 'QT_QUICK_BACKEND':'software','KWIN_COMPOSE':os.environ.get('OPM_TEST_KWIN_COMPOSE','Q'),'KDE_FULL_SESSION':'true','KDE_SESSION_VERSION':'6',
                  'OPM_MENU_DELAY':str(menu_delay),'OPM_PREF_DELAY':str(pref_delay),
                  'OPM_ICON_SIZE':'standard' if name=='slow-menu' else 'large',
                  'OPM_CUSTOM_HEIGHT':'600' if name=='slow-menu' else '460',
@@ -435,7 +464,10 @@ def main():
             if result != 0:
                 # Failed Docker RUN layers are not downloadable artifacts. Keep
                 # useful fixture diagnostics in the CI log itself.
-                for filename in ['session.log','kwin.log','backend.jsonl']:
+                failure=case/'failure.json'
+                if failure.is_file():
+                    print('OPM_FIXTURE '+json.dumps(json.loads(failure.read_text())),flush=True)
+                for filename in ['session.log','kwin.log','backend.jsonl','fresh.log','shell-restart.log']:
                     path=case/filename
                     if path.exists():
                         print(f'{case.name}/{filename}:',flush=True)

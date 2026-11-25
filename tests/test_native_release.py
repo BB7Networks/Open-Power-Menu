@@ -87,13 +87,13 @@ def test_archive_traversal_is_refused():
 
 
 def greeter_evidence(root):
-    cases = [{'mode': mode, 'kde_confirm': kde, 'action': action,
+    cases = [{'platform':'xcb','mode': mode, 'kde_confirm': kde, 'action': action,
               'confirm': mode == 'always' or (mode == 'system' and kde),
               'visible': mode == 'always' or (mode == 'system' and kde),
               'countdown': False, 'result': {'ok': True}, 'elapsed': 2.1}
              for mode in ('system', 'always', 'immediate') for kde in (False, True)
              for action in ('shutdown', 'reboot', 'logout')]
-    cases.append({'mode': 'always', 'kde_confirm': True, 'action': 'shutdown', 'confirm': True,
+    cases.append({'platform':'xcb','mode': 'always', 'kde_confirm': True, 'action': 'shutdown', 'confirm': True,
                   'visible': True, 'countdown': True, 'result': {'ok': True}, 'elapsed': 30.1})
     (root/'results.json').write_text(json.dumps(cases))
     (root/'requests.jsonl').write_text(''.join(json.dumps({'member': member})+'\n' for member in
@@ -126,3 +126,20 @@ def test_greeter_rejects_invisible_confirmation_and_early_countdown(tmp_path):
     (tmp_path/'results.json').write_text(json.dumps(cases))
     with pytest.raises(ValueError, match='mismatch'):
         release.verify_greeter(tmp_path)
+
+
+def test_x11_greeter_evidence_cannot_certify_wayland(tmp_path):
+    greeter_evidence(tmp_path)
+    with pytest.raises(ValueError,match='platform mismatch'):
+        release.verify_greeter(tmp_path,'wayland')
+
+
+def test_wayland_only_keyboard_evidence_cannot_replace_dual_session_profile(tmp_path):
+    for visibility in ('visible','hidden'):
+        seat=tmp_path/('wayland-'+visibility);seat.mkdir()
+        (seat/'stress.json').write_text(json.dumps([{'fixture':True}]*7))
+        (seat/'results.json').write_text(json.dumps([{'fixture':True}]*12))
+        (seat/'requests.jsonl').write_text(('{}\n')*25)
+    assert len(release.verify_keyboard(tmp_path,('wayland',)))==2
+    with pytest.raises(FileNotFoundError):
+        release.verify_keyboard(tmp_path)

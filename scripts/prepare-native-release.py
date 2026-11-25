@@ -2,6 +2,7 @@
 """Verify qualified native assets locally; this script cannot publish or tag."""
 import argparse
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -12,6 +13,9 @@ import tarfile
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
+_profile_spec = importlib.util.spec_from_file_location('qualification_profiles', ROOT/'scripts/qualification_profiles.py')
+profiles = importlib.util.module_from_spec(_profile_spec)
+_profile_spec.loader.exec_module(profiles)
 
 
 def inventory(data, prefix):
@@ -66,9 +70,12 @@ def verify_bundle(data, commit, version):
     return manifest, records
 
 
-def verify_keyboard(root):
+def verify_keyboard(root, platforms=('xcb','wayland')):
     seats = {}
-    for platform, expected_count in [('xcb', 27), ('wayland', 25)]:
+    if not platforms or any(p not in ('xcb','wayland') for p in platforms):
+        raise ValueError('Explicit supported keyboard platforms required')
+    for platform in platforms:
+        expected_count = 27 if platform=='xcb' else 25
         for visibility in ['visible', 'hidden']:
             name = platform+'-'+visibility
             seat = root/name
@@ -81,7 +88,7 @@ def verify_keyboard(root):
     return seats
 
 
-def verify_greeter(root):
+def verify_greeter(root, platform='xcb'):
     cases = json.loads((root/'results.json').read_text())
     expected = {(mode, kde, action) for mode in ('system', 'always', 'immediate')
                 for kde in (False, True) for action in ('shutdown', 'reboot', 'logout')}
@@ -90,6 +97,8 @@ def verify_greeter(root):
     if len(matrix) != 18 or {(c['mode'], c['kde_confirm'], c['action']) for c in matrix} != expected or len(countdown) != 1:
         raise ValueError('Incomplete three-mode real-greeter matrix')
     for case in cases:
+        if case.get('platform') != platform:
+            raise ValueError('Real-greeter platform mismatch')
         confirm = case['mode'] == 'always' or (case['mode'] == 'system' and case['kde_confirm'])
         if case['confirm'] != confirm or case['visible'] != confirm or not case['result']['ok']:
             raise ValueError('Real-greeter confirmation/result mismatch')
@@ -98,7 +107,26 @@ def verify_greeter(root):
     requests = [json.loads(line)['member'] for line in (root/'requests.jsonl').read_text().splitlines()]
     if sorted(requests) != sorted(['logoutAndShutdown']*4+['logoutAndReboot']*3+['logout']*3):
         raise ValueError('Unexpected private greeter power requests')
-    return {'platform': 'X11', 'cases': cases, 'mock_requests': requests}
+    return {'platform': platform, 'cases': cases, 'mock_requests': requests}
+
+
+def verify_pacman_sessions(root, profile):
+    coverage=profiles.verify(root,profile)
+    if (root/'desktop-tests-result').read_text().strip()!='passed':
+        raise ValueError('Required private desktop suite did not pass')
+    platforms=coverage['session_platforms']
+    startup=[]
+    for platform in platforms:
+        for name in ('slow-menu','slow-preferences','ready','ready-left'):
+            for phase in ('fresh','shell-restart'):
+                path=root/'startup-tests'/(platform+'-'+name)/(phase+'-states.json')
+                states=json.loads(path.read_text())
+                if not any(s['event']=='frame' for s in states):
+                    raise ValueError('Missing painted popup startup evidence: '+str(path))
+            startup.append(platform+'-'+name)
+    return {'coverage':coverage,'keyboard_seats':verify_keyboard(root/'keyboard-tests',platforms),
+            'greeters':{platform:verify_greeter(root/('greeter-'+platform),platform) for platform in platforms},
+            'popup_startup_cases':startup}
 
 
 def verify_applications(path):
@@ -136,6 +164,7 @@ def verify_distributions(root, commit, version):
             'installation_tests': verify_test_xml(install/'packaging-tests.xml', {'native-session-power', 'native-platform-plugins', 'native-editor-startup-x11'}),
             'applications': verify_applications(desktop/'applications.json'),
             'greeter': verify_greeter(desktop/'plasma-greeter'),
+            'wayland_greeter': verify_greeter(desktop/'plasma-greeter-wayland','wayland'),
             'keyboard_seats': verify_keyboard(desktop/'plasma-keyboard'),
             'runtime_smoke': 'passed', 'legacy_rc1_rc2_upgrade_rollback': 'passed'}
     arch = root/('opm-native-Arch-'+commit)
@@ -145,7 +174,7 @@ def verify_distributions(root, commit, version):
         'build_packages': (arch/'packages.txt').read_text().splitlines(),
         'runtime_packages': (arch/'runtime-packages.txt').read_text().splitlines(),
         'applications': verify_applications(arch/'applications.json'),
-        'greeter': verify_greeter(arch/'greeter-tests'), 'keyboard_seats': verify_keyboard(arch/'keyboard-tests')}
+        **verify_pacman_sessions(arch,'plasma67-x11')}
     return reports
 
 
@@ -196,8 +225,7 @@ def main():
     package_info = package_contents['.PKGINFO'].decode()
     if 'pkgname = open-power-menu-native\n' not in package_info or 'pkgver = '+version.replace('-rc', 'rc')+'-1\n' not in package_info:
         raise ValueError('Package version mismatch')
-    seats = verify_keyboard(args.artifacts/'keyboard-tests')
-    greeter = verify_greeter(args.artifacts/'greeter-tests')
+    sessions = verify_pacman_sessions(args.artifacts,'manjaro-wayland')
     applications = verify_applications(args.artifacts/'applications.json')
     distributions = verify_distributions(args.distribution_evidence, current, version) if args.distribution_evidence else {}
     args.output.mkdir() # Refuse to overwrite an earlier publication set.
@@ -211,7 +239,7 @@ def main():
         'os_release': (args.artifacts/'os-release').read_text(),
         'build_packages': (args.artifacts/'packages.txt').read_text().splitlines(),
         'runtime_packages': (args.artifacts/'runtime-packages.txt').read_text().splitlines(),
-        'keyboard_seats': seats, 'greeter': greeter, 'applications': applications,
+        **sessions, 'applications': applications,
         'other_distributions': distributions, 'real_power_operations': 0,
         'physical_acceptance': 'Pending; no physical workstation modified',
         'workflow': 'https://github.com/'+os.environ.get('GITHUB_REPOSITORY', 'BB7Networks/Open-Power-Menu')+'/actions/runs/'+os.environ.get('GITHUB_RUN_ID', '')}
@@ -226,7 +254,7 @@ def main():
     (args.output/'RELEASE-NOTES.md').write_text(notes)
     hashes = ''.join(hashlib.sha256(path.read_bytes()).hexdigest()+'  '+path.name+'\n' for path in sorted(args.output.iterdir()))
     (args.output/'SHA256SUMS').write_text(hashes)
-    print('Verified source, versions, sealed package/bundle equivalence and all four mock keyboard seats:', current)
+    print('Verified source, versions, sealed package/bundle equivalence and explicitly required mock sessions:', current)
 
 
 if __name__ == '__main__':

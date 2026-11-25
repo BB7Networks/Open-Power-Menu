@@ -20,6 +20,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(Path(__file__).parent))
 from plasma_startup import wait_for, install_test_input_module
 
+
+def shortcut_daemon():
+    binary=shutil.which('kglobalacceld') or next((str(path) for path in
+        (Path('/usr/lib/kglobalacceld'),Path('/usr/libexec/kglobalacceld'),
+         Path('/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld')) if path.is_file()),None)
+    assert binary, 'kglobalacceld is required for the private Meta+X fixture'
+    return binary
+
+
 ENTRIES = [
     {'kind': 'command', 'key': 'enabled', 'title': 'Enabled', 'enabled': True},
     {'kind': 'command', 'key': 'disabled', 'title': 'Disabled', 'enabled': False},
@@ -162,7 +171,7 @@ def session(args):
         command('dbus-update-activation-environment', 'DISPLAY')
         spawn(['kwin_x11'], 'kwin.log')
         if args.dismissal:
-            spawn(['/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld'], 'shortcuts.log')
+            spawn([shortcut_daemon()], 'shortcuts.log')
         spawn([sys.executable, __file__, '--backend'] + (['--hidden'] if args.hidden else []), 'backend.log')
         shell = spawn(['plasmashell', '--no-respawn'], 'plasma.log')
         wait_for(lambda: log.exists() and state() and state().get('button'), timeout=30)
@@ -280,6 +289,7 @@ def main():
             (case/'config/kwinrc').write_text('[Compositing]\nEnabled=true\nBackend=OpenGL\nGLCore=true\n[Plugins]\nslidingpopupsEnabled=true\nblurEnabled=true\ncontrastEnabled=true\n')
         with tempfile.TemporaryDirectory(prefix='opm-popup-') as runtime:
             env = {**os.environ, 'XDG_RUNTIME_DIR': runtime, 'DISPLAY': '', 'WAYLAND_DISPLAY': '',
+                   'QT_FORCE_STDERR_LOGGING': '1',
                    'QT_QPA_PLATFORM': 'xcb', 'QT_SCALE_FACTOR': str(args.scale), 'QT_QUICK_BACKEND': 'software', 'KDE_FULL_SESSION': 'true',
                    'KDE_SESSION_VERSION': '6'}
             if args.dismissal:

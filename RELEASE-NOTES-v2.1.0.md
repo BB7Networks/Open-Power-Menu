@@ -51,15 +51,20 @@ not physical workstation certification.
 ## Known issues and recovery
 
 X11 translucent-panel text ghosting and minor responsiveness remain deferred.
-An intermittent private X11 focus-readiness timeout during earlier qualification
-remains unconfirmed as a production defect. Historical v1.0.1, RC1 and RC2 remain
+An intermittent private X11 opening-focus timeout remains unresolved and
+unconfirmed as a production defect. Historical v1.0.1, RC1 and RC2 remain
 available; existing recovery snapshots are retained.
 
-A separate Kubuntu X11 hidden-launcher held-key stress test intermittently timed
-out waiting for a mock action after deliberate release/repress. The retained
-[failure log](https://github.com/BB7Networks/Open-Power-Menu/actions/runs/44805592504)
-does not establish the cause. Later runs passed with unchanged production/test
-sources; the timeout remains unresolved and is not claimed fixed.
+A separate Kubuntu held-I timeout was reproduced: Meta+X while I remained held
+also invoked KDE's Meta+I shortcut. System Settings received the later repress.
+The private fixture isolates that competing shortcut; the production input guard
+and its exact mock-count assertions remain unchanged. See the
+[recovery evidence](docs/QUALIFICATION-RECOVERY-2.1.0.md).
+
+Current Manjaro payloads target Plasma 6.8.2 / Qt 6.12 and the native Wayland
+session. The older Plasma 6.7.5 / Qt 6.11.2 snapshot and its physical installation
+acceptance are separate. Supported X11 coverage continues on pinned Plasma 6.7
+and Debian/Kubuntu. See [compatibility](docs/COMPATIBILITY.md).
 
 Keep the extracted installer for `bash install.sh --rollback`, `--recover` and
 `--uninstall`. Removing the package alone does not remove a per-user activation.

@@ -15,7 +15,7 @@ if [ "${OPM_WAYLAND_COMPOSITOR:-weston}" = kwin ]; then
     cp "$(command -v kwin_wayland)" "$runtime/bin/kwin_wayland"
     # This private compositor alone permits the fixture's input client. No
     # workstation compositor, keyboard setting or runtime configuration changes.
-    KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 KWIN_COMPOSE=Q QT_QUICK_BACKEND=software "$runtime/bin/kwin_wayland" \
+    KWIN_WAYLAND_NO_PERMISSION_CHECKS=1 KWIN_COMPOSE="${OPM_TEST_KWIN_COMPOSE:-Q}" QT_QUICK_BACKEND=software "$runtime/bin/kwin_wayland" \
         --virtual --width 1600 --height 1000 --scale "${OPM_SCALE:-1}" \
         --output-count "${OPM_OUTPUT_COUNT:-1}" --no-lockscreen --no-global-shortcuts \
         --socket "$WAYLAND_DISPLAY" > "$runtime/weston.log" 2>&1 &
@@ -30,4 +30,11 @@ for attempt in $(seq 1 100); do
     kill -0 "$compositor" || { cat "$runtime/weston.log"; exit 1; }
     sleep .05
 done
+test -S "$runtime/$WAYLAND_DISPLAY" || { cat "$runtime/weston.log"; exit 1; }
+if [ "${OPM_WAYLAND_COMPOSITOR:-weston}" = kwin ]; then
+    python3 "$(dirname "$0")/private_compositor.py" --pid "$compositor" || { cat "$runtime/weston.log"; exit 1; }
+fi
 QT_QPA_PLATFORM=wayland "$@"
+if [ "${OPM_WAYLAND_COMPOSITOR:-weston}" = kwin ]; then
+    python3 "$(dirname "$0")/private_compositor.py" --pid "$compositor" || { cat "$runtime/weston.log"; exit 1; }
+fi
