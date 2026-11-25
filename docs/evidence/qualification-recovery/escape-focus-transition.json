@@ -1,0 +1,269 @@
+{
+  "application_source": "a27f1c7e10be8b25b0d42eb2f48c3a9aafea0085",
+  "production_identical_to_recovery_source": "e8d9505c91dfeec1bce0ab6f97814ac8d4d80742",
+  "procedure": "Repeat the existing U+Escape, wait-hidden, Escape check with original application binaries on private Xvfb/KWin/mock seats.",
+  "finding": "The hidden snapshot was observed before the flyout opened. The second Escape reached XI2 during PointerRoot focus (1), but no second Qt key delivery occurred. No extra mock request occurred.",
+  "captures": [
+    {
+      "distribution": "kubuntu",
+      "seat": "xcb-hidden",
+      "scenario": "rapid-Escape-two-levels-15",
+      "premature_condition_time_ms": 1795622438569,
+      "snapshot_flyout_visible": false,
+      "mock_requests_before_and_after": 12,
+      "flyout_traces": [
+        {
+          "time_ms": 1795622438559,
+          "callback": "flyout.geometryChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        },
+        {
+          "time_ms": 1795622438573,
+          "callback": "flyout.visibleChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622438573,
+          "callback": "flyout.geometryChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622438574,
+          "callback": "flyout.visibilityChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622438580,
+          "callback": "flyout.visibleChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        },
+        {
+          "time_ms": 1795622438580,
+          "callback": "flyout.visibilityChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        }
+      ],
+      "escape_and_focus_input": [
+        {
+          "event": "focus",
+          "focus": 10485815,
+          "time_ms": 1795622438548
+        },
+        {
+          "event": "press",
+          "focus": 10485815,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11933864,
+          "source": 5,
+          "time_ms": 1795622438559
+        },
+        {
+          "event": "release",
+          "focus": 10485815,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11933864,
+          "source": 5,
+          "time_ms": 1795622438559
+        },
+        {
+          "event": "press",
+          "focus": 1,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11933886,
+          "source": 5,
+          "time_ms": 1795622438582
+        },
+        {
+          "event": "release",
+          "focus": 1,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11933888,
+          "source": 5,
+          "time_ms": 1795622438582
+        }
+      ],
+      "qml_key_delivery": [
+        "qml: OPM_KEY_ROOT 1795622438559 85 false",
+        "qml: OPM_KEY_ROOT 1795622438580 16777216 false",
+        "qml: OPM_KEY_SIDE 1795622438580 16777216 false",
+        "qml: OPM_KEY_SIDE 1795622438580 16777216 false"
+      ]
+    },
+    {
+      "distribution": "debian",
+      "seat": "xcb-visible",
+      "scenario": "rapid-Escape-two-levels-2",
+      "premature_condition_time_ms": 1795622479539,
+      "snapshot_flyout_visible": false,
+      "mock_requests_before_and_after": 12,
+      "flyout_traces": [
+        {
+          "time_ms": 1795622479532,
+          "callback": "flyout.geometryChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        },
+        {
+          "time_ms": 1795622479539,
+          "callback": "flyout.visibleChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622479539,
+          "callback": "flyout.geometryChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622479540,
+          "callback": "flyout.visibilityChanged",
+          "details": {
+            "window": {
+              "visible": true
+            }
+          }
+        },
+        {
+          "time_ms": 1795622479545,
+          "callback": "flyout.visibleChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        },
+        {
+          "time_ms": 1795622479545,
+          "callback": "flyout.visibilityChanged",
+          "details": {
+            "window": {
+              "visible": false
+            }
+          }
+        }
+      ],
+      "escape_and_focus_input": [
+        {
+          "event": "focus",
+          "focus": 10485838,
+          "time_ms": 1795622479527
+        },
+        {
+          "event": "press",
+          "focus": 10485838,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11974838,
+          "source": 5,
+          "time_ms": 1795622479532
+        },
+        {
+          "event": "release",
+          "focus": 10485838,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11974838,
+          "source": 5,
+          "time_ms": 1795622479533
+        },
+        {
+          "event": "focus",
+          "focus": 1,
+          "time_ms": 1795622479549
+        },
+        {
+          "event": "press",
+          "focus": 1,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11974856,
+          "source": 5,
+          "time_ms": 1795622479550
+        },
+        {
+          "event": "release",
+          "focus": 1,
+          "repeat": false,
+          "scan": 9,
+          "server_time": 11974856,
+          "source": 5,
+          "time_ms": 1795622479551
+        },
+        {
+          "event": "focus",
+          "focus": 10485838,
+          "time_ms": 1795622479568
+        }
+      ],
+      "qml_key_delivery": [
+        "qml: OPM_KEY_ROOT 1795622479532 85 false",
+        "qml: OPM_KEY_ROOT 1795622479545 16777216 false",
+        "qml: OPM_KEY_SIDE 1795622479545 16777216 false",
+        "qml: OPM_KEY_SIDE 1795622479545 16777216 false"
+      ]
+    }
+  ],
+  "follow_up_diagnostics": {
+    "application_binaries": "Original approved source; no production change",
+    "debian_transition_check_only": {
+      "visible_pairs": 60,
+      "hidden_pairs": 60,
+      "result": "passed"
+    },
+    "kubuntu_transition_and_no_focus_readiness_check": {
+      "visible_pairs": 60,
+      "hidden_pairs": 60,
+      "result": "passed"
+    },
+    "debian_transition_and_no_focus_readiness_check": {
+      "visible_pairs_before_failure": 20,
+      "result": "separate unresolved menu-opening focus timeout; before the next Escape sequence"
+    },
+    "kubuntu_wayland_full_keyboard": {
+      "seats": 2,
+      "ordinary_cases_per_seat": 12,
+      "held_cases_per_seat": 7,
+      "mock_requests_per_seat": 25,
+      "result": "passed"
+    },
+    "real_power_operations": 0
+  }
+}

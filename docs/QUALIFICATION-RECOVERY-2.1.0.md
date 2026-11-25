@@ -107,6 +107,28 @@ window observers used by that suite (provided by `x11-utils` on Debian/Kubuntu).
 Escape, outside-click and Meta+X assertions remain unchanged; no daemon is
 started on an existing desktop session.
 
+The next Arch run stopped at the second Escape in hidden-launcher navigation.
+Repeating that exact sequence with original application binaries reproduced the
+same assertion on Debian and Kubuntu. The [input/transition evidence](evidence/qualification-recovery/escape-focus-transition.json)
+shows the fixture accepting a hidden snapshot before U had opened the flyout.
+It injected the second Escape while the first was still returning to the root.
+XI2 recorded that second press at X11 PointerRoot focus (1), with no corresponding
+Qt delivery to OPM. The input guard admitted the first Escape; no extra mock
+request occurred. This is separate from the unresolved menu-opening timeout.
+
+Navigation now requires a newly observed flyout show/hide transition and restored
+native root input focus before sending the next step. U+Escape remains one
+zero-delay input sequence; rapid U+U and every held-key assertion remain intact.
+There is no new sleep, timeout increase, focus request or production change.
+Captured-event regressions reject both the premature snapshot and transitions
+from an earlier interaction. The corrected transition check passed 120 repeated
+Escape sequences on Debian; after also handling transient no-focus query
+responses as not-ready, Kubuntu passed 120 and both full Wayland keyboard seats.
+A subsequent Debian repetition passed 20 sequences before the separate
+menu-opening focus timeout recurred, before any next Escape input. That
+observation remains unresolved; it is not claimed fixed by this change. Failure annotations now include bounded raw input
+and the saved failure record explicitly, so parent log tails cannot omit it.
+
 ## Evidence and qualification gates
 
 Fixtures record scenario, assertion, timestamps, mock requests, input/focus,

@@ -50,9 +50,13 @@ class Evidence:
     def failure(self, processes, **values):
         # Called in except, BEFORE any process is terminated. A later XIO
         # message must not be confused with the original assertion's cause.
+        input_events=[]
+        for line in tail(self.case/'xinput.jsonl').splitlines():
+            try:input_events.append(json.loads(line))
+            except ValueError:pass # The bounded tail may start inside a record.
         row = self.record('failure-before-teardown', assertion=traceback.format_exc(),
                           processes=[{'pid': p.pid, 'command': str(p.args[0]), 'returncode': p.poll()} for p in processes],
-                          focus=self.focus(), **values)
+                          focus=self.focus(), input_events=input_events[-20:], **values)
         (self.case/'failure.json').write_text(json.dumps(row, indent=2)+'\n')
         for name in ('xinput.jsonl', 'requests.jsonl', 'kwin.log', 'display.log', 'shortcuts.log'):
             content = tail(self.case/name)

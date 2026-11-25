@@ -31,7 +31,7 @@ for argument in sys.argv[1:]:
         fixtures.append(row)
     failures = [row for row in fixtures if row['event'] == 'failure-before-teardown']
     for failure in failures[-2:]:
-        details = {key: failure.get(key) for key in ('time_ms','scenario','assertion','focus','processes')}
+        details = {key: failure.get(key) for key in ('time_ms','scenario','assertion','focus','processes','input_events')}
         state = failure.get('state') or {}
         popup = state.get('popup') or {}
         details['popup'] = {key:popup.get(key) for key in ('window','activeFocus','preferred','padding','flyout')}

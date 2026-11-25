@@ -25,6 +25,23 @@ from private_compositor import active as compositor_active
 SCRIPT = Path(__file__).resolve()
 
 
+def observed_flyout_return(log, offset):
+    """Require this input's show/hide transition, not an earlier hidden sample."""
+    with log.open('rb') as stream:
+        stream.seek(offset)
+        lines=stream.read().decode(errors='replace').splitlines()
+    shown=False
+    for line in lines:
+        if 'OPM_POPUP_TRACE ' not in line:continue
+        try:row=json.loads(line.split('OPM_POPUP_TRACE ',1)[1])
+        except ValueError:continue
+        if row.get('callback')!='flyout.visibleChanged':continue
+        visible=row['details']['window']['visible']
+        if visible:shown=True
+        elif shown:return True
+    return False
+
+
 def power_fixture():
     from PySide6.QtCore import QCoreApplication
     from PySide6.QtDBus import QDBusConnection, QDBusVirtualObject
@@ -195,6 +212,15 @@ def session(args):
             evidence.record('key-click',keys=values,focus=evidence.focus(),requests=len(records()))
             command('xdotool','key','--clearmodifiers','--delay','0',*values)
         else: packet(keys=[v.upper() if len(v)==1 else v for v in values])
+    def popup_has_input_focus():
+        if args.platform!='xcb':return True
+        focused=subprocess.run(['xdotool','getwindowfocus'],capture_output=True,text=True)
+        window=focused.stdout.strip()
+        # PointerRoot/None is an expected intermediate state while KWin
+        # restores focus. Keep observing; it is not an input-ready window.
+        if focused.returncode or not window.isdigit() or int(window)<=1:return False
+        props=subprocess.run(['xprop','-id',window,'_NET_WM_PID','_NET_WM_WINDOW_TYPE'],capture_output=True,text=True)
+        return props.returncode==0 and ('= '+str(plasma.pid)) in props.stdout and '_KDE_NET_WM_WINDOW_TYPE_APPLET_POPUP' in props.stdout
     def open_menu():
         if app_id:
             command('xdotool','windowactivate','--sync',app_id)
@@ -211,10 +237,6 @@ def session(args):
         if args.platform=='xcb':
             # Qt's grouped active state can precede XSetInputFocus. Wait for
             # actual delivery to the applet, without requesting focus ourselves.
-            def popup_has_input_focus():
-                focused=command('xdotool','getwindowfocus')
-                props=command('xprop','-id',focused,'_NET_WM_PID','_NET_WM_WINDOW_TYPE')
-                return ('= '+str(plasma.pid)) in props and '_KDE_NET_WM_WINDOW_TYPE_APPLET_POPUP' in props
             wait_for(popup_has_input_focus)
     config=case/'config/open-power-menu/menu.json'; config.parent.mkdir(exist_ok=True)
     def configure(confirm,custom=False):
@@ -296,12 +318,22 @@ def session(args):
                 assert records()[-1]['member']==method, records()[-1]
                 assert state()['hideOriginalLauncher']==args.hidden
                 report.append({'confirmation':confirm,'keys':['Meta+X','U',key.upper()],'request':records()[-1]})
-        before=len(records());open_menu();keys('u','Escape')
-        wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible'])
+        evidence.begin('escape-flyout-then-root')
+        before=len(records());open_menu()
+        log=case/'plasma.log';offset=log.stat().st_size
+        keys('u','Escape')
+        # A hidden snapshot can precede U opening the flyout. It does not prove
+        # Escape returned to the parent. Observe the actual transition before
+        # injecting the next key, then require native root input focus again.
+        wait_for(lambda:observed_flyout_return(log,offset))
+        wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible']
+                 and popup_has_input_focus())
         keys('Escape');wait_for(lambda:not state()['expanded']);assert len(records())==before
+        evidence.begin('arrow-enter-navigation')
         open_menu();keys('Down','Right','Down','Up','Return')
         wait_for(lambda:len(records())==before+1);wait_for(lambda:not state()['expanded'])
         assert records()[-1]['member']=='promptShutDown'
+        evidence.begin('modified-access-keys-ignored')
         before=len(records());open_menu();keys('u')
         wait_for(lambda:state()['popup']['flyout']['window']['visible'] and state()['popup']['flyout']['window']['active'])
         if args.platform=='xcb':
@@ -311,8 +343,11 @@ def session(args):
         assert len(records())==before
         assert not state()['layoutEditing']
         assert state()['popup']['flyout']['window']['visible']
-        keys('Left');wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible'])
+        evidence.begin('left-to-parent-then-escape')
+        keys('Left');wait_for(lambda:state()['expanded'] and not state()['popup']['flyout']['window']['visible']
+                             and popup_has_input_focus())
         keys('Escape');wait_for(lambda:not state()['expanded'])
+        evidence.begin('custom-access-keys')
         configure(False,custom=True);before=len(records());open_menu();keys('u','r','d')
         assert len(records())==before
         keys('z');wait_for(lambda:len(records())==before+1);assert records()[-1]['member']=='logoutAndShutdown'
@@ -471,6 +506,9 @@ def main():
                 if run.returncode:
                     # A failed Docker layer is not available for later artifact
                     # collection. Preserve the component diagnostics in its log.
+                    failure=case/'failure.json'
+                    if failure.is_file():
+                        print('OPM_FIXTURE '+json.dumps(json.loads(failure.read_text())),flush=True)
                     for name in ('session.log', 'plasma.log', 'kwin.log', 'backend.log',
                                  'fixture.log', 'application.log', 'shortcuts.log'):
                         path = case/name
