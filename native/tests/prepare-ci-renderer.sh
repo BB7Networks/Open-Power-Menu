@@ -8,11 +8,19 @@ mkdir -p work
 exec > >(tee work/renderer-setup.log) 2>&1
 trap 'status=$?; if [ "$status" -ne 0 ]; then python3 scripts/report-ci-failure.py work/renderer-setup.log; fi; exit "$status"' EXIT
 kernel_release=$(uname -r)
-printf 'Runner kernel: %s\n' "$kernel_release"
+printf '::notice title=Runner kernel::%s\n' "$kernel_release"
 dpkg-query -W "linux-image-$kernel_release" "linux-modules-$kernel_release" || true
 if [ -f "/boot/config-$kernel_release" ]; then
-    grep -E 'CONFIG_(UDMABUF|MEMFD_CREATE|DMA_SHARED_BUFFER|DRM_VKMS|DRM_VGEM)' "/boot/config-$kernel_release" || true
+    grep -E 'CONFIG_(UDMABUF|MEMFD_CREATE|DMA_SHARED_BUFFER|DRM_VKMS|DRM_VGEM)' "/boot/config-$kernel_release" | sed 's/^/::notice title=Kernel configuration::/' || true
 fi
+for module in udmabuf vgem vkms; do
+    if path=$(modinfo -F filename "$module" 2>&1); then
+        printf '::notice title=Available software renderer module::%s %s\n' "$module" "$path"
+    else
+        printf '::notice title=Unavailable software renderer module::%s\n' "$module"
+    fi
+done
+ls -ld /dev/udmabuf /dev/dri /sys/class/misc/udmabuf 2>/dev/null || true
 # Hosted images can omit modules for their running Azure kernel. Install only
 # that kernel's distribution package; never substitute a different kernel.
 if ! modinfo udmabuf; then

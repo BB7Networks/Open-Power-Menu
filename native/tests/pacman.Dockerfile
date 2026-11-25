@@ -8,6 +8,7 @@ ARG OPM_SESSION_PROFILE=plasma67-x11
 ENV OPM_SESSION_PROFILE=${OPM_SESSION_PROFILE}
 RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
         printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
+        sed -i '/^\[options\]/a XferCommand = /usr/bin/curl --http1.1 --fail --location --retry 3 --continue-at - --output %o %u' /etc/pacman.conf; \
     fi
 # Archived large packages can stall for more than libalpm's ten-second
 # low-speed threshold. Keep signatures/transactions intact; the CI job retains
@@ -67,6 +68,7 @@ ARG OPM_RUNTIME_PYTHON=absent
 ENV OPM_TEST_RUNTIME_PYTHON=${OPM_RUNTIME_PYTHON}
 RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
         printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
+        sed -i '/^\[options\]/a XferCommand = /usr/bin/curl --http1.1 --fail --location --retry 3 --continue-at - --output %o %u' /etc/pacman.conf; \
     fi
 RUN pacman --disable-download-timeout -Syu --noconfirm --needed qt6-base qt6-declarative qt6-svg qt6-wayland \
     kirigami kservice kconfig kde-cli-tools dbus && (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)

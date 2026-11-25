@@ -78,6 +78,9 @@ The corrected local editor-launch suite passed.
 Archived package transfers also exceeded pacman's ten-second connection or
 low-speed limits. Dependency installation disables that transfer timeout while
 retaining the overall CI deadline, signatures and fixed repository snapshot.
+The archive server subsequently reset an HTTP/2 package stream before any
+transaction. Pinned Arch transfers now use curl over HTTPS/HTTP 1.1, with bounded
+network retries. This retries downloads only; no test assertion is retried.
 Offline qualification explicitly uses umask 022, matching installation tests'
 secure ancestor requirements; an inherited umask 0000 correctly caused the
 local dependency fixture to refuse an unsafe directory.

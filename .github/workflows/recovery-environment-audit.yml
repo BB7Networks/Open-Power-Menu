@@ -45,6 +45,7 @@ jobs:
             set -euo pipefail
             if [ -n "$OPM_ARCH_SNAPSHOT" ]; then
               printf "Server = https://archive.archlinux.org/repos/%s/\$repo/os/\$arch\n" "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist
+              sed -i "/^\[options\]/a XferCommand = /usr/bin/curl --http1.1 --fail --location --retry 3 --continue-at - --output %o %u" /etc/pacman.conf
             fi
             date -u
             cat /etc/os-release
