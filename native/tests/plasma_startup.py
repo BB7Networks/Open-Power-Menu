@@ -222,6 +222,17 @@ def read_states(path):
     return rows
 
 
+def validate_flyout_root(before, shown):
+    # Plasma can resolve its theme margins after first exposure (captured
+    # 12 -> 8 px). The OPM content must remain identical and fit the CURRENT
+    # frame margins; comparing two outer heights assumes margins never change.
+    assert shown['open'] and shown['window'][4] and shown['flyout']['visible'], shown
+    assert shown['preferred']==before['preferred']==shown['min']==shown['max'], shown
+    assert shown['actual']==shown['preferred'], shown
+    assert abs(shown['window'][3]-shown['preferred']-shown['padding'])<=2, shown
+    assert shown['window'][3]<=shown['area'], shown
+
+
 def wait_for(predicate, timeout=15):
     until = time.monotonic()+timeout
     while time.monotonic() < until:
@@ -362,12 +373,16 @@ def session(args):
                     print('X11 pointer traversal passed across separators and command rows',flush=True)
                 x,y=map(round,states[-1]['firstRow'])
                 subprocess.run(['xdotool','mousemove',str(x),str(y)],check=True)
-                shown=wait_for(lambda: next((s for s in reversed(read_states(log)) if s['flyout'] and s['flyout']['visible']),None))
+                def current_flyout():
+                    samples=read_states(log)
+                    current=samples[-1] if samples else None
+                    return current if current and current['flyout'] and current['flyout']['visible'] else None
+                shown=wait_for(current_flyout)
                 assert shown['flyout']['appearance']==os.environ['OPM_APPEARANCE'], shown
                 assert shown['flyout']['doesNotAcceptFocus'], 'Mouse-opened X11 flyout stole focus'
                 evidence.record('root-flyout-geometry',first_visibility=first[-1],before_hover=states[-1],shown=shown,
                                 focus=evidence.focus())
-                assert shown['window'][3]==first[-1]['window'][3], shown
+                validate_flyout_root(first[-1],shown)
                 if os.environ['OPM_APPEARANCE']=='aero-light':
                     assert shown['flyout']['text']=='#24394b' and shown['flyout']['surface']=='#eaf1f7', shown
                 elif os.environ['OPM_APPEARANCE']=='aero':
@@ -397,7 +412,7 @@ def main():
     parser.add_argument('--session',action='store_true')
     parser.add_argument('--backend',action='store_true')
     parser.add_argument('--single-start',action='store_true', help='Check a fresh private shell without restarting it')
-    parser.add_argument('--platform',choices=['xcb','wayland'],default='xcb')
+    parser.add_argument('--platform',choices=['xcb','wayland'])
     parser.add_argument('--panel-edge',choices=['bottom','top','left','right'],default='bottom')
     parser.add_argument('--width',type=int,default=1280)
     parser.add_argument('--height',type=int,default=800)
@@ -408,7 +423,7 @@ def main():
     if args.session: return session(args)
     output=Path(args.output).resolve();output.mkdir(parents=True,exist_ok=True)
     # Delays alter reply order, never readiness correctness. Third case is warm.
-    for platform in ['xcb','wayland']:
+    for platform in ([args.platform] if args.platform else ['xcb','wayland']):
         for name,mode,density,theme,menu_delay,pref_delay,width,height,scale,outputs,edge in [
             ('slow-menu','auto','standard','native',1400,50,1280,800,1,1,args.panel_edge),
             ('slow-preferences','custom','comfortable','aero-light',50,5600,1024,640,1,1,args.panel_edge),

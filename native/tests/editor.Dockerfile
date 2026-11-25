@@ -3,6 +3,7 @@
 ARG OPM_DEB_IMAGE=debian:trixie-slim
 FROM ${OPM_DEB_IMAGE} AS build
 ARG OPM_SOURCE_COMMIT
+ENV OPM_SOURCE_COMMIT=${OPM_SOURCE_COMMIT}
 RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake ninja-build g++ qt6-base-dev qt6-declarative-dev libxcb-xinput-dev \
     libkf6service-dev libkf6config-dev kde-cli-tools dbus \
@@ -27,24 +28,10 @@ USER 1000:1000
 ENV OPM_TEST_INPUT_MODULE=/tmp/build/native/nativeinput
 RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release -DOPM_BUILD_EDITOR=ON -DOPM_BUILD_STANDALONE=ON && \
     cmake --build /tmp/build --parallel 2 && \
-    QT_QUICK_CONTROLS_STYLE=Basic ctest --test-dir /tmp/build --output-on-failure --output-junit /tmp/native-tests.xml && \
-    QT_QUICK_CONTROLS_STYLE=org.kde.desktop ctest --test-dir /tmp/build -R native-editor-gui --output-on-failure && \
-    sh native/tests/editor-appearance.sh /tmp/build/native/native-editor-gui-tests /tmp/dropdown-screenshots && \
-    dbus-run-session -- xvfb-run -a env QT_QPA_PLATFORM=xcb /tmp/build/native/native-standalone-tests && \
-    dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh native/tests/standalone-wayland.sh /tmp/build/native/native-standalone-tests && \
-    XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python3 native/tests/application_resolution.py --probe /tmp/build/native/native-application-probe --live-audit /tmp/applications.json && \
-    python3 native/tests/plasma_greeter.py --backend /tmp/build/native/open-power-menu-native --output /tmp/plasma-greeter && \
-    python3 native/tests/plasma_startup.py --output /tmp/plasma-startup && \
-    python3 native/tests/plasma_popup.py --output /tmp/plasma-popup && \
-    python3 native/tests/plasma_popup.py --output /tmp/plasma-popup-untraced --diagnostics-off && \
-    python3 native/tests/plasma_popup.py --dismissal --output /tmp/plasma-dismissal && \
-    python3 native/tests/plasma_keyboard.py --held-repeat --output /tmp/plasma-keyboard --backend /tmp/build/native/open-power-menu-native && \
-    cmake --install /tmp/build --prefix /tmp/stage && \
-    mkdir /tmp/qualification && cp /tmp/native-tests.xml /tmp/applications.json /tmp/qualification/ && \
-    cp -r /tmp/dropdown-screenshots /tmp/qualification/ && \
-    cp -r /tmp/plasma-greeter /tmp/plasma-keyboard /tmp/plasma-startup /tmp/plasma-popup /tmp/plasma-popup-untraced /tmp/plasma-dismissal /tmp/qualification/ && \
-    cp /etc/os-release /tmp/qualification/os-release && dpkg-query -W > /tmp/qualification/packages.txt && \
-    printf '%s\n' "$OPM_SOURCE_COMMIT" > /tmp/qualification/SOURCE-COMMIT
+    cmake --install /tmp/build --prefix /tmp/stage
+# CI runs editor-qualification.sh in this image, retains its raw /tmp evidence
+# even on failure, and gates the independent runtime check on its exit status.
+CMD ["sh", "/src/native/tests/editor-qualification.sh"]
 
 FROM ${OPM_DEB_IMAGE}
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -56,7 +43,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     qt6-svg-plugins qt6-qpa-plugins && rm -rf /var/lib/apt/lists/* && \
     (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home opm)
 COPY --from=build /tmp/stage/bin/ /usr/local/bin/
-COPY --from=build /tmp/qualification /opt/opm-evidence
 COPY --chmod=0644 native/tests/editor-runtime-smoke.sh /usr/local/libexec/opm-editor-smoke.sh
 RUN ! command -v python3 && ! command -v g++
 USER 1000:1000

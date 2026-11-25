@@ -153,6 +153,8 @@ No widget-supplied command or arbitrary file path is accepted over D-Bus.
 ## Runtime without Python
 
 ```bash
+docker build --target build -f native/tests/editor.Dockerfile -t opm-native-editor-build:test .
+docker run --rm --network none opm-native-editor-build:test
 docker build -f native/tests/editor.Dockerfile -t opm-native-editor:test .
 docker run --rm --network none opm-native-editor:test
 ```

@@ -26,7 +26,8 @@
   and release history remain available.
 
 X11 translucent-panel ghosting and minor responsiveness remain deferred. An
-intermittent Kubuntu keyboard-test timeout remains unresolved. Owner-reported
+intermittent X11 opening-focus timeout remains unresolved. Kubuntu held-I test
+interference was diagnosed as the competing KDE Meta+I shortcut. Owner-reported
 Manjaro installation and normal menu/Configure acceptance do not establish real
 power-action or physical held-key safety. See [release notes](RELEASE-NOTES-v2.1.0.md)
 and [test limitations](docs/TESTING.md#acceptance-scope-and-unresolved-results).

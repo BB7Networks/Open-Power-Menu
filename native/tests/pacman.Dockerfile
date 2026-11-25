@@ -4,18 +4,22 @@ ARG OPM_BASE_IMAGE=archlinux:base
 ARG OPM_ARCH_SNAPSHOT=""
 FROM ${OPM_BASE_IMAGE} AS build
 ARG OPM_ARCH_SNAPSHOT
-ARG OPM_TEST_X11=ON
+ARG OPM_SESSION_PROFILE=plasma67-x11
+ENV OPM_SESSION_PROFILE=${OPM_SESSION_PROFILE}
 RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
         printf 'Server = https://archive.archlinux.org/repos/%s/$repo/os/$arch\n' "$OPM_ARCH_SNAPSHOT" > /etc/pacman.d/mirrorlist; \
     fi
-RUN pacman -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
+# Archived large packages can stall for more than libalpm's ten-second
+# low-speed threshold. Keep signatures/transactions intact; the CI job retains
+# its overall deadline instead of treating that transfer stall as a test fail.
+RUN pacman --disable-download-timeout -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
     dbus python pyside6 unzip xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
     plasma-desktop plasma-workspace kwin discover dolphin konsole systemsettings powerdevil plasma-nm print-manager \
     plasma-systemmonitor kinfocenter ksystemlog partitionmanager virt-manager krdc && \
-    case "$OPM_TEST_X11" in \
-        ON) pacman -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
-        OFF) :;; \
+    case "$OPM_SESSION_PROFILE" in \
+        plasma67-x11) pacman -S --noconfirm --needed kwin-x11 && command -v kwin_x11;; \
+        manjaro-wayland) ! command -v kwin_x11;; \
         *) exit 1;; \
     esac && command -v kwin_wayland && \
     (getent passwd 1000 >/dev/null || useradd --uid 1000 --create-home builder)
@@ -37,13 +41,14 @@ RUN sha256sum -c SOURCE.sha256 && makepkg --noconfirm --nocolor && \
     python src/Open-Power-Menu/native/packaging/prepare-ez.py --allow-arch-test --bundle src/build/native-bundle --output /tmp/ez-final && unzip -q /tmp/ez-final/*.zip -d /tmp/ez-final/root && \
     cp /tmp/ez-final/*.zip /tmp/ez-final/*.sha256 artifacts/ && \
     cp /etc/os-release artifacts/os-release && pacman -Q > artifacts/packages.txt && \
+    python src/Open-Power-Menu/scripts/qualification_profiles.py --profile "$OPM_SESSION_PROFILE" --output artifacts/session-coverage.json && \
     XDG_CURRENT_DESKTOP=KDE QT_QPA_PLATFORM=offscreen python src/Open-Power-Menu/native/tests/application_resolution.py \
       --probe src/build/native/native-application-probe --live-audit artifacts/applications.json && \
     printf '%s\n' 'Stable 2.1.0 preparation artifacts; publication not approved. Physical Plasma acceptance remains pending; new installs follow KDE; existing immediate preferences and explicit custom commands are preserved.' > artifacts/CANDIDATE.txt && \
     xvfb-run -a sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* xcb artifacts && \
     dbus-run-session -- env OPM_WAYLAND_COMPOSITOR=kwin sh src/Open-Power-Menu/native/tests/standalone-wayland.sh sh src/Open-Power-Menu/native/tests/ez-desktop-smoke.sh /tmp/ez-final/root/* wayland artifacts
-# The workflow runs all four keyboard seats in this build image with networking
-# disabled, then collects their evidence alongside the sealed runtime artifacts.
+# Xvfb above exercises the xcb application plugin, not a KDE X11 session. CI
+# separately requires every session in the validated profile, with no network.
 # Test actual legacy migration and all transaction fault paths in a separate
 # instrumented bundle. The already-built package/artifacts retain hooks OFF.
 RUN cmake -S /src/work/package-rc1 -B /tmp/rc1-build -G Ninja -DCMAKE_BUILD_TYPE=Release \

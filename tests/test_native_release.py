@@ -87,13 +87,13 @@ def test_archive_traversal_is_refused():
 
 
 def greeter_evidence(root):
-    cases = [{'mode': mode, 'kde_confirm': kde, 'action': action,
+    cases = [{'platform':'xcb','mode': mode, 'kde_confirm': kde, 'action': action,
               'confirm': mode == 'always' or (mode == 'system' and kde),
               'visible': mode == 'always' or (mode == 'system' and kde),
               'countdown': False, 'result': {'ok': True}, 'elapsed': 2.1}
              for mode in ('system', 'always', 'immediate') for kde in (False, True)
              for action in ('shutdown', 'reboot', 'logout')]
-    cases.append({'mode': 'always', 'kde_confirm': True, 'action': 'shutdown', 'confirm': True,
+    cases.append({'platform':'xcb','mode': 'always', 'kde_confirm': True, 'action': 'shutdown', 'confirm': True,
                   'visible': True, 'countdown': True, 'result': {'ok': True}, 'elapsed': 30.1})
     (root/'results.json').write_text(json.dumps(cases))
     (root/'requests.jsonl').write_text(''.join(json.dumps({'member': member})+'\n' for member in

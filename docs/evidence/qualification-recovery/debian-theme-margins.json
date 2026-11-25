@@ -1,0 +1,143 @@
+{
+  "purpose": "Historical successful geometry comparison only; not current qualification credit",
+  "states": [
+    {
+      "time": 1795105706964,
+      "event": "visibility",
+      "window": [
+        8,
+        557,
+        340,
+        382,
+        true
+      ],
+      "preferred": 370,
+      "actual": 375,
+      "padding": 12,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 272,
+        "height": 52,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    },
+    {
+      "time": 1795105706995,
+      "event": "frame",
+      "window": [
+        8,
+        554,
+        340,
+        382,
+        true
+      ],
+      "preferred": 370,
+      "actual": 370,
+      "padding": 12,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 272,
+        "height": 52,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    },
+    {
+      "time": 1795105706996,
+      "event": "frame",
+      "window": [
+        8,
+        554,
+        340,
+        382,
+        true
+      ],
+      "preferred": 370,
+      "actual": 370,
+      "padding": 12,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 272,
+        "height": 52,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    },
+    {
+      "time": 1795105707255,
+      "event": "visibility",
+      "window": [
+        8,
+        558,
+        336,
+        378,
+        true
+      ],
+      "preferred": 370,
+      "actual": 370,
+      "padding": 8,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 268,
+        "height": 48,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    },
+    {
+      "time": 1795105707262,
+      "event": "frame",
+      "window": [
+        8,
+        558,
+        336,
+        378,
+        true
+      ],
+      "preferred": 370,
+      "actual": 370,
+      "padding": 8,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 268,
+        "height": 48,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    },
+    {
+      "time": 1795105707262,
+      "event": "frame",
+      "window": [
+        8,
+        558,
+        336,
+        378,
+        true
+      ],
+      "preferred": 370,
+      "actual": 370,
+      "padding": 8,
+      "flyout": {
+        "visible": false,
+        "doesNotAcceptFocus": true,
+        "appearance": "aero",
+        "width": 268,
+        "height": 48,
+        "text": "#eff3f8",
+        "surface": "#27313d"
+      }
+    }
+  ]
+}
