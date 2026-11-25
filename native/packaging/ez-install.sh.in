@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# User-facing entrypoint for the existing native transactional installer.
+set -euo pipefail
+umask 077
+fail() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
+[[ $EUID -ne 0 ]] || fail 'Run bash install.sh as your normal desktop user, without sudo.'
+[[ ! -L ${BASH_SOURCE[0]} ]] || fail 'Extract the complete archive; do not launch a symbolic link.'
+here="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+bundle="$here/native-bundle"
+mode=install
+approved=false
+for argument in "$@"; do
+    case "$argument" in
+        --yes) approved=true;;
+        --check|--rollback|--recover|--uninstall) [[ $mode = install ]] || fail 'Choose one operation.'; mode=${argument#--};;
+        *) fail 'Usage: bash install.sh [--yes | --check | --rollback | --recover | --uninstall]';;
+    esac
+done
+for tool in sha256sum find uname mktemp; do
+    command -v "$tool" >/dev/null || fail "Required system tool missing: $tool"
+done
+[[ -f "$here/SHA256SUMS" ]] || fail 'Incomplete archive: SHA256SUMS is missing.'
+[[ -z $(find "$here" -type l -print -quit) ]] || fail 'Symbolic links are not supported in the extracted installer.'
+(cd -- "$here" && sha256sum --strict --quiet -c SHA256SUMS) || fail 'Integrity check failed. Download and extract a fresh complete archive.'
+[[ $(uname -m) = '@CPU@' ]] || fail 'This installer targets @CPU@; obtain a matching architecture build.'
+. /etc/os-release
+[[ $ID = '@OS@' && ${VERSION_ID:-} = '@OS_VERSION@' ]] || fail 'This installer targets @LABEL@. Obtain the archive for your distribution and version.'
+
+dependency_help() {
+    printf '\nRuntime setup for @LABEL@ (run separately, only when you choose):\n%s\n' '@DEPENDENCIES@' >&2
+    printf '%s\n' 'Use the distribution repositories and a complete system update; do not force library versions or partially upgrade Qt/KDE.' >&2
+    printf '%s\n' 'No system packages were installed or removed by this script.' >&2
+}
+printf '\nOpen Power Menu @VERSION@ — @LABEL@ / @CPU@\n'
+printf '%s\n' 'Verified native EZ installer. Application setup runs only for your user.'
+for binary in open-power-menu-native open-power-menu-editor open-power-menu-standalone; do
+    [[ -x "$bundle/app/bin/$binary" ]] || fail "Missing executable permission: $binary. Extract the ZIP with an archive manager that preserves Unix permissions."
+    if ! "$bundle/app/bin/$binary" --version; then
+        dependency_help
+        fail "Cannot load $binary. The loader diagnostic above identifies missing or incompatible libraries."
+    fi
+done
+if [[ $mode = install || $mode = check ]]; then
+    for tool in dbus-run-session plasmashell; do
+        if ! command -v "$tool" >/dev/null; then dependency_help; fail "Missing dependency: $tool (KDE Plasma 6 is required)."; fi
+    done
+    # Read installed package metadata; do not start a second Plasma process.
+    if [[ $ID = manjaro || $ID = arch ]]; then
+        if ! plasma_package=$(pacman -Q plasma-workspace); then dependency_help; fail 'plasma-workspace is not installed.'; fi
+        plasma_version=${plasma_package#* }
+    else
+        if ! plasma_package=$(dpkg-query -W -f='${db:Status-Status} ${Version}' plasma-workspace); then dependency_help; fail 'plasma-workspace is not installed.'; fi
+        [[ $plasma_package = 'installed '* ]] || fail 'plasma-workspace is not configured; finish system package setup first.'
+        plasma_version=${plasma_package#installed }
+        plasma_version=${plasma_version#*:}
+    fi
+    [[ $plasma_version = 6.* ]] || fail "KDE Plasma 6 is required; found: $plasma_version"
+    printf 'KDE Plasma %s (installed package)\n' "$plasma_version"
+    probe=$(mktemp -d)
+    trap 'rm -rf -- "$probe"' EXIT
+    if ! QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software "$bundle/app/bin/open-power-menu-editor" --config "$probe/menu.json" --smoke-test; then dependency_help; fail 'Qt/Kirigami/QML runtime validation failed; see the diagnostic above.'; fi
+fi
+if [[ $mode = check ]]; then
+    printf '%s\n' 'Archive and runtime checks passed. No application files were installed.'
+    exit 0
+fi
+data="${XDG_DATA_HOME:-$HOME/.local/share}"
+if [[ $mode = install ]]; then
+    if [[ -f "$data/open-power-menu/run.py" ]]; then
+        printf '%s\n' 'Upgrade from legacy 1.0.1 detected. Keep Python/PySide6 available for rollback.'
+    elif [[ -f "$data/open-power-menu/bin/open-power-menu-native" ]]; then
+        printf '%s\n' 'Existing native installation detected (RC1, RC2 or 2.1). This is an upgrade/reinstall.'
+        "$data/open-power-menu/bin/open-power-menu-native" --version || true
+    else
+        printf '%s\n' 'New user-local installation.'
+    fi
+    printf '%s\n' 'Settings, custom commands, shortcuts and panel layout are preserved.'
+    printf '%s\n' 'Power actions may execute immediately. Custom power commands keep their explicit behavior.'
+else
+    printf 'Requested operation: %s\n' "$mode"
+    [[ $mode != uninstall ]] || printf '%s\n' 'First remove only the OPM applet through Plasma so its launcher visibility and shortcut can be restored.'
+fi
+if [[ $approved != true ]]; then
+    read -r -p "Proceed with $mode? [y/N]: " reply || reply=''
+    case "$reply" in y|Y|yes|YES) :;; *) printf '%s\n' 'Cancelled. No installation operation was performed.'; exit 0;; esac
+fi
+if [[ $mode = install ]]; then
+    # Native code retains OS, hash, ELF, plugin, safe-path and transaction checks.
+    if ! bash "$bundle/install.sh"; then fail 'Native installation failed; read the diagnostic above and README-INSTALL.md. Retain this archive for --recover or --rollback.'; fi
+    printf '\n%s\n' 'Installed. For a new setup: panel → Add Widgets → Open Power Menu Start Button.'
+    printf '%s\n' 'For an upgrade, keep the existing applet and original launcher. Do not recreate the panel.'
+    printf '%s\n' 'If Plasma has cached an older widget, sign out and back in when convenient. No session restart was performed.'
+else
+    "$bundle/app/bin/open-power-menu-install" "--$mode"
+fi
+printf '\n%s\n' 'Retain this extracted archive. Recovery: bash install.sh --recover'
+printf '%s\n' 'Rollback: bash install.sh --rollback    Uninstall: bash install.sh --uninstall'
+printf '%s\n' 'Personal configuration and recovery history are retained. See README-INSTALL.md.'

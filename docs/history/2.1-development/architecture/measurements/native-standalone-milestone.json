@@ -1,0 +1,254 @@
+{
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+  "method": "Xvfb X11; warm caches; private D-Bus; harmless availability fixtures; first exposed diagnostic; memory after 2 seconds",
+  "native_source_revision": "de763de",
+  "native_sha256": "f1041f1b7636a5f21c00f90169b11c7c89328f95210707c6434657fec3ffad1e",
+  "baseline": "3405848 (released 1.0.1)",
+  "cases": {
+    "default": {
+      "legacy": {
+        "exposure": {
+          "median_ms": 253.288,
+          "p95_ms": 346.967,
+          "samples_ms": [
+            346.967,
+            251.303,
+            255.12,
+            299.82,
+            218.455,
+            242.36,
+            211.855,
+            268.604,
+            253.288,
+            231.564,
+            263.057,
+            253.6,
+            241.001,
+            275.638,
+            246.54
+          ]
+        },
+        "check_process": {
+          "median_ms": 95.906,
+          "p95_ms": 133.868,
+          "samples_ms": [
+            88.246,
+            125.674,
+            74.199,
+            77.211,
+            116.209,
+            91.133,
+            98.16,
+            95.906,
+            100.397,
+            78.705,
+            108.598,
+            81.523,
+            123.365,
+            133.868,
+            82.445
+          ]
+        },
+        "memory_KiB": [
+          {
+            "Rss": 69212,
+            "Pss": 59942
+          },
+          {
+            "Rss": 69092,
+            "Pss": 59808
+          },
+          {
+            "Rss": 70056,
+            "Pss": 60877
+          }
+        ],
+        "median_RSS_KiB": 69212,
+        "median_PSS_KiB": 59942
+      },
+      "native": {
+        "exposure": {
+          "median_ms": 36.277,
+          "p95_ms": 88.511,
+          "samples_ms": [
+            32.223,
+            35.544,
+            88.511,
+            34.718,
+            39.274,
+            34.26,
+            37.395,
+            34.169,
+            34.942,
+            40.463,
+            34.383,
+            39.316,
+            36.277,
+            41.986,
+            36.837
+          ]
+        },
+        "check_process": {
+          "median_ms": 19.477,
+          "p95_ms": 32.801,
+          "samples_ms": [
+            25.097,
+            26.019,
+            32.801,
+            25.201,
+            22.723,
+            20.037,
+            18.624,
+            15.812,
+            16.456,
+            16.366,
+            23.085,
+            17.331,
+            17.465,
+            19.477,
+            13.872
+          ]
+        },
+        "memory_KiB": [
+          {
+            "Rss": 34832,
+            "Pss": 30331
+          },
+          {
+            "Rss": 34752,
+            "Pss": 30321
+          },
+          {
+            "Rss": 34684,
+            "Pss": 30178
+          }
+        ],
+        "median_RSS_KiB": 34752,
+        "median_PSS_KiB": 30321
+      }
+    },
+    "200-commands": {
+      "legacy": {
+        "exposure": {
+          "median_ms": 267.158,
+          "p95_ms": 415.194,
+          "samples_ms": [
+            312.36,
+            274.984,
+            294.966,
+            274.561,
+            227.628,
+            259.769,
+            213.874,
+            267.158,
+            306.865,
+            244.478,
+            236.217,
+            260.92,
+            296.007,
+            225.548,
+            415.194
+          ]
+        },
+        "check_process": {
+          "median_ms": 111.111,
+          "p95_ms": 211.308,
+          "samples_ms": [
+            118.733,
+            211.308,
+            81.235,
+            109.766,
+            129.028,
+            87.998,
+            111.111,
+            92.251,
+            142.171,
+            116.975,
+            97.98,
+            115.89,
+            101.219,
+            122.465,
+            106.48
+          ]
+        },
+        "memory_KiB": [
+          {
+            "Rss": 74676,
+            "Pss": 63425
+          },
+          {
+            "Rss": 74208,
+            "Pss": 62716
+          },
+          {
+            "Rss": 74320,
+            "Pss": 62751
+          }
+        ],
+        "median_RSS_KiB": 74320,
+        "median_PSS_KiB": 62751
+      },
+      "native": {
+        "exposure": {
+          "median_ms": 36.754,
+          "p95_ms": 50.379,
+          "samples_ms": [
+            50.379,
+            40.716,
+            35.365,
+            36.553,
+            34.008,
+            37.473,
+            36.516,
+            34.816,
+            37.023,
+            36.754,
+            42.031,
+            34.139,
+            42.6,
+            41.696,
+            33.925
+          ]
+        },
+        "check_process": {
+          "median_ms": 18.988,
+          "p95_ms": 31.868,
+          "samples_ms": [
+            20.711,
+            19.429,
+            31.868,
+            23.202,
+            16.901,
+            18.415,
+            16.215,
+            18.202,
+            16.856,
+            17.698,
+            21.873,
+            21.431,
+            18.988,
+            18.359,
+            20.594
+          ]
+        },
+        "memory_KiB": [
+          {
+            "Rss": 35660,
+            "Pss": 30934
+          },
+          {
+            "Rss": 35100,
+            "Pss": 30314
+          },
+          {
+            "Rss": 35940,
+            "Pss": 31183
+          }
+        ],
+        "median_RSS_KiB": 35660,
+        "median_PSS_KiB": 30934
+      }
+    }
+  },
+  "native_ldd": "\tlinux-vdso.so.1 (0x00007f1df1a56000)\n\tlibQt6Widgets.so.6 => /lib/x86_64-linux-gnu/libQt6Widgets.so.6 (0x00007f1df122b000)\n\tlibQt6Gui.so.6 => /lib/x86_64-linux-gnu/libQt6Gui.so.6 (0x00007f1df09f9000)\n\tlibQt6Core.so.6 => /lib/x86_64-linux-gnu/libQt6Core.so.6 (0x00007f1df0420000)\n\tlibstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f1df01ba000)\n\tlibgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f1df018b000)\n\tlibc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1deff97000)\n\tlibm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f1defea7000)\n\tlibEGL.so.1 => /lib/x86_64-linux-gnu/libEGL.so.1 (0x00007f1defe91000)\n\tlibfontconfig.so.1 => /lib/x86_64-linux-gnu/libfontconfig.so.1 (0x00007f1defe43000)\n\tlibX11.so.6 => /lib/x86_64-linux-gnu/libX11.so.6 (0x00007f1defcfb000)\n\tlibglib-2.0.so.0 => /lib/x86_64-linux-gnu/libglib-2.0.so.0 (0x00007f1defba0000)\n\tlibQt6DBus.so.6 => /lib/x86_64-linux-gnu/libQt6DBus.so.6 (0x00007f1defadf000)\n\tlibxkbcommon.so.0 => /lib/x86_64-linux-gnu/libxkbcommon.so.0 (0x00007f1defa94000)\n\tlibGLX.so.0 => /lib/x86_64-linux-gnu/libGLX.so.0 (0x00007f1defa60000)\n\tlibOpenGL.so.0 => /lib/x86_64-linux-gnu/libOpenGL.so.0 (0x00007f1defa35000)\n\tlibpng16.so.16 => /lib/x86_64-linux-gnu/libpng16.so.16 (0x00007f1def9fc000)\n\tlibharfbuzz.so.0 => /lib/x86_64-linux-gnu/libharfbuzz.so.0 (0x00007f1def8b9000)\n\tlibmd4c.so.0 => /lib/x86_64-linux-gnu/libmd4c.so.0 (0x00007f1def8a7000)\n\tlibfreetype.so.6 => /lib/x86_64-linux-gnu/libfreetype.so.6 (0x00007f1def7d7000)\n\tlibz.so.1 => /lib/x86_64-linux-gnu/libz.so.1 (0x00007f1def7b7000)\n\tlibicui18n.so.76 => /lib/x86_64-linux-gnu/libicui18n.so.76 (0x00007f1def41b000)\n\tlibicuuc.so.76 => /lib/x86_64-linux-gnu/libicuuc.so.76 (0x00007f1def1f6000)\n\tlibdouble-conversion.so.3 => /lib/x86_64-linux-gnu/libdouble-conversion.so.3 (0x00007f1def1e0000)\n\tlibb2.so.1 => /lib/x86_64-linux-gnu/libb2.so.1 (0x00007f1def1c1000)\n\tlibpcre2-16.so.0 => /lib/x86_64-linux-gnu/libpcre2-16.so.0 (0x00007f1def121000)\n\tlibzstd.so.1 => /lib/x86_64-linux-gnu/libzstd.so.1 (0x00007f1def057000)\n\t/lib64/ld-linux-x86-64.so.2 (0x00007f1df1a58000)\n\tlibGLdispatch.so.0 => /lib/x86_64-linux-gnu/libGLdispatch.so.0 (0x00007f1deef9c000)\n\tlibexpat.so.1 => /lib/x86_64-linux-gnu/libexpat.so.1 (0x00007f1deef6e000)\n\tlibxcb.so.1 => /lib/x86_64-linux-gnu/libxcb.so.1 (0x00007f1deef43000)\n\tlibatomic.so.1 => /lib/x86_64-linux-gnu/libatomic.so.1 (0x00007f1deef39000)\n\tlibpcre2-8.so.0 => /lib/x86_64-linux-gnu/libpcre2-8.so.0 (0x00007f1deee8a000)\n\tlibdbus-1.so.3 => /lib/x86_64-linux-gnu/libdbus-1.so.3 (0x00007f1deee31000)\n\tlibgraphite2.so.3 => /lib/x86_64-linux-gnu/libgraphite2.so.3 (0x00007f1deee07000)\n\tlibbz2.so.1.0 => /lib/x86_64-linux-gnu/libbz2.so.1.0 (0x00007f1deedf4000)\n\tlibbrotlidec.so.1 => /lib/x86_64-linux-gnu/libbrotlidec.so.1 (0x00007f1deede6000)\n\tlibicudata.so.76 => /lib/x86_64-linux-gnu/libicudata.so.76 (0x00007f1decf81000)\n\tlibgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f1decf2a000)\n\tlibXau.so.6 => /lib/x86_64-linux-gnu/libXau.so.6 (0x00007f1decf25000)\n\tlibXdmcp.so.6 => /lib/x86_64-linux-gnu/libXdmcp.so.6 (0x00007f1decf1d000)\n\tlibsystemd.so.0 => /lib/x86_64-linux-gnu/libsystemd.so.0 (0x00007f1dece07000)\n\tlibbrotlicommon.so.1 => /lib/x86_64-linux-gnu/libbrotlicommon.so.1 (0x00007f1decde4000)\n\tlibcap.so.2 => /lib/x86_64-linux-gnu/libcap.so.2 (0x00007f1decdd6000)\n"
+}

@@ -46,17 +46,16 @@ class AdaptivePlacementTests(unittest.TestCase):
     def test_qml_anchors_to_visible_row_not_parent_popup(self):
         main = (ROOT/'plasmoid/contents/ui/main.qml').read_text()
         side = (ROOT/'plasmoid/contents/ui/SideFlyout.qml').read_text()
-        self.assertIn('flyout.screenRect = sourceRow.menuScreen;', main)
-        self.assertIn('readonly property rect menuScreen: Qt.rect(', main)
-        self.assertIn('Screen.virtualX, Screen.virtualY', main)
+        self.assertIn('flyout.screenRect = Qt.binding(() => root.menuWorkArea);', main)
+        self.assertIn('readonly property rect menuScreen: root.menuWorkArea', main)
+        self.assertIn('Metrics.workArea(root.screenGeometry, root.availableScreenRect)', main)
         self.assertIn('floating: true', side)
         self.assertNotIn('floating: false\n', side)
         self.assertIn('const point = anchor.mapToGlobal(0, 0);', side)
         self.assertIn('if (availableScreen.width <= 0', side)
         self.assertIn('return Qt.RightEdge;', side)
         self.assertIn('popupDirection: Qt.RightEdge', side)
-        self.assertIn('childPopup.screenRect = row.menuScreen;', side)
-        self.assertNotIn('root.screenGeometry', main)
+        self.assertIn('childPopup.screenRect = Qt.binding(() => flyout.screenRect);', side)
 
     def test_adaptive_side_geometry_when_screen_resolution_available(self):
         # 328px main menu at x=0 on a 1920px-wide screen: flyout to the right.

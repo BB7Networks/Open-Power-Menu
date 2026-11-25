@@ -20,7 +20,7 @@ def run_node(code):
     source = MAIN.read_text()
     methods = '\n'.join(function(source, name) for name in (
         'activateLauncher', 'activateSelectedLauncher', 'openMenu', 'closeLauncherPopup',
-        'finishOpeningPower', 'onOriginalLauncherOpened'))
+        'finishOpeningPower', 'preparePowerPopup', 'onOriginalLauncherOpened'))
     methods += '\n' + timer_handler(source, 'launcherActivationSettle')
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15,
                             env={**os.environ, 'ADAPTERS': bundle_adapter_js(), 'METHODS': methods})
@@ -40,14 +40,15 @@ for(const hidden of [false,true]) for(const draft of [null,{token:'opaque',entri
   const applet={id:59,pluginName:'dev.xarbit.appgrid',status:hidden?1:2,
     activated(){activations++; if(item.gridOpen) item.closeWindow();
       else {item.gridOpen=true;item.gridWindow.visible=true}}};
-  const root={selectedLauncherPlan:{item,applet},selectedLauncherItem:item,launcherAppletId:59,
-    menuSwitchEpoch:0,requestedMenu:'none',expanded:false,pendingPowerEpoch:-1,pendingLauncherEpoch:-1,
+  const root={setPowerExpanded(value){this.expanded=value},selectedLauncherPlan:{item,applet},selectedLauncherItem:item,launcherAppletId:59,
+    openingPower:false,openingPreferencesReady:false,openingEntriesReady:false,
+    fullRepresentationItem:{prepareForOpen(){}},menuSwitchEpoch:0,requestedMenu:'none',expanded:false,pendingPowerEpoch:-1,pendingLauncherEpoch:-1,
     awaitingAsyncClose:false,launcherSwitchError:'',maskActive:hidden,hideOriginalLauncherRequested:hidden,
-    layoutDraft:draft,fetchMenu(){},send(){throw Error('Unexpected D-Bus activation')}};
+    layoutDraft:draft,fetchMenu(_,done){done()},send(){throw Error('Unexpected D-Bus activation')}};
   const timer=()=>({running:false,start(){this.running=true},restart(){this.running=true},stop(){this.running=false}});
-  const c={root,console:h.console,LauncherAdapters:h,Qt:{callLater(f){callbacks.push(f)}},
-    launcherActivationSettle:timer(),launcherClosePoll:timer(),launcherCloseFollowup:timer(),fetchIntegration(){},
-    fetchMenu(){},closeLauncherPopup(){return root.closeLauncherPopup()}};
+  const c={popupTrace:{record(){}},root,console:h.console,LauncherAdapters:h,Qt:{callLater(f){callbacks.push(f)}},
+    launcherActivationSettle:timer(),launcherClosePoll:timer(),launcherCloseFollowup:timer(),fetchIntegration(done){done()},
+    fetchMenu(_,done){done()},closeLauncherPopup(){return root.closeLauncherPopup()}};
   for(const name of Object.keys(root)) Object.defineProperty(c,name,{configurable:true,get(){return root[name]},set(v){root[name]=v}});
   vm.createContext(c);vm.runInContext(process.env.METHODS,c);
   for(const name of ['activateSelectedLauncher','closeLauncherPopup','onOriginalLauncherOpened']) root[name]=c[name];
@@ -58,7 +59,7 @@ for(const hidden of [false,true]) for(const draft of [null,{token:'opaque',entri
     c.activateLauncher();drain();assert.equal(activations,before+1);
     assert.equal(item.gridOpen,true);assert.equal(item.gridWindow.visible,true);
     c.openMenu();assert.equal(item.gridOpen,false);assert.equal(item.gridWindow.visible,false);
-    finishAnimations();c.finishOpeningPower(root.menuSwitchEpoch);
+    finishAnimations();c.finishOpeningPower(root.menuSwitchEpoch);drain();
     assert.equal(root.expanded,true);
     const count=closes;
     c.closeLauncherPopup(); // the delayed right-click follow-up
@@ -72,7 +73,7 @@ for(const hidden of [false,true]) for(const draft of [null,{token:'opaque',entri
     // Rapid left-left-right: both unsent activations are stale.
     const rapid=activations;
     c.activateLauncher();c.activateLauncher();c.openMenu();drain();
-    assert.equal(activations,rapid);c.finishOpeningPower(root.menuSwitchEpoch);
+    assert.equal(activations,rapid);c.finishOpeningPower(root.menuSwitchEpoch);drain();
     root.expanded=false;
     assert.equal(root.layoutDraft,draft);
   }

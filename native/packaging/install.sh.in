@@ -1,0 +1,14 @@
+#!/bin/sh
+# Explicitly invoked by the user from a trusted matching native bundle.
+set -eu
+bundle=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ "$(uname -m)" != '@CMAKE_SYSTEM_PROCESSOR@' ]; then
+    echo 'This package targets @CMAKE_SYSTEM_PROCESSOR@. Obtain a build for your CPU architecture.' >&2
+    exit 2
+fi
+. /etc/os-release
+if [ "$ID" != '@OPM_PACKAGE_OS@' ] || [ "${VERSION_ID:-}" != '@OPM_PACKAGE_OS_VERSION@' ]; then
+    echo 'This package targets @OPM_PACKAGE_OS@ @OPM_PACKAGE_OS_VERSION@. Obtain a matching distribution build.' >&2
+    exit 2
+fi
+exec "$bundle/app/bin/open-power-menu-install" --install "$bundle"

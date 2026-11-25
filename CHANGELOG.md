@@ -1,5 +1,36 @@
 # Open Power Menu changelog
 
+## 2.1.0
+
+- Native C++/Qt backend, Qt Quick/Kirigami Configure editor and Qt Widgets
+  standalone menu, with a Plasma 6 widget and native input plugin. Native
+  installations need no Python, PySide6 or compiler.
+- X11 popup-collapse and Meta+X reopening corrections, shared XInput2 held-key
+  protection across root/flyout windows, configurable Win+X-style access keys,
+  nested keyboard navigation and independent hint visibility.
+- KDE-native Shutdown, Restart and Sign out with Follow KDE system settings, Always
+  show confirmation and Execute immediately modes. Native Sleep/Hibernate capability,
+  authorization and inhibitor handling; explicit custom commands retain their
+  behavior. Power actions can execute immediately.
+- Persistent Configure/session-environment handling and a naturally sized Power
+  Actions dropdown. Preserve configuration migration, protected selections,
+  custom layouts, shortcuts, original launchers and panel layouts.
+- Complete native EZ installers for qualified Manjaro KDE, Debian 13 KDE and
+  Kubuntu 26.04 x86-64 runtimes; sealed native bundles, the Manjaro package,
+  exact-source archives, checksums and distribution qualification evidence.
+- Transactional installation, upgrades from 1.0.1/RC1/RC2, recovery and rollback.
+  Keep historical components and compatibility tests; native installation
+  entrypoints no longer direct new users through the legacy Python installer.
+- Comprehensive documentation and 39 genuine native screenshots, explicitly
+  separating the installed defaults from customized examples. Existing galleries
+  and release history remain available.
+
+X11 translucent-panel ghosting and minor responsiveness remain deferred. An
+intermittent Kubuntu keyboard-test timeout remains unresolved. Owner-reported
+Manjaro installation and normal menu/Configure acceptance do not establish real
+power-action or physical held-key safety. See [release notes](RELEASE-NOTES-v2.1.0.md)
+and [test limitations](docs/TESTING.md#acceptance-scope-and-unresolved-results).
+
 ## 1.0.1 - first public release
 
 - Add Desktop to new/default top-level menus using KDE’s registered Show Desktop

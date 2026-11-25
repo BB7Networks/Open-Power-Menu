@@ -1,0 +1,654 @@
+{
+  "applications": {
+    "title": "Installed Applications",
+    "icon": "applications-other",
+    "commands": [
+      {
+        "argv": [
+          "pamac-manager"
+        ],
+        "desktop_ids": [
+          "org.manjaro.pamac.manager.desktop",
+          "pamac-manager.desktop"
+        ],
+        "preferred_distros": [
+          "manjaro"
+        ]
+      },
+      {
+        "argv": [
+          "plasma-discover"
+        ],
+        "desktop_ids": [
+          "org.kde.discover.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-software"
+        ],
+        "desktop_ids": [
+          "org.gnome.Software.desktop",
+          "gnome-software.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "octopi"
+        ],
+        "desktop_ids": [
+          "octopi.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "snap-store"
+        ],
+        "desktop_ids": [
+          "snap-store_snap-store.desktop",
+          "io.snapcraft.Store.desktop",
+          "snap-store_ubuntu-software.desktop",
+          "snap-store_app-center.desktop",
+          "org.ubuntu.AppCenter.desktop"
+        ]
+      }
+    ]
+  },
+  "power": {
+    "title": "Power Options",
+    "icon": "battery",
+    "commands": [
+      {
+        "argv": [
+          "kcmshell6",
+          "kcm_powerdevilprofilesconfig"
+        ],
+        "kcm": "kcm_powerdevilprofilesconfig"
+      },
+      {
+        "argv": [
+          "gnome-control-center",
+          "power"
+        ],
+        "desktops": [
+          "GNOME"
+        ]
+      }
+    ]
+  },
+  "logs": {
+    "title": "System Logs",
+    "icon": "view-list-details",
+    "commands": [
+      {
+        "argv": [
+          "ksystemlog"
+        ],
+        "desktop_ids": [
+          "org.kde.ksystemlog.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "konsole",
+          "--hold",
+          "-e",
+          "journalctl",
+          "-b",
+          "-p",
+          "warning",
+          "-n",
+          "1000",
+          "--follow",
+          "--no-pager"
+        ],
+        "requires": [
+          "journalctl"
+        ]
+      },
+      {
+        "argv": [
+          "xterm",
+          "-hold",
+          "-e",
+          "journalctl",
+          "-b",
+          "-p",
+          "warning",
+          "-n",
+          "1000",
+          "--follow",
+          "--no-pager"
+        ],
+        "requires": [
+          "journalctl"
+        ]
+      }
+    ]
+  },
+  "system": {
+    "title": "System Information",
+    "icon": "computer",
+    "commands": [
+      {
+        "argv": [
+          "kinfocenter"
+        ],
+        "desktop_ids": [
+          "org.kde.kinfocenter.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "hardinfo2"
+        ],
+        "desktop_ids": [
+          "hardinfo2.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-control-center",
+          "info-overview"
+        ],
+        "desktops": [
+          "GNOME"
+        ]
+      }
+    ]
+  },
+  "hardware": {
+    "title": "Hardware Information",
+    "icon": "preferences-system",
+    "commands": [
+      {
+        "argv": [
+          "konsole",
+          "--hold",
+          "-e",
+          "inxi",
+          "-Fzxx"
+        ],
+        "requires": [
+          "inxi"
+        ]
+      },
+      {
+        "argv": [
+          "hardinfo2"
+        ],
+        "desktop_ids": [
+          "hardinfo2.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "kinfocenter"
+        ],
+        "desktop_ids": [
+          "org.kde.kinfocenter.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      }
+    ]
+  },
+  "network": {
+    "title": "Network Connections",
+    "icon": "network-wired",
+    "commands": [
+      {
+        "argv": [
+          "kcmshell6",
+          "kcm_networkmanagement"
+        ],
+        "kcm": "kcm_networkmanagement",
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "nm-connection-editor"
+        ],
+        "desktop_ids": [
+          "nm-connection-editor.desktop"
+        ]
+      }
+    ]
+  },
+  "disks": {
+    "title": "Disk Management",
+    "icon": "drive-harddisk",
+    "commands": [
+      {
+        "argv": [
+          "partitionmanager"
+        ],
+        "desktop_ids": [
+          "org.kde.partitionmanager.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-disks"
+        ],
+        "desktop_ids": [
+          "org.gnome.DiskUtility.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "gparted"
+        ],
+        "desktop_ids": [
+          "gparted.desktop"
+        ]
+      }
+    ]
+  },
+  "printers": {
+    "title": "Printers",
+    "icon": "preferences-devices-printer",
+    "commands": [
+      {
+        "argv": [
+          "kcmshell6",
+          "kcm_printer_manager"
+        ],
+        "kcm": "kcm_printer_manager"
+      },
+      {
+        "argv": [
+          "system-config-printer"
+        ],
+        "desktop_ids": [
+          "system-config-printer.desktop"
+        ]
+      }
+    ]
+  },
+  "vms": {
+    "title": "Virtual Machine Manager",
+    "icon": "computer",
+    "commands": [
+      {
+        "argv": [
+          "virt-manager"
+        ],
+        "desktop_ids": [
+          "virt-manager.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "virtualbox"
+        ],
+        "desktop_ids": [
+          "virtualbox.desktop"
+        ]
+      }
+    ]
+  },
+  "terminal": {
+    "title": "Terminal",
+    "icon": "utilities-terminal",
+    "commands": [
+      {
+        "argv": [
+          "konsole"
+        ],
+        "desktop_ids": [
+          "org.kde.konsole.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "kitty"
+        ],
+        "desktop_ids": [
+          "kitty.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "alacritty"
+        ],
+        "desktop_ids": [
+          "Alacritty.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-terminal"
+        ],
+        "desktop_ids": [
+          "org.gnome.Terminal.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "xfce4-terminal"
+        ],
+        "desktop_ids": [
+          "xfce4-terminal.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "xterm"
+        ],
+        "desktop_ids": [
+          "xterm.desktop"
+        ]
+      }
+    ]
+  },
+  "monitor": {
+    "title": "Task Manager / System Monitor",
+    "icon": "utilities-system-monitor",
+    "commands": [
+      {
+        "argv": [
+          "plasma-systemmonitor"
+        ],
+        "desktop_ids": [
+          "org.kde.plasma-systemmonitor.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-system-monitor"
+        ],
+        "desktop_ids": [
+          "org.gnome.SystemMonitor.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "ksysguard"
+        ],
+        "desktop_ids": [
+          "org.kde.ksysguard.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "xfce4-taskmanager"
+        ],
+        "desktop_ids": [
+          "xfce4-taskmanager.desktop"
+        ]
+      }
+    ]
+  },
+  "files": {
+    "title": "File Manager",
+    "icon": "system-file-manager",
+    "commands": [
+      {
+        "argv": [
+          "dolphin"
+        ],
+        "desktop_ids": [
+          "org.kde.dolphin.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "nautilus"
+        ],
+        "desktop_ids": [
+          "org.gnome.Nautilus.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "thunar"
+        ],
+        "desktop_ids": [
+          "thunar.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "nemo"
+        ],
+        "desktop_ids": [
+          "nemo.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "pcmanfm-qt"
+        ],
+        "desktop_ids": [
+          "pcmanfm-qt.desktop"
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "title": "Settings",
+    "icon": "preferences-system",
+    "commands": [
+      {
+        "argv": [
+          "systemsettings"
+        ],
+        "desktop_ids": [
+          "systemsettings.desktop",
+          "org.kde.systemsettings.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      {
+        "argv": [
+          "gnome-control-center"
+        ],
+        "desktops": [
+          "GNOME"
+        ]
+      },
+      {
+        "argv": [
+          "xfce4-settings-manager"
+        ],
+        "desktops": [
+          "XFCE"
+        ]
+      }
+    ]
+  },
+  "run": {
+    "title": "Search / Run",
+    "icon": "system-search",
+    "commands": [
+      {
+        "argv": [
+          "qdbus6",
+          "org.kde.krunner",
+          "/App",
+          "org.kde.krunner.App.display"
+        ],
+        "desktops": [
+          "KDE",
+          "PLASMA"
+        ],
+        "dbus_service": "org.kde.krunner",
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      },
+      [
+        "rofi",
+        "-show",
+        "run"
+      ],
+      {
+        "argv": [
+          "krunner"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      }
+    ]
+  },
+  "remote": {
+    "title": "Remote Desktop",
+    "icon": "preferences-desktop-remote-desktop",
+    "commands": [
+      {
+        "argv": [
+          "remmina"
+        ],
+        "desktop_ids": [
+          "org.remmina.Remmina.desktop",
+          "remmina.desktop"
+        ]
+      },
+      {
+        "argv": [
+          "krdc"
+        ],
+        "desktop_ids": [
+          "org.kde.krdc.desktop"
+        ],
+        "preferred_desktops": [
+          "KDE",
+          "PLASMA"
+        ]
+      }
+    ]
+  },
+  "network_locations": {
+    "title": "Network Locations",
+    "icon": "network-server",
+    "commands": [
+      [
+        "dolphin",
+        "{home}/Network Locations"
+      ]
+    ],
+    "path_required": "{home}/Network Locations"
+  },
+  "lock": {
+    "title": "Lock",
+    "icon": "system-lock-screen",
+    "commands": [
+      [
+        "loginctl",
+        "lock-session"
+      ]
+    ]
+  },
+  "logout": {
+    "title": "Sign out...",
+    "icon": "system-log-out",
+    "commands": [
+      [
+        "qdbus6",
+        "org.kde.LogoutPrompt",
+        "/LogoutPrompt",
+        "promptLogout"
+      ]
+    ],
+    "desktops": [
+      "KDE",
+      "PLASMA"
+    ]
+  },
+  "reboot": {
+    "title": "Restart...",
+    "icon": "system-reboot",
+    "commands": [
+      [
+        "qdbus6",
+        "org.kde.LogoutPrompt",
+        "/LogoutPrompt",
+        "promptReboot"
+      ]
+    ],
+    "desktops": [
+      "KDE",
+      "PLASMA"
+    ]
+  },
+  "show_desktop": {
+    "title": "Desktop",
+    "icon": "user-desktop",
+    "desktops": [
+      "KDE",
+      "PLASMA"
+    ],
+    "commands": [
+      {
+        "argv": [
+          "qdbus6",
+          "org.kde.kglobalaccel",
+          "/component/kwin",
+          "org.kde.kglobalaccel.Component.invokeShortcut",
+          "Show Desktop"
+        ],
+        "kwin_shortcut": "Show Desktop"
+      }
+    ]
+  },
+  "shutdown": {
+    "title": "Shut down...",
+    "icon": "system-shutdown",
+    "commands": [
+      [
+        "qdbus6",
+        "org.kde.LogoutPrompt",
+        "/LogoutPrompt",
+        "promptShutDown"
+      ]
+    ],
+    "desktops": [
+      "KDE",
+      "PLASMA"
+    ]
+  }
+}

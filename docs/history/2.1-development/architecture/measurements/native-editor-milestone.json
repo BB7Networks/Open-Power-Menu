@@ -1,0 +1,185 @@
+{
+  "environment": {
+    "platform": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "qt": "6.8.2",
+    "python_test_client": "3.13.5",
+    "legacy_version": "Open Power Menu 1.0.1",
+    "native_version": "open-power-menu-native 2.0.0-dev"
+  },
+  "method": "Same container, private D-Bus, fake availability tools, software rendering; warm filesystem caches. Process RSS/PSS, not total desktop memory.",
+  "source_revisions": {
+    "native": "37b3e45d9f376aac7defc0cd75f48c383be233bf",
+    "legacy": "34058480b6e3bc1ecc1f19d420fb744f570eca34"
+  },
+  "binary_sha256": {
+    "open-power-menu-native": "00eff22f18fdf1aa781efbf889ff9515208d4c58b9dbf7aca8a894362866deee",
+    "open-power-menu-editor": "774b487fd7707d201b1fc14106ab95d15ff7e3053efc641a981c77363fc565bd"
+  },
+  "configurations": {
+    "default": {
+      "legacy_1.0.1": {
+        "fresh_cli_process": {
+          "median_ms": 73.988,
+          "p95_ms": 138.611,
+          "samples": 25
+        },
+        "service_ready_ms_single_observation": 254.078,
+        "warm_GetMenu_roundtrip": {
+          "median_ms": 1.997,
+          "p95_ms": 2.992,
+          "samples": 200
+        },
+        "backend_memory": {
+          "Rss_KiB": 41060,
+          "Pss_KiB": 28135,
+          "Private_Clean_KiB": 1096,
+          "Private_Dirty_KiB": 15520
+        },
+        "editor_memory_after_2s": {
+          "Rss_KiB": 78128,
+          "Pss_KiB": 65220,
+          "Private_Clean_KiB": 24568,
+          "Private_Dirty_KiB": 29092
+        },
+        "editor_mapped_memory_after_2s": {
+          "other_files": {
+            "Rss_KiB": 44240,
+            "Pss_KiB": 32508
+          },
+          "anonymous": {
+            "Rss_KiB": 20704,
+            "Pss_KiB": 20696
+          },
+          "Python_PySide_files": {
+            "Rss_KiB": 13184,
+            "Pss_KiB": 12012
+          }
+        }
+      },
+      "native_2.0_dev": {
+        "fresh_cli_process": {
+          "median_ms": 9.403,
+          "p95_ms": 15.765,
+          "samples": 25
+        },
+        "service_ready_ms_single_observation": 15.415,
+        "warm_GetMenu_roundtrip": {
+          "median_ms": 0.786,
+          "p95_ms": 1.168,
+          "samples": 200
+        },
+        "backend_memory": {
+          "Rss_KiB": 15284,
+          "Pss_KiB": 8446,
+          "Private_Clean_KiB": 1108,
+          "Private_Dirty_KiB": 1880
+        },
+        "editor_memory_after_2s": {
+          "Rss_KiB": 81364,
+          "Pss_KiB": 73285,
+          "Private_Clean_KiB": 32332,
+          "Private_Dirty_KiB": 34284
+        },
+        "editor_mapped_memory_after_2s": {
+          "other_files": {
+            "Rss_KiB": 42108,
+            "Pss_KiB": 34031
+          },
+          "anonymous": {
+            "Rss_KiB": 18080,
+            "Pss_KiB": 18072
+          },
+          "Qt_Quick_Qml_KDE_files": {
+            "Rss_KiB": 21176,
+            "Pss_KiB": 21176
+          }
+        }
+      }
+    },
+    "custom_200_commands": {
+      "legacy_1.0.1": {
+        "fresh_cli_process": {
+          "median_ms": 90.326,
+          "p95_ms": 142.13,
+          "samples": 25
+        },
+        "service_ready_ms_single_observation": 165.316,
+        "warm_GetMenu_roundtrip": {
+          "median_ms": 13.739,
+          "p95_ms": 23.102,
+          "samples": 200
+        },
+        "backend_memory": {
+          "Rss_KiB": 41600,
+          "Pss_KiB": 28369,
+          "Private_Clean_KiB": 840,
+          "Private_Dirty_KiB": 15708
+        },
+        "editor_memory_after_2s": {
+          "Rss_KiB": 80312,
+          "Pss_KiB": 67654,
+          "Private_Clean_KiB": 25248,
+          "Private_Dirty_KiB": 31096
+        },
+        "editor_mapped_memory_after_2s": {
+          "other_files": {
+            "Rss_KiB": 44728,
+            "Pss_KiB": 33232
+          },
+          "anonymous": {
+            "Rss_KiB": 22204,
+            "Pss_KiB": 22196
+          },
+          "Python_PySide_files": {
+            "Rss_KiB": 13380,
+            "Pss_KiB": 12222
+          }
+        }
+      },
+      "native_2.0_dev": {
+        "fresh_cli_process": {
+          "median_ms": 10.455,
+          "p95_ms": 20.178,
+          "samples": 25
+        },
+        "service_ready_ms_single_observation": 13.361,
+        "warm_GetMenu_roundtrip": {
+          "median_ms": 5.049,
+          "p95_ms": 6.885,
+          "samples": 200
+        },
+        "backend_memory": {
+          "Rss_KiB": 15640,
+          "Pss_KiB": 8709,
+          "Private_Clean_KiB": 720,
+          "Private_Dirty_KiB": 2444
+        },
+        "editor_memory_after_2s": {
+          "Rss_KiB": 80028,
+          "Pss_KiB": 72079,
+          "Private_Clean_KiB": 32088,
+          "Private_Dirty_KiB": 33432
+        },
+        "editor_mapped_memory_after_2s": {
+          "other_files": {
+            "Rss_KiB": 41788,
+            "Pss_KiB": 33841
+          },
+          "anonymous": {
+            "Rss_KiB": 16912,
+            "Pss_KiB": 16904
+          },
+          "Qt_Quick_Qml_KDE_files": {
+            "Rss_KiB": 21328,
+            "Pss_KiB": 21328
+          }
+        }
+      }
+    }
+  },
+  "program_payload_bytes": {
+    "native_backend": 356416,
+    "native_editor": 482808,
+    "legacy_python_sources": 173531
+  }
+}

@@ -1,43 +1,110 @@
-# Reviewing and preparing releases
+# Publishing native 2.1.0 Stable
 
-Version **1.0.1** is the first public release. Keep the widget ID
-`org.openpowermenu.start` stable and preserve existing menu/panel settings.
-GitHub Releases is the source of truth for published versions and assets.
+Publication requires explicit owner approval of the exact source, qualification
+results and recorded physical-acceptance scope. Creating an integration PR or
+verifying assets does not authorize a merge, tag or release. The target is
+**2.1.0 Stable**. Keep v1.0.1, RC1 and RC2 unchanged.
 
-## Review gates
+## Source and qualification
 
-1. Confirm `main` includes merged PRs #8 and #9, with the current 1.0.1
-   gallery. PR #7 was reviewed and closed as superseded; do not replace the
-   newer captures with its historical gallery.
-2. Run [automated and physical checks](TESTING.md), including the
-   [1.0.1 release checklist](RELEASE-1.0.1.md). Verify real Manjaro Wayland
-   Desktop toggling, cross-window pointer dismissal and launcher/shortcut behavior.
-3. Test clean installation, upgrade, failure rollback and uninstall from the
-   extracted EZ package. Preserve custom menus, widget instances and recovery
-   history. Review exact archive checksums and contents before distribution.
-4. Publishing must be explicitly approved. The approved release commit uses
-   `release: publish v<version>` to trigger the guarded GitHub Actions release
-   workflow, which builds archives, verifies checksums, creates the tag and
-   uploads the complete EZ assets. KDE Store remains a separate process.
+Use a clean checkout of the exact reviewed commit. `native/VERSION` is `2.1.0`;
+the native packager stamps the installed widget with that version. The source
+widget's 1.0.1 metadata is retained for legacy compatibility tests. Root
+`install.sh`/`uninstall.sh` only explain supported native installation.
 
-## Build review artifacts
+The Tests workflow qualifies Manjaro, Debian 13 and Kubuntu 26.04 separately;
+Arch is an additional compatibility fixture, not a fourth advertised EZ target.
+Released 1.0.1/RC1/RC2 upgrade baselines stay pinned. All power endpoints are mocks.
+See [testing](TESTING.md) and [compatibility limits](COMPATIBILITY.md).
 
-```bash
-bash scripts/build-release.sh
-bash scripts/build-widget-only.sh
-(cd dist && sha256sum -c SHA256SUMS)
-unzip -t dist/OpenPowerMenu-EZ-v1.0.1.zip
-tar -tzf dist/OpenPowerMenu-EZ-v1.0.1.tar.gz
+Review branches produce `opm-2.1.0-review-<commit>` and
+`opm-2.1.0-stable-verified-<commit>` Actions artifacts. These are
+review downloads with a retention period, not persistent public releases. To
+collect completed same-run evidence locally, use a **new** output directory:
+
+```sh
+python3 scripts/stage-native-ez.py --evidence qualification-evidence \
+  --output review-assets --commit "$(git rev-parse HEAD)"
 ```
 
-The metadata version controls archive names, top-level directory and release-note
-selection. Python/CLI/D-Bus report the matching package version, covered by tests.
-The complete ZIP/TAR contain backend, widget, assets, screenshots, documentation
-and both installer wrappers. Widget-only packaging remains separate.
+`--publication` produces release content instead of `REVIEW-STATUS.md`. Collection
+never publishes or tags. It verifies source archive equality with `git archive`,
+package/bundle equivalence, sealed payload inventories, exact OS/version/CPU,
+complete keyboard/greeter/distribution evidence, minimal runtime and installed
+EZ activation, then reconstructs each EZ ZIP byte-for-byte from that committed
+wrapper and qualified native bundle. It rejects a nonempty output directory.
 
-The release workflow creates the tag from the exact approved source commit
-and attaches the complete EZ ZIP, TAR.GZ and SHA256SUMS. Do not replace
-published versioned assets with different contents. The widget-only archive
-is separate and must not be advertised as a complete installer.
+## Complete stable asset set
 
-See [KDE Store](KDE-STORE.md) before considering that separate distribution path.
+- Three EZ ZIPs: Manjaro, Debian13 and Kubuntu26.04, x86_64.
+- Three matching native `.tar.gz` bundles and the Manjaro `.pkg.tar.zst`.
+- Source `.tar.gz` and an external `.sha256` for each of the eight archives.
+- `SOURCE-COMMIT`, `RELEASE-NOTES.md`, `QUALIFICATION.json`,
+  `RELEASE-MANIFEST.json` and aggregate `SHA256SUMS`.
+
+The 21-file set is enforced, including matching distribution payload hashes in
+qualification evidence. `QUALIFICATION.json` records actual package inventories,
+mock request counts, held-key cases, greeter results and the qualification run.
+It explicitly does not claim that automation establishes physical acceptance.
+Native bundles contain a concise installation guide with source-pinned links,
+license and current release notes. Historical reports remain in the source
+archive rather than masquerading as current installed instructions.
+
+## Approved stable publication
+
+After reviews and physical acceptance, merge only with owner approval. GitHub
+must have the manually dispatched **Publish approved 2.1.0 Stable** workflow on
+the default branch before it can be dispatched. Select the reviewed source ref,
+enter its exact 40-character commit, type `Publish v2.1.0 Stable`, and affirm
+physical acceptance. The workflow refuses a ref/approval mismatch, reruns the
+complete qualification matrix and consumes only artifacts from that same run.
+There is no push/tag/commit-message publication trigger.
+
+Preserve the approved source identity. A normal PR merge can retain the reviewed
+integration commit as an ancestor of `main`; the publisher may then select that
+unchanged release branch and exact commit. A squash, rebase or subsequent source
+edit creates a different commit and requires fresh qualification and approval.
+Never substitute a generated PR merge SHA for the reviewed push SHA in assets.
+
+Owner-reported Manjaro EZ installation and normal menu/Configure acceptance are
+limited evidence from the earlier installer build. They do not establish real
+power-action or physical held-key safety, or acceptance of every later commit.
+`QUALIFICATION.json` and release notes retain that distinction. The workflow's
+physical-acceptance input must not be inferred from a green automated run.
+
+`scripts/publish-stable-release.py` defaults to verification only. Actual
+publication additionally requires `--publish`, an exact `--approved-commit` and
+`--physical-acceptance-approved`. The workflow is its supported invocation.
+
+The publisher refuses an existing stable tag or release, creates a draft with
+Prerelease false, uploads exactly the qualified set, downloads every uploaded
+asset and verifies bytes/checksums again. After verification it pins the tag to
+the approved commit, rechecks draft state and assets, then publishes with
+`draft=false`, `prerelease=false`, `make_latest=true`. It verifies GitHub's Latest
+response. Published links are persistent GitHub Release downloads:
+
+`https://github.com/BB7Networks/Open-Power-Menu/releases/tag/v2.1.0`
+
+## Failure handling and readiness limits
+
+A failed upload/download/verification leaves a draft, never a partial public
+release. No automatic deletion, forced tags or overwrite is allowed. If a final
+API call fails, inspect the release and tag before retrying: the tag may already
+exist, or GitHub may have accepted publication despite a response failure.
+Review and explicitly authorize any cleanup; the normal rerun refuses existing
+state. Restore permissions/network access rather than treating HTTP errors as
+an absent release.
+
+Tests substitute a fake GitHub transport for missing approval, existing history,
+403s, corrupt/incomplete assets, upload/download failures and concurrent metadata
+or tag changes. These tests verify the mutation order and Stable/Latest flags;
+they do not prove a live publication. Verification-only runs never create a
+draft, tag or public release. Exact-source and publication approval remain
+separate from automated qualification.
+
+Archived [legacy](history/releases/publish-legacy-release.yml.txt) and
+[prerelease](history/releases/publish-native-prerelease.yml.txt) publishers are
+historical text. Their original tags retain the original workflows. See the
+[final integration review](maintenance/FINAL-INTEGRATION.md) for the current
+review boundary and the earlier [cleanup record](maintenance/PHASE2-CLEANUP.md)
+for historical evidence.

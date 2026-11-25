@@ -1,0 +1,67 @@
+name: Publish approved 2.1.0 Stable
+on:
+  workflow_dispatch:
+    inputs:
+      approved_commit:
+        description: Exact reviewed 40-character source commit (must match selected branch)
+        required: true
+        type: string
+      approval:
+        description: Type Publish v2.1.0 Stable after cleanup, documentation and release review
+        required: true
+        type: string
+      physical_acceptance:
+        description: Physical workstation acceptance has passed for this source
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: publish-v2.1.0-stable
+  cancel-in-progress: false
+jobs:
+  authorization:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require explicit reviewed source and physical acceptance
+        env:
+          APPROVED_COMMIT: ${{ inputs.approved_commit }}
+          APPROVAL: ${{ inputs.approval }}
+          PHYSICAL_ACCEPTANCE: ${{ inputs.physical_acceptance }}
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from pathlib import Path
+          assert re.fullmatch('[0-9a-f]{40}', os.environ['APPROVED_COMMIT'])
+          assert os.environ['APPROVED_COMMIT'] == os.environ['GITHUB_SHA']
+          assert os.environ['APPROVAL'] == 'Publish v2.1.0 Stable'
+          assert os.environ['PHYSICAL_ACCEPTANCE'] == 'true'
+          assert Path('native/VERSION').read_text().strip() == '2.1.0'
+          PY
+  qualification:
+    needs: authorization
+    uses: ./.github/workflows/tests.yml
+  publish:
+    needs: qualification
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: opm-*-${{ github.sha }}
+          path: qualification-evidence
+      - name: Verify exact source and qualified distribution payloads
+        run: |
+          python3 scripts/stage-native-ez.py --publication --evidence qualification-evidence --output stable-assets --commit "$GITHUB_SHA"
+          python3 scripts/publish-stable-release.py --assets stable-assets --commit "$GITHUB_SHA"
+      - name: Upload to draft, download and verify, then mark Stable and Latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVED_COMMIT: ${{ inputs.approved_commit }}
+        run: |
+          python3 scripts/publish-stable-release.py --assets stable-assets --commit "$GITHUB_SHA" \
+            --publish --approved-commit "$APPROVED_COMMIT" --physical-acceptance-approved

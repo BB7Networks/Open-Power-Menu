@@ -17,6 +17,29 @@ def library(name, exports):
     return f'const {name} = (() => {{\n{source}\nreturn {{{exports}}};\n}})();\n'
 
 
+def test_aero_light_icon_contrast_policy():
+    if not shutil.which('node'):
+        pytest.skip('Node is required for QML JavaScript tests')
+    code = 'const assert=require("node:assert/strict");\n'
+    code += library('IconContrast', 'shouldMask') + r'''
+const check=IconContrast.shouldMask;
+for (const icon of ['view-list-details','computer','network-wired','drive-harddisk',
+                    'system-search','network-server','system-shutdown','system-lock-screen',
+                    'go-next-symbolic']) {
+    assert.equal(check('aero-light',icon), true, icon);
+    assert.equal(check('native',icon), false, icon);
+    assert.equal(check('aero',icon), false, icon);
+}
+for (const icon of ['system-file-manager','battery','utilities-system-monitor',
+                    'preferences-system','applications-other','user-desktop',
+                    '/tmp/art.png','file:///tmp/art.svg','']) {
+    assert.equal(check('aero-light',icon), false, icon);
+}
+'''
+    result = subprocess.run(['node','-e',code],capture_output=True,text=True,timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_draft_and_controller_behavior():
     if not shutil.which('node'):
         pytest.skip('Node is required for QML JavaScript tests')
@@ -53,7 +76,7 @@ assert.equal(Draft.nextIndex(visible,2,-1,false),3);
 assert.equal(Draft.nextIndex(visible,-1,1,true),0);
 assert.equal(Draft.nextIndex([{kind:'separator'}],-1,1,false),-1);
 let requests=[],fetches=0;
-const root={layoutDraft:null,layoutBusy:false,layoutExpired:false,layoutEpoch:0,menuFetchEpoch:0,
+const root={setPowerExpanded(value){expanded=value},layoutDraft:null,layoutBusy:false,layoutExpired:false,layoutEpoch:0,menuFetchEpoch:0,
  layoutStatus:'',menuStatus:'',expanded:true,
  send(service,path,iface,method,args,done){requests.push({method,args,done})},fetchMenu(){fetches++}};
 assert.equal(root.layoutDraft,null); // locked default
@@ -96,15 +119,21 @@ for(let i=0;i<5;i++){
  assert.equal(root.layoutDraft,null);
 }
 '''
-    code += '\n' + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
+    code += '\n' + function((UI / 'main.qml').read_text(), 'finishRun') + function((UI / 'main.qml').read_text(), 'runItem') + function((UI / 'main.qml').read_text(), 'startNativeRun') + function((UI / 'main.qml').read_text(), 'launchItem') + r'''
 let layoutEditing=true,layoutBusy=false,launchPending=false,menuSwitchEpoch=0,commandError='',expanded=true;
-function send(...args){root.send(...args)}
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else root.send(...args)}
+let activationPoll={restarts:0,restart(){this.restarts++}};
 launchItem('0'); assert.equal(requests.length,0);
 layoutEditing=false;layoutBusy=true;launchItem('0');assert.equal(requests.length,0);
-layoutBusy=false;launchItem('0');assert.equal(requests[0].method,'Run');
-requests.shift().done(true,false);assert.equal(expanded,true);assert.match(commandError,/Could not start/);
-launchItem('0');requests.shift().done(true,true);assert.equal(expanded,false);
-expanded=true;launchItem('0');menuSwitchEpoch++;requests.shift().done(true,true);
+layoutBusy=false;launchItem('0');assert.equal(requests[0].method,'StartRun');
+requests.shift().done(true,JSON.stringify({state:'finished',ok:false,error:'Permission denied'}));assert.equal(expanded,true);assert.equal(commandError,'Permission denied');
+assert.equal(requests.length,0); // no service-global LastError race
+launchItem('0');requests.shift().done(true,JSON.stringify({state:'pending',operation:'own-request'}));
+assert.equal(activationPoll.operation,'own-request');assert.equal(activationPoll.restarts,1);assert.equal(launchPending,true);
+launchItem('0');assert.equal(requests.length,0); // duplicate guarded while pending
+finishRun({ok:false,error:'Cancelled'},menuSwitchEpoch);assert.equal(launchPending,false);
+launchItem('0');requests.shift().done(true,JSON.stringify({state:'finished',ok:true}));assert.equal(expanded,false);
+expanded=true;launchItem('0');menuSwitchEpoch++;requests.shift().done(true,JSON.stringify({state:'finished',ok:true}));
 assert.equal(expanded,true); // stale launch callback cannot close a newer popup
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
@@ -118,26 +147,27 @@ def test_locked_popup_and_flyout_keyboard_handlers():
     side = (UI / 'SideFlyout.qml').read_text()
     handlers = ''
     for name, source in [('mainKeys', main), ('sideKeys', side)]:
-        start = source.rindex('Keys.onPressed: event =>')
+        start = source.rindex('function handleKey(event)')
         handlers += f'function {name}(event) ' + braced(source, source.index('{', start)) + '\n'
     code = 'const assert=require("node:assert/strict");\n'
-    code += library('LayoutDraft', 'nextIndex') + handlers + r'''
+    code += library('AccessKeys', 'index, editable') + library('LayoutDraft', 'nextIndex') + handlers + r'''
 const Qt=Object.fromEntries(['Up','Down','Right','Left','Return','Enter','Escape'].map(k=>['Key_'+k,k]));
-let opens=0,launches=[],returned=0,childClosed=0,childFocused=0;
+let opens=0,launches=[],returned=0,childClosed=0,childFocused=0,parentKeys=0;
 let activeIndex=-1;
 const entries=[{kind:'separator'},{kind:'command',enabled:false,key:'disabled'},
  {kind:'submenu',key:'group'},{kind:'command',key:'command'}];
 const rows=entries.map((entry,i)=>({entry,y:i*28,height:28,
  openChild(){opens++},childPopup:{focusFirst(){childFocused++}}}));
-const root={visibleEntries:entries,layoutEditing:false,layoutBusy:false,launchPending:false,
+const root={expanded:true,keyboardInputReady:true,visibleEntries:entries,layoutEditing:false,layoutBusy:false,launchPending:false,
  launchItem(key){launches.push(key)}};
 const autoDismiss={keyboardUsed(){}};
-const flyout={keyboardUsed(){},entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
- closeChild(){childClosed++},returnToParent(){returned++},triggered(key){launches.push(key)}};
+const popup={Window:{window:{activeFocusItem:null}}};
+const flyout={inputGuard:{ready:true},keyboardUsed(){},entries,activeIndex:-1,visible:true,focusFirst(){childFocused++},
+ closeChild(){childClosed++},returnToParent(){returned++},keyToParent(){parentKeys++},triggered(key){launches.push(key)}};
 const normalRows={itemAt(i){return rows[i]}},flyoutRows=normalRows;
 const menuScroll={contentItem:{contentY:0},availableHeight:55},viewport=menuScroll;
 function showFlyout(){opens++}
-function key(handler,key){const e={key,accepted:false};handler(e);return e}
+function key(handler,key){const e={key,modifiers:0,isAutoRepeat:false,accepted:false};handler(e);return e}
 key(mainKeys,'Down');assert.equal(activeIndex,2);assert.equal(flyout.visible,false);
 assert.equal(menuScroll.contentItem.contentY,29);
 key(mainKeys,'Right');assert.equal(opens,1);assert.equal(childFocused,1);
@@ -150,13 +180,14 @@ root.layoutEditing=true;assert.equal(key(mainKeys,'Return').accepted,false);
 root.layoutEditing=false;root.layoutBusy=true;key(mainKeys,'Return');
 root.layoutBusy=false;root.launchPending=true;key(mainKeys,'Return');
 assert.equal(launches.length,1);
+flyout.visible=true;
 key(sideKeys,'Down');assert.equal(flyout.activeIndex,2);assert.equal(childClosed,1);
 key(sideKeys,'Right');assert.equal(opens,2);assert.equal(childFocused,2);
 key(sideKeys,'Down');assert.equal(flyout.activeIndex,3);
 key(sideKeys,'Enter');assert.deepEqual(launches,['command','command']);
 flyout.visible=true;key(sideKeys,'Left');assert.equal(returned,1);assert.equal(flyout.visible,false);
 flyout.visible=true;key(sideKeys,'Escape');assert.equal(returned,2);assert.equal(flyout.visible,false);
-flyout.activeIndex=1;key(sideKeys,'Return');assert.equal(launches.length,2);
+flyout.activeIndex=1;key(sideKeys,'Return');assert.equal(launches.length,2);assert.equal(parentKeys,1);
 '''
     result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stdout + result.stderr
@@ -168,6 +199,7 @@ def test_icon_preference_transport_defaults_and_recovery():
     code = 'const assert=require("node:assert/strict");\n'
     code += function((UI / 'main.qml').read_text(), 'fetchIntegration')
     code += r'''
+let integrationFetching=false,integrationCallbacks=[];
 let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
 let response={},ok=true;
 function send(service,path,iface,method,args,callback){callback(ok,JSON.stringify(response))}
@@ -189,19 +221,98 @@ def test_desktop_dispatch_waits_for_popup_close_and_cancels_stale_request():
     from test_v0416_popup_handoff import timer_handler
     source=(UI/'main.qml').read_text()
     code='const assert=require("node:assert/strict");\n'
-    code+=function(source,'runItem')+function(source,'launchItem')
+    code+=function(source,'finishRun')+function(source,'runItem')+function(source,'startNativeRun')+function(source,'launchItem')
     code+=timer_handler(source,'desktopCloseSettle').replace('function settleTick()', 'function desktopTick()')
     code+=r'''
 let layoutEditing=false,layoutBusy=false,launchPending=false,commandError='',expanded=true,menuSwitchEpoch=1;
 let sent=[],waiting=0;
-const root={runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
+const root={setPowerExpanded(value){expanded=value},runItem, get menuSwitchEpoch(){return menuSwitchEpoch},set launchPending(v){launchPending=v}};
 const desktopCloseSettle={key:'',epoch:-1,restart(){waiting++}};
-function send(...args){sent.push(args)}
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else sent.push(args)}
 launchItem('desktop',true);assert.equal(expanded,false);assert.equal(sent.length,0);assert.equal(waiting,1);
 let {key,epoch}=desktopCloseSettle;desktopTick();assert.equal(sent.length,1);
-sent.shift().at(-1)(true,true);assert.equal(launchPending,false);
+sent.shift().at(-1)(true,JSON.stringify({state:'finished',ok:true}));assert.equal(launchPending,false);
 expanded=true;launchItem('desktop',true);({key,epoch}=desktopCloseSettle);menuSwitchEpoch++;
 desktopTick();assert.equal(sent.length,0);assert.equal(launchPending,false);
 '''
     result=subprocess.run(['node','-e',code],capture_output=True,text=True,timeout=15)
     assert result.returncode==0,result.stdout+result.stderr
+
+
+def test_async_activation_poll_reports_only_its_operation_and_never_retries():
+    if not shutil.which('node'):
+        pytest.skip('Node required')
+    from test_v0416_popup_handoff import timer_handler
+    source = (UI / 'main.qml').read_text()
+    code = 'const assert=require("node:assert/strict");\n'
+    code += 'const root={setPowerExpanded(value){expanded=value}};\n'
+    code += function(source, 'finishRun')
+    code += timer_handler(source, 'activationPoll').replace('function settleTick()', 'function activationTick()')
+    code += r'''
+let launchPending=true, menuSwitchEpoch=7, expanded=true, commandError='';
+let operation='request-a', epoch=7, deadline=Date.now()+10000, sent=[];
+const activationPoll={restarts:0,restart(){this.restarts++}};
+function send(...args){if(args[3]==='Introspect')args.at(-1)(true, '<method name="StartRun"/>');else sent.push(args)}
+activationTick(); assert.equal(sent[0][3],'RunResult'); assert.deepEqual(sent[0][4],['request-a']);
+sent.shift().at(-1)(true,JSON.stringify({state:'pending'}));
+assert.equal(activationPoll.restarts,1); assert.equal(launchPending,true);
+activationTick(); sent.shift().at(-1)(true,JSON.stringify({state:'finished',ok:false,error:'Cancelled by policy'}));
+assert.equal(launchPending,false); assert.equal(commandError,'Cancelled by policy'); assert.equal(expanded,true);
+launchPending=true; activationTick(); sent.shift().at(-1)(false,'');
+assert.match(commandError,/uncertain/); assert.equal(sent.length,0); assert.equal(activationPoll.restarts,1);
+launchPending=true; deadline=0; activationTick(); sent.shift().at(-1)(true,JSON.stringify({state:'pending'}));
+assert.match(commandError,/unresolved/); assert.equal(launchPending,false); assert.equal(activationPoll.restarts,1);
+launchPending=true; activationTick(); sent.shift().at(-1)(true,'null');
+assert.equal(launchPending,false); assert.match(commandError,/Invalid/);
+'''
+    result = subprocess.run(['node', '-e', code], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_frontend_protocol_probe_and_legacy_rollback_never_retry():
+    if not shutil.which('node'): pytest.skip('Node required')
+    source = (UI/'main.qml').read_text()
+    code = 'const assert=require("node:assert/strict");\n'
+    code += 'const root={setPowerExpanded(value){expanded=value}};\n'
+    for name in ['runItem','startNativeRun','finishRun']:
+        code += function(source,name)
+    code += r'''
+let launchPending=true,menuSwitchEpoch=1,expanded=true,commandError='';
+let requests=[];
+function send(...args){requests.push(args)}
+runItem('protected-key',1);assert.equal(requests[0][3],'Introspect');
+requests.shift().at(-1)(true, '<interface name="org.openpowermenu.Service"><method name="Run"/></interface>');
+assert.equal(requests[0][3],'Run');assert.deepEqual(requests[0][4],['protected-key']);
+requests.shift().at(-1)(true,true);assert.equal(expanded,false);
+expanded=true;launchPending=true;
+runItem('key',1);requests.shift().at(-1)(true, '<method name="StartRun"/>');
+assert.equal(requests[0][3],'StartRun');requests.shift().at(-1)(false,'owner disappeared');
+assert.equal(requests.length,0);assert.equal(expanded,true);assert.match(commandError,/do not automatically retry/);
+for(const reply of [[false,''],[true,'<interface/>']]) {
+ runItem('key',1);requests.shift().at(-1)(...reply);assert.equal(requests.length,0);
+}
+runItem('stale',1);menuSwitchEpoch=2;
+requests.shift().at(-1)(true,'<method name="Run"/>');assert.equal(requests.length,0);
+'''
+    result = subprocess.run(['node','-e',code], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_saved_height_preferences_poll_without_restart():
+    if not shutil.which('node'): pytest.skip('Node required')
+    source=(UI/'main.qml').read_text()
+    code='const assert=require("node:assert/strict");\n'+function(source,'fetchIntegration')
+    code+=r'''
+let integrationFetching=false,integrationCallbacks=[];
+let launcherAppletId=0,hideOriginalLauncherRequested=false,buttonIconMode='',customButtonIcon='',menuAppearance='',showMenuIcons=true,autoCloseOnPointerLeave=false;
+let menuHeightPreference={mode:'auto',height:600},menuDensity='standard';
+let response={menu_height_mode:'custom',menu_custom_height:910,menu_density:'compact'};
+function send(service,path,iface,method,args,callback){assert.equal(method,'GetIntegration');callback(true,JSON.stringify(response))}
+function synchronizeLauncherVisibility(){} function releaseMask(){}
+fetchIntegration();assert.equal(menuHeightPreference.mode,'custom');assert.equal(menuHeightPreference.height,910);
+response.menu_density='comfortable';fetchIntegration();assert.equal(menuDensity,'comfortable');assert.equal(menuHeightPreference.height,910);
+response.menu_height_mode='auto';fetchIntegration();assert.equal(menuHeightPreference.mode,'auto');assert.equal(menuHeightPreference.height,910);
+response={};fetchIntegration();assert.equal(menuHeightPreference.mode,'auto');assert.equal(menuHeightPreference.height,600);
+'''
+    result=subprocess.run(['node','-e',code],capture_output=True,text=True)
+    assert result.returncode==0,result.stderr

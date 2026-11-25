@@ -1,0 +1,43 @@
+$ sha256sum -c OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip.sha256
+OpenPowerMenu-EZ-v2.1.0-Debian13-x86_64.zip: OK
+
+$ bash install.sh --check
+
+Open Power Menu 2.1.0 — Debian 13 KDE Plasma 6 / x86_64
+Verified native EZ installer. Application setup runs only for your user.
+open-power-menu-native 2.1.0
+Open Power Menu Configure 2.1.0
+open-power-menu-standalone 2.1.0
+KDE Plasma 6.3.6-2 (installed package)
+Warning: fallback to QtQuick software backend.
+kf.config.core: Watching absolute paths is not supported "/tmp/tmp.CUI4Rjype9/menu.json"
+Archive and runtime checks passed. No application files were installed.
+
+$ bash install.sh
+
+Open Power Menu 2.1.0 — Debian 13 KDE Plasma 6 / x86_64
+Verified native EZ installer. Application setup runs only for your user.
+open-power-menu-native 2.1.0
+Open Power Menu Configure 2.1.0
+open-power-menu-standalone 2.1.0
+KDE Plasma 6.3.6-2 (installed package)
+Warning: fallback to QtQuick software backend.
+kf.config.core: Watching absolute paths is not supported "/tmp/tmp.IDCifm7zdn/menu.json"
+New user-local installation.
+Settings, custom commands, shortcuts and panel layout are preserved.
+Power actions may execute immediately. Custom power commands keep their explicit behavior.
+Proceed with install? [y/N]: y
+Native transaction committed: dd3c3a458f42459aa1fb16518d61b957
+Snapshots retained; configuration, panels and shortcuts preserved.
+OPM updated successfully
+Updated widget code is installed. Your running Plasma session may still be using the previous interface. Sign out and back in when convenient to activate it. You can defer and keep working. No desktop reload or logout has been performed. Ordinary settings changes need no restart. After rollback to 1.0.1, an older cached 2.1 frontend may need that sign-in before commands work.
+Later: I'll log out and back in myself.
+
+Installed. For a new setup: panel → Add Widgets → Open Power Menu Start Button.
+For an upgrade, keep the existing applet and original launcher. Do not recreate the panel.
+If Plasma has cached an older widget, sign out and back in when convenient. No session restart was performed.
+
+Retain this extracted archive. Recovery: bash install.sh --recover
+Rollback: bash install.sh --rollback    Uninstall: bash install.sh --uninstall
+Personal configuration and recovery history are retained. See README-INSTALL.md.
+

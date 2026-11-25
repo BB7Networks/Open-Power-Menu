@@ -16,7 +16,9 @@ users' information in issues.
 
 Run `python3 -m pytest -q -ra` before sending changes; see [TESTING.md](TESTING.md)
 for optional Qt/D-Bus checks and the live desktop acceptance matrix. Report
-skips and manual checks separately. The adapter architecture
-is described in `ADAPTERS.md`; keep launcher-specific behavior out of the
+skips and manual checks separately. Run `python3 scripts/audit-repository.py` for the inventory, protected-file and
+local-link checks. Native source builds and the full CI matrix are documented in
+[development](../native/README.md) and [testing](TESTING.md). The shared adapters
+are in `plasmoid/contents/ui/adapters/`; keep launcher-specific behavior out of the
 normal Plasma adapter. Preserve the reversible HiddenStatus behavior and do
 not remove users' existing launchers or rewrite the panel configuration.
