@@ -74,12 +74,7 @@ jobs:
           docker rm "$container"
       - name: Provide software rendering buffers on the disposable Manjaro runner
         if: matrix.session_profile == 'manjaro-wayland'
-        run: |
-          sudo modprobe udmabuf
-          test -c /dev/udmabuf
-          sudo chgrp 1000 /dev/udmabuf
-          sudo chmod 0660 /dev/udmabuf
-          ls -l /dev/udmabuf
+        run: bash native/tests/prepare-ci-renderer.sh
       - name: Qualify every supported private session on the target distro
         shell: bash
         run: |
