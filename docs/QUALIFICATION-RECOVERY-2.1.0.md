@@ -98,6 +98,15 @@ same, so journal-default Qt builds expose the samples those tests consume.
 The parent also prints the saved pre-teardown failure record explicitly before
 bounded log tails, preventing X server warnings from crowding it out.
 
+The corrected Arch run subsequently passed both sessions' keyboard, greeter and
+startup suites plus popup crossing, then exposed a Debian-specific
+`kglobalacceld` path in dismissal setup. Dismissal now shares the keyboard
+fixture's existing lookup for PATH, Arch and Debian-family library locations.
+The pacman test image explicitly installs `xorg-xwininfo` and `xorg-xev`, the
+window observers used by that suite (provided by `x11-utils` on Debian/Kubuntu).
+Escape, outside-click and Meta+X assertions remain unchanged; no daemon is
+started on an existing desktop session.
+
 ## Evidence and qualification gates
 
 Fixtures record scenario, assertion, timestamps, mock requests, input/focus,

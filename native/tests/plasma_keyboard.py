@@ -250,11 +250,7 @@ def session(args):
         spawn([args.backend,'--service','--bus-name','org.openpowermenu.Service'],'backend.log')
         if args.platform=='xcb':
             spawn(['kwin_x11'],'kwin.log')
-            shortcut_daemon=shutil.which('kglobalacceld') or next((str(path) for path in
-                (Path('/usr/lib/kglobalacceld'),Path('/usr/libexec/kglobalacceld'),
-                 Path('/usr/lib/x86_64-linux-gnu/libexec/kglobalacceld')) if path.is_file()),None)
-            assert shortcut_daemon, 'kglobalacceld is required for the private Meta+X fixture'
-            spawn([shortcut_daemon],'shortcuts.log')
+            spawn([plasma_popup.shortcut_daemon()],'shortcuts.log')
         else:
             binary=case/'bin/kwin_wayland'; shutil.copyfile(shutil.which('kwin_wayland'),binary);binary.chmod(0o700)
             compositor=spawn([binary,'--virtual','--width','1280','--height','800','--no-lockscreen','--no-global-shortcuts','--socket',os.environ['WAYLAND_DISPLAY']],'kwin.log')

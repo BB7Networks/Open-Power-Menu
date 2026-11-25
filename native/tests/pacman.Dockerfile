@@ -15,7 +15,7 @@ RUN if [ -n "$OPM_ARCH_SNAPSHOT" ]; then \
 # its overall deadline instead of treating that transfer stall as a test fail.
 RUN pacman --disable-download-timeout -Syu --noconfirm --needed base-devel cmake ninja extra-cmake-modules \
     qt6-base qt6-declarative qt6-svg qt6-wayland kirigami kservice kconfig kde-cli-tools \
-    dbus python pyside6 unzip xorg-server-xvfb xorg-xauth xorg-xprop xdotool xterm qt6-tools \
+    dbus python pyside6 unzip xorg-server-xvfb xorg-xauth xorg-xprop xorg-xwininfo xorg-xev xdotool xterm qt6-tools \
     plasma-desktop plasma-workspace kwin discover dolphin konsole systemsettings powerdevil plasma-nm print-manager \
     plasma-systemmonitor kinfocenter ksystemlog partitionmanager virt-manager krdc && \
     case "$OPM_SESSION_PROFILE" in \
